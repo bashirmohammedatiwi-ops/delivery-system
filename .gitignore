@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Database (contains user data)
+data/*.db
+data/*.db-journal
+data/*.db-wal
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

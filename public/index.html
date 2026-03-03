@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>شركة ديما الحياة - نظام إدارة التوصيل</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- شاشة تسجيل الدخول -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <div class="login-logo">شركة ديما الحياة</div>
+            <p class="login-subtitle">نظام إدارة التوصيل</p>
+            <form id="login-form">
+                <div class="form-group">
+                    <label>اسم المستخدم</label>
+                    <input type="text" id="loginUsername" required autocomplete="username" placeholder="أدخل اسم المستخدم">
+                </div>
+                <div class="form-group">
+                    <label>كلمة السر</label>
+                    <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="أدخل كلمة السر">
+                </div>
+                <div id="loginError" class="login-error" style="display:none"></div>
+                <button type="submit" class="btn btn-primary btn-block" id="btnLogin">تسجيل الدخول</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- التطبيق الرئيسي -->
+    <div id="app-main" class="app" style="display:none">
+        <div class="app-body" id="appBody">
+            <button type="button" class="sidebar-toggle" id="sidebarToggle" title="إخفاء/إظهار القائمة" aria-label="إخفاء/إظهار القائمة">
+                <span class="sidebar-toggle-icon">◀</span>
+            </button>
+            <aside class="sidebar" id="sidebar">
+                <div class="logo">شركة ديما الحياة</div>
+                <div class="user-info" id="sidebarUserInfo"></div>
+                <nav class="nav" id="mainNav">
+                    <a href="#" data-screen="dashboard" class="nav-item active nav-admin">لوحة التحكم</a>
+                    <a href="#" data-screen="orders" class="nav-item">الطلبات</a>
+                    <a href="#" data-screen="new-order" class="nav-item">إدخال طلب جديد</a>
+                    <a href="#" data-screen="drivers" class="nav-item nav-admin">السائقين</a>
+                    <a href="#" data-screen="driver-receive" class="nav-item">استلام الطلبات</a>
+                    <a href="#" data-screen="driver-return" class="nav-item nav-admin">تبديل السائق</a>
+                    <a href="#" data-screen="driver-returned" class="nav-item nav-admin">طلب راجع</a>
+                    <a href="#" data-screen="reports" class="nav-item nav-admin">التقارير</a>
+                    <a href="#" data-screen="users" class="nav-item nav-admin">المستخدمين</a>
+                    <a href="#" data-screen="settings" class="nav-item nav-admin">الإعدادات</a>
+                </nav>
+                <button type="button" class="btn btn-secondary btn-logout" id="btnLogout">تسجيل الخروج</button>
+            </aside>
+            <main class="content">
+                <div id="screen-container"></div>
+            </main>
+        </div>
+        <footer class="app-footer">
+            <div class="app-footer-content">
+                <span class="app-footer-title">تم التطوير</span>
+                <span class="app-footer-dev">بشير محمد</span>
+                <span class="app-footer-dev">سلمان داود</span>
+                <span class="app-footer-sep">|</span>
+                <span class="app-footer-company">فضه للحلول البرمجية</span>
+                <span class="app-footer-tel">07735567009</span>
+                <span class="app-footer-sep">|</span>
+                <span class="app-footer-tel">07832593306</span>
+            </div>
+        </footer>
+    </div>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
