@@ -83,8 +83,7 @@ function getArabicFont(doc) {
     // 2) Linux
     const linuxFonts = [
         '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',
-        '/usr/share/fonts/truetype/fonts-arabic/'
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'
     ];
     for (const fp of linuxFonts) {
         if (fs.existsSync(fp)) {
@@ -138,7 +137,8 @@ async function createLabelPDF(order) {
     });
 
     const font = getArabicFont(doc);
-    doc.font(font);
+    const setArabic = () => doc.font(font);
+    const setNumeric = () => doc.font('Helvetica');
     const MARGIN = 6;
     const cw = w - MARGIN * 2;
     const GAP = 2;
@@ -147,6 +147,7 @@ async function createLabelPDF(order) {
 
     doc.rect(MARGIN, MARGIN, cw, h - MARGIN * 2).lineWidth(1).strokeColor(BLACK).stroke();
 
+    setArabic();
     // ─── هيدر: شركة ديما الحياة (بنفس أسلوب PDF) ───
     const headerH = 36;
     doc.rect(MARGIN, y, cw, headerH).fill(COLORS.headerBg);
@@ -175,7 +176,9 @@ async function createLabelPDF(order) {
     const qrData = await generateQRBase64(order.ShipmentNumber);
     doc.image(qrData, MARGIN + barW + GAP + (qrW - 36) / 2, y + 2, { width: 36 });
     doc.fillColor(BLACK).fontSize(7);
+    setNumeric();
     doc.text(order.ShipmentNumber, MARGIN + barW + GAP + 4, y + 28, { width: qrW - 8, align: 'right' });
+    setArabic();
     y += barH + GAP;
 
     // ─── جدول البيانات: أسلوب PDF (حدود، ألوان، doc.text مع width و align) ───
@@ -195,14 +198,17 @@ async function createLabelPDF(order) {
     function drawLabelCell(x, cellW, cellH, text) {
         doc.rect(x, y, cellW, cellH).fill(COLORS.labelBg);
         doc.rect(x, y, cellW, cellH).lineWidth(0.4).strokeColor(BLACK).stroke();
-    doc.fillColor(BLACK).fontSize(7);
-    textRTL(doc, text + ':', x + 4, y + (cellH - 10) / 2 + 2, { width: cellW - 8, align: 'right' });
+        setArabic();
+        doc.fillColor(BLACK).fontSize(7);
+        textRTL(doc, text + ':', x + 4, y + (cellH - 10) / 2 + 2, { width: cellW - 8, align: 'right' });
     }
 
-    function drawValueCell(x, cellW, cellH, text, alt, noRev, noWrap) {
+    function drawValueCell(x, cellW, cellH, text, alt, noRev, noWrap, isNumeric) {
         const bg = alt ? COLORS.rowAlt : COLORS.rowNormal;
         doc.rect(x, y, cellW, cellH).fill(bg);
         doc.rect(x, y, cellW, cellH).lineWidth(0.4).strokeColor(BLACK).stroke();
+        if (isNumeric) setNumeric();
+        else setArabic();
         const str = String(text ?? '-').slice(0, 40);
         doc.fillColor(BLACK).fontSize(9);
         const cy = y + (cellH - 11) / 2 + 2;
@@ -214,41 +220,49 @@ async function createLabelPDF(order) {
         } else {
             textRTL(doc, str, x + 4, cy, { width: cellW - 8, align: 'right' });
         }
+        setArabic();
     }
 
-    function row2(lbl1, val1, lbl2, val2, noRev1, noRev2, alt, val2NoWrap) {
+    function row2(lbl1, val1, lbl2, val2, noRev1, noRev2, alt, val2NoWrap, val1Numeric, val2Numeric) {
         const x1 = MARGIN;
         const x2 = MARGIN + valW + GAP;
         const x3 = MARGIN + halfW + GAP;
         const x4 = MARGIN + halfW + valW + GAP * 2;
 
         drawLabelCell(x4, labelW, rh, lbl1);
-        drawValueCell(x3, valW, rh, val1, alt, noRev1);
+        drawValueCell(x3, valW, rh, val1, alt, noRev1, false, val1Numeric);
         drawLabelCell(x2, labelW, rh, lbl2);
-        drawValueCell(x1, valW, rh, val2, alt, noRev2, val2NoWrap);
+        drawValueCell(x1, valW, rh, val2, alt, noRev2, val2NoWrap, val2Numeric);
         y += rh + ROW_GAP;
     }
 
-    function row1(lbl, val, noRev, emphasize) {
+    function row1(lbl, val, noRev, emphasize, valNumeric) {
         doc.rect(MARGIN, y, cw, rh).fill(emphasize ? COLORS.tableHeader : COLORS.rowNormal);
         doc.rect(MARGIN, y, cw, rh).lineWidth(0.4).strokeColor(BLACK).stroke();
         if (emphasize) {
+            setArabic();
             doc.fillColor(COLORS.headerText).fontSize(9);
             textRTL(doc, lbl + ':', MARGIN + cw - 101, y + (rh - 12) / 2 + 2, { width: 95, align: 'right' });
             doc.fontSize(11);
+            if (valNumeric) setNumeric();
             textRTL(doc, String(val ?? '-').slice(0, 60), MARGIN + 6, y + (rh - 12) / 2, { width: cw - 116, align: 'left' });
+            setArabic();
         } else {
             doc.rect(MARGIN + cw - 90, y, 90, rh).fill(COLORS.labelBg);
+            setArabic();
             doc.fillColor(COLORS.labelText).fontSize(7);
             textRTL(doc, lbl + ':', MARGIN + cw - 86, y + (rh - 10) / 2 + 2, { width: 82, align: 'right' });
             doc.fillColor(COLORS.valueText).fontSize(9);
+            if (valNumeric) setNumeric();
             textRTL(doc, String(val ?? '-'), MARGIN + 6, y + (rh - 10) / 2 + 2, { width: cw - 100, align: 'right' });
+            setArabic();
         }
         y += rh + ROW_GAP;
     }
 
+    setArabic();
     let alt = false;
-    row2('المتجر', order.StoreName, 'هاتف المتجر', order.StorePhone, false, true, alt);
+    row2('المتجر', order.StoreName, 'هاتف المتجر', order.StorePhone, false, true, alt, false, false, true);
     alt = !alt;
 
     doc.rect(MARGIN, y, cw, rh).fill(COLORS.labelBg);
@@ -265,24 +279,24 @@ async function createLabelPDF(order) {
     y += rh + ROW_GAP;
     alt = !alt;
 
-    row2('اسم المستلم', order.CustomerName, 'هاتف المستلم', order.CustomerPhone, false, true, alt);
+    row2('اسم المستلم', order.CustomerName, 'هاتف المستلم', order.CustomerPhone, false, true, alt, false, false, true);
     alt = !alt;
 
     const driverDelivery = order.FreeDelivery ? (order.WaivedDeliveryIQD || 0) : (order.DeliveryFeeIQD || 0);
     const deliveryText = order.FreeDelivery ? 'مجاني' : formatIQD(driverDelivery) + ' د.ع';
-    row2('مبلغ الفاتورة', formatIQD(order.AmountIQD) + ' د.ع', 'مبلغ التوصيل', deliveryText, true, true, alt, true);
+    row2('مبلغ الفاتورة', formatIQD(order.AmountIQD) + ' د.ع', 'مبلغ التوصيل', deliveryText, true, true, alt, true, true, true);
     alt = !alt;
 
-    row1('المبلغ النهائي', formatIQD(order.TotalIQD) + ' دينار عراقي', true, true);
+    row1('المبلغ النهائي', formatIQD(order.TotalIQD) + ' دينار عراقي', true, true, true);
 
     if (hasNotes) {
-        row1('الملاحظات', order.Notes.trim().slice(0, 80), false, false);
+        row1('الملاحظات', order.Notes.trim().slice(0, 80), false, false, false);
     }
 
     const dateStr = (order.CreatedDate || new Date().toISOString()).replace('T', ' ').slice(0, 19);
-    row2('عدد القطع', String(order.Pieces || 1), 'تاريخ الشحنة', dateStr, true, true, alt);
+    row2('عدد القطع', String(order.Pieces || 1), 'تاريخ الشحنة', dateStr, true, true, alt, false, true, true);
     alt = !alt;
-    row2('رقم الطلب', order.AdminOrderNo ?? '-', 'رقم الشحنة', order.ShipmentNumber, true, true, alt);
+    row2('رقم الطلب', order.AdminOrderNo ?? '-', 'رقم الشحنة', order.ShipmentNumber, true, true, alt, false, true, true);
 
     doc.end();
     return pdfPromise;

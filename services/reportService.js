@@ -167,7 +167,7 @@ function drawHeader(doc, title, subtitle, font) {
 }
 
 // ─── رسم بطاقات المعلومات (شكل Excel) ───
-function drawCards(doc, cards, y) {
+function drawCards(doc, cards, y, font) {
     const gap = 10;
     const n = cards.length;
     const cardW = (PAGE_WIDTH - MARGIN * 2 - gap * (n - 1)) / n;
@@ -175,10 +175,12 @@ function drawCards(doc, cards, y) {
     cards.forEach((c, i) => {
         const x = PAGE_WIDTH - MARGIN - (i + 1) * (cardW + gap) + gap;
         doc.rect(x, y, cardW, cardH).fillAndStroke(COLORS.rowNormal, COLORS.gridLine);
-        doc.fillColor(COLORS.textMuted).fontSize(FONT_SM);
+        doc.font(font).fillColor(COLORS.textMuted).fontSize(FONT_SM);
         textRTL(doc, txt(c.label), x + 8, y + 6, { width: cardW - 16, align: 'right' });
+        if (c.numeric) doc.font('Helvetica');
         doc.fillColor(COLORS.text).fontSize(FONT_MD);
         textRTL(doc, String(c.value), x + 8, y + 20, { width: cardW - 16, align: 'right' });
+        doc.font(font);
     });
 }
 
@@ -206,14 +208,17 @@ function drawTableHead(doc, columns, y, font, compact) {
     return headerH;
 }
 
-function getTableRowHeight(doc, columns, cells, font, fontSize) {
-    doc.font(font).fontSize(fontSize ?? FONT_TBL);
+function getTableRowHeight(doc, columns, cells, font, fontSize, numericIndices) {
     const lineH = doc.currentLineHeight();
     let maxH = ROW_H_MIN;
     columns.forEach((col, i) => {
         const str = String(cells[i] ?? '-');
         const cellW = Math.max(10, col.width - 6);
+        const useNum = numericIndices && numericIndices.includes(i);
+        if (useNum) doc.font('Helvetica').fontSize(fontSize ?? FONT_TBL);
+        else doc.font(font).fontSize(fontSize ?? FONT_TBL);
         const lines = wrapRTL(doc, str, cellW);
+        doc.font(font);
         const h = lines.length * lineH;
         const needH = Math.ceil(Math.max(h, lineH)) + CELL_PAD * 2;
         if (needH > maxH) maxH = needH;
@@ -222,14 +227,17 @@ function getTableRowHeight(doc, columns, cells, font, fontSize) {
 }
 
 // ─── صف في الجدول - يتكيف الارتفاع مع النص المتعدد الأسطر ───
-function drawTableRow(doc, columns, cells, y, alt, font, fontSize, returned) {
+function drawTableRow(doc, columns, cells, y, alt, font, fontSize, returned, numericIndices) {
     doc.font(font).fontSize(fontSize ?? FONT_TBL);
     const lineH = doc.currentLineHeight();
     let maxH = ROW_H_MIN;
     columns.forEach((col, i) => {
         const str = String(cells[i] ?? '-');
         const cellW = Math.max(10, col.width - 6);
+        const useNum = numericIndices && numericIndices.includes(i);
+        if (useNum) doc.font('Helvetica');
         const lines = wrapRTL(doc, str, cellW);
+        if (useNum) doc.font(font);
         const h = lines.length * lineH;
         const needH = Math.ceil(Math.max(h, lineH)) + CELL_PAD * 2;
         if (needH > maxH) maxH = needH;
@@ -242,15 +250,20 @@ function drawTableRow(doc, columns, cells, y, alt, font, fontSize, returned) {
     cells.forEach((cell, i) => {
         const w = columns[i].width;
         if (i > 0) { doc.moveTo(xRight, y).lineTo(xRight, y + rowH).stroke(); }
-        doc.font(font).fillColor(COLORS.text).fontSize(fontSize ?? FONT_TBL);
+        const useNum = numericIndices && numericIndices.includes(i);
+        if (useNum) doc.font('Helvetica');
+        else doc.font(font);
+        doc.fillColor(COLORS.text).fontSize(fontSize ?? FONT_TBL);
         textRTL(doc, String(cell ?? '-'), xRight - w - 4, y + CELL_PAD, { width: w - 6, align: 'right' });
+        doc.font(font);
         xRight -= w + GAP;
     });
     return rowH;
 }
 
 // ─── عنوان القسم ───
-function drawSectionTitle(doc, title, y) {
+function drawSectionTitle(doc, title, y, font) {
+    if (font) doc.font(font);
     doc.fillColor(COLORS.primary).fontSize(FONT_MD);
     textRTL(doc, txt(title), PAGE_WIDTH - MARGIN - 350, y, { width: 200, align: 'right' });
 }
@@ -277,16 +290,17 @@ function drawDeliveryFeeStats(doc, report, y, font) {
     mainCards.forEach((c) => {
         const w = c.width;
         doc.rect(xRight - w, y, w, cardH).fillAndStroke(COLORS.rowNormal, COLORS.gridLine);
-        doc.fillColor(COLORS.textMuted).fontSize(7);
+        doc.font(font).fillColor(COLORS.textMuted).fontSize(7);
         textRTL(doc, txt(c.label), xRight - w + 6, y + 8, { width: w - 12, align: 'right' });
-        doc.fillColor(COLORS.text).fontSize(FONT_MD);
+        doc.font('Helvetica').fillColor(COLORS.text).fontSize(FONT_MD);
         textRTL(doc, String(c.value), xRight - w + 6, y + 20, { width: w - 12, align: 'right' });
+        doc.font(font);
         xRight -= w + gap;
     });
 
     if (feeEntries.length > 0) {
         y += cardH + 10;
-        doc.fillColor(COLORS.textMuted).fontSize(7);
+        doc.font(font).fillColor(COLORS.textMuted).fontSize(7);
         textRTL(doc, 'حسب المبلغ', PAGE_WIDTH - MARGIN - 10, y, { width: 80, align: 'right' });
         y += 14;
         const n = feeEntries.length;
@@ -294,10 +308,11 @@ function drawDeliveryFeeStats(doc, report, y, font) {
         xRight = PAGE_WIDTH - MARGIN;
         feeEntries.forEach(([fee, c]) => {
             doc.rect(xRight - feeCardW, y, feeCardW, 32).fillAndStroke(COLORS.rowAlt, COLORS.gridLine);
-            doc.fillColor(COLORS.textMuted).fontSize(6);
+            doc.font('Helvetica').fillColor(COLORS.textMuted).fontSize(6);
             textRTL(doc, formatIQD(fee) + ' د.ع', xRight - feeCardW + 4, y + 4, { width: feeCardW - 8, align: 'right' });
             doc.fillColor(COLORS.text).fontSize(FONT_SM);
             textRTL(doc, c.toString(), xRight - feeCardW + 4, y + 16, { width: feeCardW - 8, align: 'right' });
+            doc.font(font);
             xRight -= feeCardW + 8;
         });
         y += 36;
@@ -318,17 +333,20 @@ function drawSummary(doc, items, y, font) {
     const itemW = Math.max(90, (boxW - 90 - (n - 1) * 12) / n);
     items.forEach((item, i) => {
         const ix = PAGE_WIDTH - MARGIN - 85 - (i + 1) * (itemW + 12) + 12;
-        doc.fillColor('#e0f2fe').fontSize(FONT_SM);
+        doc.font(font).fillColor('#e0f2fe').fontSize(FONT_SM);
         textRTL(doc, txt(item.label), ix, y + 6, { width: itemW, align: 'right' });
+        if (item.numeric) doc.font('Helvetica');
         doc.fillColor('#ffffff').fontSize(FONT_LG - 1);
         textRTL(doc, String(item.value), ix, y + 22, { width: itemW, align: 'right' });
+        doc.font(font);
     });
 }
 
 // ─── الفوتر ───
-function drawFooter(doc) {
+function drawFooter(doc, font) {
     const fy = PAGE_HEIGHT - 22;
     doc.strokeColor(COLORS.gridLine).lineWidth(0.5).moveTo(MARGIN, fy - 8).lineTo(PAGE_WIDTH - MARGIN, fy - 8).stroke();
+    if (font) doc.font(font);
     doc.fillColor(COLORS.textMuted).fontSize(8);
     textRTL(doc, 'شركة ديما الحياة - نظام إدارة التوصيل', MARGIN, fy, { width: PAGE_WIDTH - MARGIN * 2, align: 'center' });
 }
@@ -361,13 +379,13 @@ async function generateDriverReportPDF(report) {
     drawCards(doc, [
         { label: 'السائق', value: report.driver.DriverName },
         { label: 'التاريخ', value: report.date },
-        { label: 'عدد الطلبات', value: report.count.toString() },
-        { label: 'عدد المرتجعات', value: (report.countReturned || 0).toString() },
-        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع' }
-    ], y);
+        { label: 'عدد الطلبات', value: report.count.toString(), numeric: true },
+        { label: 'عدد المرتجعات', value: (report.countReturned || 0).toString(), numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع', numeric: true }
+    ], y, font);
     y += 46;
 
-    drawSectionTitle(doc, 'تفاصيل الطلبات', y);
+    drawSectionTitle(doc, 'تفاصيل الطلبات', y, font);
     y += 18;
 
     const cols = [
@@ -390,6 +408,7 @@ async function generateDriverReportPDF(report) {
     ];
     const wrap = (s, n) => (s || '-').toString().slice(0, n);
     const BOTTOM_MARGIN = 85;
+    const numericCols = [1, 2, 5, 7, 8, 9, 10, 11, 12];
 
     y += drawTableHead(doc, cols, y, font, true);
 
@@ -415,9 +434,9 @@ async function generateDriverReportPDF(report) {
             wrap(o.CreatedByName, 14),
             wrap(o.Notes, 35)
         ];
-        const rowH = getTableRowHeight(doc, cols, cells, font);
+        const rowH = getTableRowHeight(doc, cols, cells, font, null, numericCols);
         if (y + rowH > PAGE_HEIGHT - BOTTOM_MARGIN) {
-            drawFooter(doc);
+            drawFooter(doc, font);
             doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
             doc.font(font);
             drawHeader(doc, 'تقرير السائق', 'شركة ديما الحياة', font);
@@ -425,13 +444,13 @@ async function generateDriverReportPDF(report) {
             y += drawTableHead(doc, cols, y, font, true);
         }
         const returned = isOrderReturned(o);
-        drawTableRow(doc, cols, cells, y, i % 2 === 1, font, null, returned);
+        drawTableRow(doc, cols, cells, y, i % 2 === 1, font, null, returned, numericCols);
         y += rowH;
     });
 
     y += 12;
     if (y + 120 > PAGE_HEIGHT - 25) {
-        drawFooter(doc);
+        drawFooter(doc, font);
         doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
         doc.font(font);
         drawHeader(doc, 'تقرير السائق', 'شركة ديما الحياة', font);
@@ -439,15 +458,15 @@ async function generateDriverReportPDF(report) {
     }
     y = drawDeliveryFeeStats(doc, report, y, font);
     drawSummary(doc, [
-        { label: 'عدد الطلبات', value: report.count.toString() },
-        { label: 'عدد المرتجعات', value: (report.countReturned || 0).toString() },
-        { label: 'إجمالي الفواتير', value: formatIQD(totalInvoice) + ' د.ع' },
-        { label: 'أجور التوصيل', value: formatIQD(totalDelivery) + ' د.ع' },
-        { label: 'المبلغ النهائي', value: formatIQD(totalNet) + ' د.ع' },
-        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع' }
+        { label: 'عدد الطلبات', value: report.count.toString(), numeric: true },
+        { label: 'عدد المرتجعات', value: (report.countReturned || 0).toString(), numeric: true },
+        { label: 'إجمالي الفواتير', value: formatIQD(totalInvoice) + ' د.ع', numeric: true },
+        { label: 'أجور التوصيل', value: formatIQD(totalDelivery) + ' د.ع', numeric: true },
+        { label: 'المبلغ النهائي', value: formatIQD(totalNet) + ' د.ع', numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع', numeric: true }
     ], y, font);
 
-    drawFooter(doc);
+    drawFooter(doc, font);
     doc.end();
     return bufferPromise;
 }
@@ -474,11 +493,11 @@ async function generateDailySummaryReportPDF(report) {
 
     drawCards(doc, [
         { label: 'الفترة', value: dateStr },
-        { label: 'عدد السجلات', value: report.rows.length.toString() }
-    ], y);
+        { label: 'عدد السجلات', value: report.rows.length.toString(), numeric: true }
+    ], y, font);
     y += 46;
 
-    drawSectionTitle(doc, 'ملخص يومي لكل سائق', y);
+    drawSectionTitle(doc, 'ملخص يومي لكل سائق', y, font);
     y += 18;
 
     const cols = [
@@ -497,6 +516,7 @@ async function generateDailySummaryReportPDF(report) {
     ];
     const wrap = (s, n) => (s || '-').toString().slice(0, n);
     const BOTTOM_MARGIN = 60;
+    const dailyNumericCols = [0, 2, 3, 4, 5, 6, 7, 9, 10];
 
     y += drawTableHead(doc, cols, y, font, true);
 
@@ -518,20 +538,20 @@ async function generateDailySummaryReportPDF(report) {
             r.countPaidDelivery.toString(),
             wrap(feeDetail, 65)
         ];
-        const rowH = getTableRowHeight(doc, cols, cells, font);
+        const rowH = getTableRowHeight(doc, cols, cells, font, null, dailyNumericCols);
         if (y + rowH > PAGE_HEIGHT - BOTTOM_MARGIN) {
-            drawFooter(doc);
+            drawFooter(doc, font);
             doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
             doc.font(font);
             drawHeader(doc, 'التقرير اليومي الملخص', 'شركة ديما الحياة - ' + dateStr, font);
             y = 58;
             y += drawTableHead(doc, cols, y, font, true);
         }
-        drawTableRow(doc, cols, cells, y, i % 2 === 1, font);
+        drawTableRow(doc, cols, cells, y, i % 2 === 1, font, null, false, dailyNumericCols);
         y += rowH;
     });
 
-    drawFooter(doc);
+    drawFooter(doc, font);
     doc.end();
     return bufferPromise;
 }
@@ -564,14 +584,14 @@ async function generateCompanyReportPDF(report) {
 
     drawCards(doc, [
         { label: 'التاريخ', value: report.date },
-        { label: 'إجمالي الطلبات', value: report.totalOrders.toString() },
-        { label: 'عدد المرتجعات', value: (report.totalReturned || 0).toString() },
-        { label: 'عدد السائقين', value: report.summary.length.toString() },
-        { label: 'المبلغ المستحق', value: formatIQD(grandDue) + ' د.ع' }
-    ], y);
+        { label: 'إجمالي الطلبات', value: report.totalOrders.toString(), numeric: true },
+        { label: 'عدد المرتجعات', value: (report.totalReturned || 0).toString(), numeric: true },
+        { label: 'عدد السائقين', value: report.summary.length.toString(), numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(grandDue) + ' د.ع', numeric: true }
+    ], y, font);
     y += 46;
 
-    drawSectionTitle(doc, 'ملخص حسب السائق', y);
+    drawSectionTitle(doc, 'ملخص حسب السائق', y, font);
     y += 22;
 
     // ملخص السائقين: 7 أعمدة
@@ -593,6 +613,7 @@ async function generateCompanyReportPDF(report) {
         const sDelivery = driverOrders.reduce((a, o) => a + getDriverDeliveryAmount(o), 0);
         const sNet = driverOrders.reduce((a, o) => a + (o.TotalIQD || 0), 0);
         const sDue = driverOrders.reduce((a, o) => a + getAmountDue(o), 0);
+        const sumNumericCols = [1, 2, 3, 4, 5, 6];
         const sumRowH = drawTableRow(doc, sumCols, [
             s.driverName,
             s.count.toString(),
@@ -601,12 +622,12 @@ async function generateCompanyReportPDF(report) {
             formatIQD(sDelivery),
             formatIQD(sNet),
             formatIQD(sDue)
-        ], y, false, font);
+        ], y, false, font, null, false, sumNumericCols);
         y += sumRowH;
     });
 
     y += 18;
-    drawSectionTitle(doc, 'تفاصيل الطلبات', y);
+    drawSectionTitle(doc, 'تفاصيل الطلبات', y, font);
     y += 18;
 
     const detCols = [
@@ -652,9 +673,10 @@ async function generateCompanyReportPDF(report) {
             o.LabelPrinted ? 'تم' : '-',
             wrap(o.CreatedByName, 14)
         ];
-        const detRowH = getTableRowHeight(doc, detCols, cells, font);
+        const detNumericCols = [1, 2, 6, 8, 9, 10, 11];
+        const detRowH = getTableRowHeight(doc, detCols, cells, font, null, detNumericCols);
         if (y + detRowH > PAGE_HEIGHT - BOTTOM_MARGIN) {
-            drawFooter(doc);
+            drawFooter(doc, font);
             doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
             doc.font(font);
             drawHeader(doc, 'التقرير العام', 'شركة ديما الحياة', font);
@@ -662,13 +684,13 @@ async function generateCompanyReportPDF(report) {
             y += drawTableHead(doc, detCols, y, font, true);
         }
         const returned = isOrderReturned(o);
-        drawTableRow(doc, detCols, cells, y, i % 2 === 1, font, null, returned);
+        drawTableRow(doc, detCols, cells, y, i % 2 === 1, font, null, returned, detNumericCols);
         y += detRowH;
     });
 
     y += 12;
     if (y + 120 > PAGE_HEIGHT - 25) {
-        drawFooter(doc);
+        drawFooter(doc, font);
         doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
         doc.font(font);
         drawHeader(doc, 'التقرير العام', 'شركة ديما الحياة', font);
@@ -676,14 +698,14 @@ async function generateCompanyReportPDF(report) {
     }
     y = drawDeliveryFeeStats(doc, report, y, font);
     drawSummary(doc, [
-        { label: 'إجمالي الطلبات', value: report.totalOrders.toString() },
-        { label: 'إجمالي الفواتير', value: formatIQD(grandInvoice) + ' د.ع' },
-        { label: 'أجور التوصيل', value: formatIQD(grandDelivery) + ' د.ع' },
-        { label: 'المبلغ النهائي', value: formatIQD(grandTotal) + ' د.ع' },
-        { label: 'المبلغ المستحق', value: formatIQD(grandDue) + ' د.ع' }
+        { label: 'إجمالي الطلبات', value: report.totalOrders.toString(), numeric: true },
+        { label: 'إجمالي الفواتير', value: formatIQD(grandInvoice) + ' د.ع', numeric: true },
+        { label: 'أجور التوصيل', value: formatIQD(grandDelivery) + ' د.ع', numeric: true },
+        { label: 'المبلغ النهائي', value: formatIQD(grandTotal) + ' د.ع', numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(grandDue) + ' د.ع', numeric: true }
     ], y, font);
 
-    drawFooter(doc);
+    drawFooter(doc, font);
     doc.end();
     return bufferPromise;
 }
