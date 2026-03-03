@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "تطبيق السائق - ديما الحياة",
+    "slug": "delivery-driver-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "scheme": "delivery-driver",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.alhayat.deliverydriver",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
+      }
+    },
+    "android": {
+      "package": "com.alhayat.deliverydriver",
+      "usesCleartextTraffic": true
+    }
+  }
+}

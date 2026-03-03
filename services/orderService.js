@@ -242,6 +242,31 @@ function markLabelPrinted(orderId) {
     return true;
 }
 
+function markDeliveredByDriver(orderId, driverId) {
+    const database = db.getDatabase();
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, error: 'الطلب غير موجود' };
+    if (parseInt(order.DriverID) !== parseInt(driverId)) return { success: false, error: 'الطلب ليس معك' };
+    if (order.Status === 'Delivered') return { success: false, error: 'تم توصيل الطلب سابقاً' };
+    if (order.Status !== 'AssignedToDriver') return { success: false, error: 'الطلب ليس مع سائق حالياً' };
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    database.prepare('UPDATE Orders SET Status = ?, DeliveredDate = ? WHERE OrderID = ?').run('Delivered', now, orderId);
+    return { success: true, order: getOrderById(orderId) };
+}
+
+function markReturnedByDriver(orderId, driverId) {
+    const database = db.getDatabase();
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, error: 'الطلب غير موجود' };
+    if (parseInt(order.DriverID) !== parseInt(driverId)) return { success: false, error: 'الطلب ليس معك' };
+    if (order.Status === 'Delivered') return { success: false, error: 'تم توصيل الطلب - لا يمكن إرجاعه' };
+    if (order.Status !== 'AssignedToDriver') return { success: false, error: 'الطلب ليس مع سائق حالياً' };
+
+    database.prepare('UPDATE Orders SET DriverID = NULL, Status = ? WHERE OrderID = ?').run('New', orderId);
+    return { success: true, order: { ...order, DriverID: null, Status: 'New' } };
+}
+
 module.exports = {
     createOrder,
     getOrderByShipmentNumber,
@@ -252,5 +277,7 @@ module.exports = {
     getOrderById,
     updateOrder,
     deleteOrder,
-    markLabelPrinted
+    markLabelPrinted,
+    markDeliveredByDriver,
+    markReturnedByDriver
 };

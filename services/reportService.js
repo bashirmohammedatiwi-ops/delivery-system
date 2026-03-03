@@ -39,13 +39,34 @@ function formatIQD(val) {
 }
 
 function getArabicFont(doc) {
-    const sysRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
-    const fonts = [
-        path.join(sysRoot, 'Fonts', 'tahoma.ttf'),
-        path.join(sysRoot, 'Fonts', 'arial.ttf'),
-        path.join(sysRoot, 'Fonts', 'segoeui.ttf')
+    // 1) خط داخل المشروع أو في node_modules (يعمل على Windows و Linux و Docker)
+    const projectFonts = [
+        path.join(__dirname, '..', 'fonts', 'Amiri-Regular.ttf'),
+        path.join(__dirname, '..', 'node_modules', '@fontsource', 'amiri', 'files', 'amiri-arabic-400-normal.woff'),
+        path.join(__dirname, '..', 'node_modules', '@fontsource', 'amiri', 'files', 'amiri-arabic-400-normal.woff2')
     ];
-    for (const fp of fonts) {
+    for (const fp of projectFonts) {
+        if (fs.existsSync(fp)) {
+            doc.registerFont('Arabic', fp);
+            return 'Arabic';
+        }
+    }
+    // 2) Linux
+    const linuxFonts = [
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'
+    ];
+    for (const fp of linuxFonts) {
+        if (fs.existsSync(fp)) {
+            doc.registerFont('Arabic', fp);
+            return 'Arabic';
+        }
+    }
+    // 3) Windows
+    const sysRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
+    const winFonts = ['tahoma.ttf', 'arial.ttf', 'segoeui.ttf'];
+    for (const f of winFonts) {
+        const fp = path.join(sysRoot, 'Fonts', f);
         if (fs.existsSync(fp)) {
             doc.registerFont('Arabic', fp);
             return 'Arabic';

@@ -337,6 +337,38 @@ app.get('/api/driver/me', async (req, res) => {
     }
 });
 
+app.post('/api/driver/orders/:id/deliver', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const orderId = parseInt(req.params.id, 10);
+        if (isNaN(orderId)) return res.status(400).json({ error: 'معرّف الطلب غير صالح' });
+        const result = orderService.markDeliveredByDriver(orderId, driver.DriverID);
+        if (!result.success) return res.status(400).json({ error: result.error });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/driver/orders/:id/return', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const orderId = parseInt(req.params.id, 10);
+        if (isNaN(orderId)) return res.status(400).json({ error: 'معرّف الطلب غير صالح' });
+        const result = orderService.markReturnedByDriver(orderId, driver.DriverID);
+        if (!result.success) return res.status(400).json({ error: result.error });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── API: الطلبات (يتطلب تسجيل الدخول) ───
 app.post('/api/orders', requireAppAuth, async (req, res) => {
     try {
@@ -546,9 +578,16 @@ app.post('/api/label/pdf', requireAppAuth, async (req, res) => {
     }
 });
 
+// ─── أي مسار API غير معرّف يُرجع JSON ───
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+        return res.status(404).json({ error: 'المسار غير موجود' });
+    }
+    next();
+});
+
 // ─── واجهة الويب ───
 app.get('*', (req, res) => {
-    if (req.path.startsWith('/api')) return res.status(404).json({ error: 'Not found' });
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
