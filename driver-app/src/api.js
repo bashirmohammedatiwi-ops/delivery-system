@@ -68,16 +68,62 @@ export async function markOrderDelivered(token, orderId) {
   return data;
 }
 
-export async function markOrderReturned(token, orderId) {
+export async function markOrderReturned(token, orderId, returnReason = '') {
   const res = await fetch(`${API_BASE_URL}/api/driver/orders/${orderId}/return`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ returnReason: returnReason.trim() || '' }),
   });
   const data = await parseResponse(res);
   if (!res.ok) throw new Error(data.error || 'فشل إرجاع الطلب');
+  return data;
+}
+
+export async function getDriverStats(token, date) {
+  const d = date || new Date().toISOString().slice(0, 10);
+  const res = await fetch(`${API_BASE_URL}/api/driver/stats?date=${encodeURIComponent(d)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل تحميل الإحصائيات');
+  return data;
+}
+
+export async function getDriverDeliveredOrders(token, date) {
+  const d = date || new Date().toISOString().slice(0, 10);
+  const res = await fetch(`${API_BASE_URL}/api/driver/delivered-orders?date=${encodeURIComponent(d)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل تحميل الطلبات');
+  return Array.isArray(data) ? data : [];
+}
+
+export async function getDriverReturnedOrders(token, date) {
+  const d = date || new Date().toISOString().slice(0, 10);
+  const res = await fetch(`${API_BASE_URL}/api/driver/returned-orders?date=${encodeURIComponent(d)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل تحميل الطلبات');
+  return Array.isArray(data) ? data : [];
+}
+
+export async function receiveOrder(token, shipmentNumber) {
+  const num = String(shipmentNumber || '').replace(/\D/g, '').trim() || String(shipmentNumber || '').trim();
+  if (!num) throw new Error('أدخل رقم الشحنة');
+  const res = await fetch(`${API_BASE_URL}/api/driver/receive-order`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ shipmentNumber: num }),
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل استلام الطلب');
   return data;
 }

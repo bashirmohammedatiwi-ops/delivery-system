@@ -146,6 +146,12 @@ async function showEditOrderModal(container, order, onSuccess) {
                         <label>ملاحظات</label>
                         <textarea id="editNotes" rows="2">${(order.Notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                     </div>
+                    ${(order.Status === 'Returned' && order.ReturnReason) ? `
+                    <div class="form-group full">
+                        <label>سبب الإرجاع (من السائق)</label>
+                        <input type="text" value="${(order.ReturnReason || '').replace(/"/g, '&quot;')}" disabled>
+                    </div>
+                    ` : ''}
                     ${currentUser?.Role === 'admin' ? `
                     <div class="form-group full">
                         <label>تغيير الحالة (للربط مع تطبيق السائق)</label>

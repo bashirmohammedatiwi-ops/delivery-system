@@ -14,12 +14,22 @@
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "NSCameraUsageDescription": "السماح بالوصول للكاميرا لمسح الباركود"
       }
     },
     "android": {
       "package": "com.alhayat.deliverydriver",
-      "usesCleartextTraffic": true
-    }
+      "usesCleartextTraffic": true,
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "السماح بالوصول للكاميرا لمسح الباركود"
+        }
+      ]
+    ]
   }
 }

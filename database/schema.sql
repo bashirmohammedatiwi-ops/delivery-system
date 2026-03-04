@@ -42,7 +42,11 @@ CREATE TABLE IF NOT EXISTS Orders (
     DriverID INTEGER,
     CreatedDate TEXT DEFAULT (datetime('now', 'localtime')),
     DeliveredDate TEXT,
-    FOREIGN KEY (DriverID) REFERENCES Drivers(DriverID)
+    ReturnReason TEXT,
+    ReturnedDate TEXT,
+    ReturnedByDriverID INTEGER,
+    FOREIGN KEY (DriverID) REFERENCES Drivers(DriverID),
+    FOREIGN KEY (ReturnedByDriverID) REFERENCES Drivers(DriverID)
 );
 
 -- جدول تتبع الطلبات

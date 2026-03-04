@@ -361,7 +361,71 @@ app.post('/api/driver/orders/:id/return', async (req, res) => {
         if (!driver) return res.status(401).json({ error: 'غير مصرح' });
         const orderId = parseInt(req.params.id, 10);
         if (isNaN(orderId)) return res.status(400).json({ error: 'معرّف الطلب غير صالح' });
-        const result = orderService.markReturnedByDriver(orderId, driver.DriverID);
+        const returnReason = req.body?.returnReason || '';
+        const result = orderService.markReturnedByDriver(orderId, driver.DriverID, returnReason);
+        if (!result.success) return res.status(400).json({ error: result.error });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/driver/stats', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const stats = orderService.getDriverStats(driver.DriverID, date);
+        stats.feesCollected = feeCollectionService.isFeesCollected(driver.DriverID, date);
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/driver/delivered-orders', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const orders = orderService.getDriverDeliveredOrders(driver.DriverID, date);
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/driver/returned-orders', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const orders = orderService.getDriverReturnedOrders(driver.DriverID, date);
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/driver/receive-order', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        let { shipmentNumber } = req.body || {};
+        if (!shipmentNumber || !String(shipmentNumber).trim()) {
+            return res.status(400).json({ error: 'أدخل رقم الشحنة' });
+        }
+        shipmentNumber = String(shipmentNumber).replace(/\D/g, '') || String(shipmentNumber).trim();
+        if (!shipmentNumber) return res.status(400).json({ error: 'رقم الشحنة غير صالح' });
+        const result = orderService.assignOrderToDriver(shipmentNumber, driver.DriverID);
         if (!result.success) return res.status(400).json({ error: result.error });
         res.json(result);
     } catch (err) {

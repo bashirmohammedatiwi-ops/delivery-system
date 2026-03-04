@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
-import OrdersScreen from './src/screens/OrdersScreen';
+import MainTabs from './src/components/MainTabs';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
 
 const Stack = createNativeStackNavigator();
@@ -19,10 +19,11 @@ function AppNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#1e40af' },
+        headerStyle: { backgroundColor: '#0ea5e9' },
         headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
-        contentStyle: { backgroundColor: '#f1f5f9' },
+        headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: '#f8fafc' },
       }}
     >
       {!token ? (
@@ -34,9 +35,12 @@ function AppNavigator() {
       ) : (
         <>
           <Stack.Screen
-            name="Orders"
-            component={OrdersScreen}
-            options={{ title: 'طلباتي' }}
+            name="Main"
+            component={MainTabs}
+            options={{
+              title: 'تطبيق السائق',
+              headerLargeTitle: false,
+            }}
           />
           <Stack.Screen
             name="OrderDetail"

@@ -60,28 +60,38 @@ export default function OrderDetailScreen({ route, navigation }) {
     );
   };
 
-  const handleReturn = async () => {
+  const RETURN_REASONS = [
+    'غير متوفر',
+    'رفض الاستلام',
+    'عنوان خاطئ',
+    'المحل مغلق',
+    'أخرى',
+  ];
+
+  const doReturn = async (reason) => {
+    setLoading(true);
+    try {
+      await markOrderReturned(token, order.OrderID, reason);
+      Alert.alert('تم', 'تم إرجاع الطلب');
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('خطأ', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReturn = () => {
     Alert.alert(
-      'إرجاع الطلب',
-      `هل تريد إرجاع الطلب #${order.ShipmentNumber}؟`,
+      'إرجاع الطلب - اختر سبب الإرجاع',
+      `الطلب #${order.ShipmentNumber} مرفوض من الزبون. اختر السبب:`,
       [
         { text: 'إلغاء', style: 'cancel' },
-        {
-          text: 'نعم، إرجاع',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await markOrderReturned(token, order.OrderID);
-              Alert.alert('تم', 'تم إرجاع الطلب');
-              navigation.goBack();
-            } catch (e) {
-              Alert.alert('خطأ', e.message);
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
+        { text: 'غير متوفر', onPress: () => doReturn('غير متوفر') },
+        { text: 'رفض الاستلام', onPress: () => doReturn('رفض الاستلام') },
+        { text: 'عنوان خاطئ', onPress: () => doReturn('عنوان خاطئ') },
+        { text: 'المحل مغلق', onPress: () => doReturn('المحل مغلق') },
+        { text: 'أخرى', onPress: () => doReturn('أخرى') },
       ]
     );
   };
@@ -156,35 +166,40 @@ export default function OrderDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
-  content: { padding: 16, paddingBottom: 40 },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
+  content: { padding: 20, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   shipment: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#1e40af',
-    marginBottom: 16,
+    color: '#0ea5e9',
+    marginBottom: 20,
     textAlign: 'right',
   },
-  row: { marginBottom: 12 },
-  label: { fontSize: 12, color: '#94a3b8', marginBottom: 2 },
-  value: { fontSize: 15, color: '#1e293b', textAlign: 'right' },
-  link: { color: '#1e40af', textDecorationLine: 'underline' },
-  amount: { fontSize: 18, fontWeight: '700', color: '#16a34a' },
-  actions: { gap: 12 },
+  row: { marginBottom: 14 },
+  label: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },
+  value: { fontSize: 16, color: '#0f172a', textAlign: 'right' },
+  link: { color: '#0ea5e9', textDecorationLine: 'underline' },
+  amount: { fontSize: 20, fontWeight: '700', color: '#10b981' },
+  actions: { gap: 14 },
   btn: {
-    padding: 16,
-    borderRadius: 10,
+    padding: 18,
+    borderRadius: 14,
     alignItems: 'center',
   },
-  btnDeliver: { backgroundColor: '#16a34a' },
-  btnReturn: { backgroundColor: '#dc2626' },
+  btnDeliver: { backgroundColor: '#10b981' },
+  btnReturn: { backgroundColor: '#ef4444' },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  btnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
 });

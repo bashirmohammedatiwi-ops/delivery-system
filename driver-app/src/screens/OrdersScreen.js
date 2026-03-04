@@ -18,7 +18,7 @@ function formatIQD(n) {
 }
 
 export default function OrdersScreen({ navigation }) {
-  const { token, driver, logout } = useAuth();
+  const { token } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -71,7 +71,7 @@ export default function OrdersScreen({ navigation }) {
   if (loading && orders.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1e40af" />
+        <ActivityIndicator size="large" color="#0ea5e9" />
         <Text style={styles.loadingText}>جاري تحميل الطلبات...</Text>
       </View>
     );
@@ -79,15 +79,6 @@ export default function OrdersScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      {driver ? (
-        <View style={styles.headerBar}>
-          <Text style={styles.welcome}>مرحباً، {driver.DriverName}</Text>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
-            <Text style={styles.logoutText}>خروج</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
       {orders.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>لا توجد طلبات معك حالياً</Text>
@@ -99,7 +90,7 @@ export default function OrdersScreen({ navigation }) {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1e40af']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
           }
         />
       )}
@@ -108,32 +99,25 @@ export default function OrdersScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  container: { flex: 1, backgroundColor: '#f8fafc' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#64748b' },
-  headerBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-  },
-  welcome: { fontSize: 14, color: '#64748b' },
-  logoutBtn: { padding: 8 },
-  logoutText: { color: '#dc2626', fontWeight: '600' },
-  list: { padding: 12, paddingBottom: 24 },
+  list: { padding: 16, paddingBottom: 24 },
   card: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 14,
+    padding: 18,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  shipment: { fontSize: 16, fontWeight: '700', color: '#1e40af' },
-  amount: { fontSize: 14, fontWeight: '600', color: '#16a34a' },
-  customer: { fontSize: 15, color: '#1e293b', marginBottom: 4 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  shipment: { fontSize: 17, fontWeight: '700', color: '#0ea5e9' },
+  amount: { fontSize: 15, fontWeight: '600', color: '#10b981' },
+  customer: { fontSize: 16, color: '#0f172a', marginBottom: 4 },
   address: { fontSize: 13, color: '#64748b', marginBottom: 4 },
   region: { fontSize: 12, color: '#94a3b8' },
   empty: {

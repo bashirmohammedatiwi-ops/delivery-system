@@ -100,7 +100,7 @@ function assignOrderToDriver(shipmentNumber, driverId) {
     database.prepare('INSERT INTO OrderTracking (OrderID, DriverID) VALUES (?, ?)')
         .run(order.OrderID, driverId);
 
-    return { success: true, order };
+    return { success: true, order: getOrderById(order.OrderID) };
 }
 
 function returnOrderFromDriver(shipmentNumber) {
@@ -255,7 +255,7 @@ function markDeliveredByDriver(orderId, driverId) {
     return { success: true, order: getOrderById(orderId) };
 }
 
-function markReturnedByDriver(orderId, driverId) {
+function markReturnedByDriver(orderId, driverId, returnReason = '') {
     const database = db.getDatabase();
     const order = getOrderById(orderId);
     if (!order) return { success: false, error: 'الطلب غير موجود' };
@@ -263,8 +263,94 @@ function markReturnedByDriver(orderId, driverId) {
     if (order.Status === 'Delivered') return { success: false, error: 'تم توصيل الطلب - لا يمكن إرجاعه' };
     if (order.Status !== 'AssignedToDriver') return { success: false, error: 'الطلب ليس مع سائق حالياً' };
 
-    database.prepare('UPDATE Orders SET DriverID = NULL, Status = ? WHERE OrderID = ?').run('New', orderId);
-    return { success: true, order: { ...order, DriverID: null, Status: 'New' } };
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    database.prepare('UPDATE Orders SET Status = ?, ReturnReason = ?, ReturnedDate = ?, ReturnedByDriverID = ?, DriverID = NULL WHERE OrderID = ?')
+        .run('Returned', (returnReason || '').trim() || null, now, driverId, orderId);
+    return { success: true, order: getOrderById(orderId) };
+}
+
+function getAmountDue(order) {
+    if (order.FreeDelivery) return Math.max(0, (order.AmountIQD || 0) - (order.WaivedDeliveryIQD || 0));
+    return order.AmountIQD || 0;
+}
+
+function getDriverStats(driverId, date) {
+    const database = db.getDatabase();
+    const d = date || new Date().toISOString().slice(0, 10);
+    const delivered = database.prepare(
+        `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'Delivered' AND date(CreatedDate) = date(?)`
+    ).get(driverId, d);
+    const returned = database.prepare(
+        `SELECT COUNT(*) as c FROM Orders WHERE ReturnedByDriverID = ? AND Status = 'Returned' AND date(CreatedDate) = date(?)`
+    ).get(driverId, d);
+    const assigned = database.prepare(
+        `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'AssignedToDriver'`
+    ).get(driverId);
+    const notDelivered = database.prepare(
+        `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'AssignedToDriver' AND date(CreatedDate) = date(?)`
+    ).get(driverId, d);
+    const ordersForDay = database.prepare(
+        `SELECT TotalIQD, AmountIQD, DeliveryFeeIQD, WaivedDeliveryIQD, FreeDelivery, Status 
+         FROM Orders WHERE (DriverID = ? OR ReturnedByDriverID = ?) 
+         AND (Status = 'Delivered' OR Status = 'Returned') 
+         AND date(CreatedDate) = date(?)`
+    ).all(driverId, driverId, d);
+
+    let totalDeliveredIQD = 0;
+    let totalReturnedIQD = 0;
+    let totalAmountDue = 0;
+
+    for (const o of ordersForDay) {
+        const totalIQD = Number(o.TotalIQD) || 0;
+        const status = String(o.Status ?? o.status ?? '').trim();
+        if (status === 'Delivered') {
+            totalDeliveredIQD += totalIQD;
+            totalAmountDue += getAmountDue(o);
+        } else if (status === 'Returned') {
+            totalReturnedIQD += totalIQD;
+        }
+    }
+
+    totalAmountDue = Math.max(0, Math.round(totalAmountDue * 100) / 100);
+
+    const deliveredCount = (delivered && delivered.c) || 0;
+    const returnedCount = (returned && returned.c) || 0;
+    const notDeliveredCount = (notDelivered && notDelivered.c) || 0;
+    return {
+        date: d,
+        delivered: deliveredCount,
+        returned: returnedCount,
+        assigned: (assigned && assigned.c) || 0,
+        notDelivered: notDeliveredCount,
+        orderCount: deliveredCount + returnedCount + notDeliveredCount,
+        totalDeliveredIQD,
+        totalReturnedIQD,
+        totalAmountDue
+    };
+}
+
+function getDriverDeliveredOrders(driverId, date) {
+    const database = db.getDatabase();
+    const d = date || new Date().toISOString().slice(0, 10);
+    return database.prepare(
+        `SELECT o.*, d.DriverName, r.RegionName 
+         FROM Orders o LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+         LEFT JOIN Regions r ON o.RegionID = r.RegionID 
+         WHERE o.DriverID = ? AND o.Status = 'Delivered' AND date(o.CreatedDate) = date(?)
+         ORDER BY o.CreatedDate DESC, o.DeliveredDate DESC`
+    ).all(driverId, d);
+}
+
+function getDriverReturnedOrders(driverId, date) {
+    const database = db.getDatabase();
+    const d = date || new Date().toISOString().slice(0, 10);
+    return database.prepare(
+        `SELECT o.*, d.DriverName, r.RegionName 
+         FROM Orders o LEFT JOIN Drivers d ON o.ReturnedByDriverID = d.DriverID 
+         LEFT JOIN Regions r ON o.RegionID = r.RegionID 
+         WHERE o.ReturnedByDriverID = ? AND o.Status = 'Returned' AND date(o.CreatedDate) = date(?)
+         ORDER BY o.CreatedDate DESC, o.ReturnedDate DESC`
+    ).all(driverId, d);
 }
 
 module.exports = {
@@ -279,5 +365,8 @@ module.exports = {
     deleteOrder,
     markLabelPrinted,
     markDeliveredByDriver,
-    markReturnedByDriver
+    markReturnedByDriver,
+    getDriverStats,
+    getDriverDeliveredOrders,
+    getDriverReturnedOrders
 };
