@@ -279,10 +279,11 @@ async function createLabelPDF(order) {
 
     const driverDelivery = order.FreeDelivery ? (order.WaivedDeliveryIQD || 0) : (order.DeliveryFeeIQD || 0);
     const deliveryText = order.FreeDelivery ? 'مجاني' : formatIQD(driverDelivery) + ' د.ع';
-    row2('مبلغ الفاتورة', formatIQD(order.AmountIQD) + ' د.ع', 'مبلغ التوصيل', deliveryText, true, true, alt, true, true, true);
+    // المبالغ تحتوي "د.ع" عربي - نستخدم خط العربية وليس Helvetica
+    row2('مبلغ الفاتورة', formatIQD(order.AmountIQD) + ' د.ع', 'مبلغ التوصيل', deliveryText, true, true, alt, true, false, false);
     alt = !alt;
 
-    row1('المبلغ النهائي', formatIQD(order.TotalIQD) + ' دينار عراقي', true, true, true);
+    row1('المبلغ النهائي', formatIQD(order.TotalIQD) + ' دينار عراقي', true, true, false);
 
     if (hasNotes) {
         row1('الملاحظات', order.Notes.trim().slice(0, 80), false, false, false);

@@ -172,7 +172,8 @@ function drawCards(doc, cards, y, font) {
         doc.rect(x, y, cardW, cardH).fillAndStroke(COLORS.rowNormal, COLORS.gridLine);
         doc.font(font).fillColor(COLORS.textMuted).fontSize(FONT_SM);
         textRTL(doc, txt(c.label), x + 8, y + 6, { width: cardW - 16, align: 'right' });
-        if (c.numeric) doc.font('Helvetica');
+        // المبالغ تحتوي "د.ع" عربي - لا نستخدم Helvetica إلا للأرقام الخالصة
+        if (c.numeric && !String(c.value).includes('د.ع')) doc.font('Helvetica');
         doc.fillColor(COLORS.text).fontSize(FONT_MD);
         textRTL(doc, String(c.value), x + 8, y + 20, { width: cardW - 16, align: 'right' });
         doc.font(font);
@@ -210,7 +211,8 @@ function getTableRowHeight(doc, columns, cells, font, fontSize, numericIndices) 
         const str = String(cells[i] ?? '-');
         const cellW = Math.max(10, col.width - 6);
         const useNum = numericIndices && numericIndices.includes(i);
-        if (useNum) doc.font('Helvetica').fontSize(fontSize ?? FONT_TBL);
+        const hasArabic = /[\u0600-\u06FF]/.test(str);
+        if (useNum && !hasArabic) doc.font('Helvetica').fontSize(fontSize ?? FONT_TBL);
         else doc.font(font).fontSize(fontSize ?? FONT_TBL);
         const lines = wrapRTL(doc, str, cellW);
         doc.font(font);
@@ -230,9 +232,10 @@ function drawTableRow(doc, columns, cells, y, alt, font, fontSize, returned, num
         const str = String(cells[i] ?? '-');
         const cellW = Math.max(10, col.width - 6);
         const useNum = numericIndices && numericIndices.includes(i);
-        if (useNum) doc.font('Helvetica');
+        const hasArabic = /[\u0600-\u06FF]/.test(str);
+        if (useNum && !hasArabic) doc.font('Helvetica');
         const lines = wrapRTL(doc, str, cellW);
-        if (useNum) doc.font(font);
+        if (useNum && !hasArabic) doc.font(font);
         const h = lines.length * lineH;
         const needH = Math.ceil(Math.max(h, lineH)) + CELL_PAD * 2;
         if (needH > maxH) maxH = needH;
@@ -246,10 +249,13 @@ function drawTableRow(doc, columns, cells, y, alt, font, fontSize, returned, num
         const w = columns[i].width;
         if (i > 0) { doc.moveTo(xRight, y).lineTo(xRight, y + rowH).stroke(); }
         const useNum = numericIndices && numericIndices.includes(i);
-        if (useNum) doc.font('Helvetica');
+        const cellStr = String(cell ?? '-');
+        // إذا احتوى الخيار على عربي (مجاني، د.ع) نستخدم خط العربية
+        const hasArabic = /[\u0600-\u06FF]/.test(cellStr);
+        if (useNum && !hasArabic) doc.font('Helvetica');
         else doc.font(font);
         doc.fillColor(COLORS.text).fontSize(fontSize ?? FONT_TBL);
-        textRTL(doc, String(cell ?? '-'), xRight - w - 4, y + CELL_PAD, { width: w - 6, align: 'right' });
+        textRTL(doc, cellStr, xRight - w - 4, y + CELL_PAD, { width: w - 6, align: 'right' });
         doc.font(font);
         xRight -= w + GAP;
     });
@@ -303,7 +309,7 @@ function drawDeliveryFeeStats(doc, report, y, font) {
         xRight = PAGE_WIDTH - MARGIN;
         feeEntries.forEach(([fee, c]) => {
             doc.rect(xRight - feeCardW, y, feeCardW, 32).fillAndStroke(COLORS.rowAlt, COLORS.gridLine);
-            doc.font('Helvetica').fillColor(COLORS.textMuted).fontSize(6);
+            doc.font(font).fillColor(COLORS.textMuted).fontSize(6);
             textRTL(doc, formatIQD(fee) + ' د.ع', xRight - feeCardW + 4, y + 4, { width: feeCardW - 8, align: 'right' });
             doc.fillColor(COLORS.text).fontSize(FONT_SM);
             textRTL(doc, c.toString(), xRight - feeCardW + 4, y + 16, { width: feeCardW - 8, align: 'right' });
@@ -330,7 +336,8 @@ function drawSummary(doc, items, y, font) {
         const ix = PAGE_WIDTH - MARGIN - 85 - (i + 1) * (itemW + 12) + 12;
         doc.font(font).fillColor('#e0f2fe').fontSize(FONT_SM);
         textRTL(doc, txt(item.label), ix, y + 6, { width: itemW, align: 'right' });
-        if (item.numeric) doc.font('Helvetica');
+        // المبالغ تحتوي "د.ع" - نستخدم خط العربية
+        if (item.numeric && !String(item.value).includes('د.ع')) doc.font('Helvetica');
         doc.fillColor('#ffffff').fontSize(FONT_LG - 1);
         textRTL(doc, String(item.value), ix, y + 22, { width: itemW, align: 'right' });
         doc.font(font);

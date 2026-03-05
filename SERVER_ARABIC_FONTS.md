@@ -13,11 +13,15 @@
 - **Dockerfile**: ينسخ مجلد `fonts/` داخل الصورة.
 - **docker-compose.yml**: يربط مجلد `./fonts` كـ Volume على المسار `/app/fonts`.
 
-عند التشغيل:
+عند التشغيل (بعد تثبيت Docker Desktop):
 
 ```bash
-docker-compose build --no-cache
-docker-compose up -d
+# الطريقة الحديثة (مسافة):
+docker compose build --no-cache
+docker compose up -d
+
+# أو استخدم السكربت الجاهز:
+.\docker-build.ps1
 ```
 
 تأكد أن مجلد `fonts` وملف `Amiri-Regular.ttf` موجودان في نفس مستوى `docker-compose.yml` قبل التنفيذ.
