@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS Orders (
     ReturnReason TEXT,
     ReturnedDate TEXT,
     ReturnedByDriverID INTEGER,
+    ReturnedOrderReceived INTEGER DEFAULT 0,
+    ReturnedOrderReceivedAt TEXT,
     FOREIGN KEY (DriverID) REFERENCES Drivers(DriverID),
     FOREIGN KEY (ReturnedByDriverID) REFERENCES Drivers(DriverID)
 );

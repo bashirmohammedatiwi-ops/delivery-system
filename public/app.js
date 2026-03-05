@@ -627,16 +627,16 @@ const screens = {
                                     <label>أجرة التوصيل (د.ع)</label>
                                     <input type="number" id="deliveryFee" min="0" step="1" placeholder="0">
                                 </div>
-                                <div class="form-group">
-                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                                <div class="form-group amounts-row">
+                                    <div class="amounts-block">
+                                        <label>المبلغ النهائي (د.ع)</label>
+                                        <div id="totalDisplay" class="total-display">0</div>
+                                        <div id="totalDue" class="final-price-box">المبلغ المستحق: <strong>0</strong> د.ع</div>
+                                    </div>
+                                    <label class="free-delivery-label">
                                         <input type="checkbox" id="freeDelivery">
-                                        توصيل مجاني (السائق يأخذ أجرة التوصيل ويتم خصمها من المستحق)
+                                        توصيل مجاني
                                     </label>
-                                </div>
-                                <div class="form-group">
-                                    <label>المبلغ النهائي (د.ع)</label>
-                                    <div id="totalDisplay" class="total-display">0</div>
-                                    <div id="totalDue" class="final-price-box">المبلغ المستحق: <strong>0</strong> د.ع</div>
                                 </div>
                                 <div class="form-group full">
                                     <label>ملاحظات</label>
@@ -1173,6 +1173,83 @@ const screens = {
         }
     },
 
+    'receive-returned': {
+        async render(container) {
+            container.innerHTML = `
+                <div class="screen active">
+                    <h1 class="page-title">استلام الطلب الراجع</h1>
+                    <div class="card driver-scan-area">
+                        <p style="margin-bottom:16px;color:#64748b;text-align:center">امسح الباركود أو اكتب رقم الشحنة لتسجيل استلام الطلب الراجع عند الشركة (هل أرجع السائق الطلب الراجع المرفوض من الزبون وسلمه؟)</p>
+                        <div class="form-group" style="display:flex;gap:8px;align-items:flex-end">
+                            <div style="flex:1">
+                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
+                                <input type="text" id="receiveReturnedScanInput" placeholder="رقم الشحنة" autocomplete="off">
+                            </div>
+                            <button type="button" class="btn btn-primary" id="btnReceiveReturned" style="height:42px;white-space:nowrap">تسجيل الاستلام</button>
+                        </div>
+                        <div id="receiveReturnedFeedback" class="scan-feedback" style="display:none"></div>
+                    </div>
+                </div>
+            `;
+
+            const scanInput = document.getElementById('receiveReturnedScanInput');
+            const feedback = document.getElementById('receiveReturnedFeedback');
+
+            const markReceived = async () => {
+                const num = normalizeBarcodeInput(scanInput.value);
+                if (!num) {
+                    feedback.style.display = 'block';
+                    feedback.className = 'scan-feedback error';
+                    feedback.textContent = 'أدخل رقم الشحنة';
+                    return;
+                }
+                try {
+                    const order = await window.api.orders.getByShipment(num);
+                    if (!order) {
+                        feedback.style.display = 'block';
+                        feedback.className = 'scan-feedback error';
+                        feedback.textContent = 'الطلب غير موجود: ' + num;
+                        return;
+                    }
+                    if (order.Status !== 'Returned' && !/راجع|returned/i.test(String(order.Status || ''))) {
+                        feedback.style.display = 'block';
+                        feedback.className = 'scan-feedback error';
+                        feedback.textContent = 'الطلب ليس راجعاً - يمكن استلام الطلبات الراجعة فقط';
+                        return;
+                    }
+                    if (order.ReturnedOrderReceived) {
+                        feedback.style.display = 'block';
+                        feedback.className = 'scan-feedback';
+                        feedback.style.background = '#e0f2fe';
+                        feedback.style.color = '#0369a1';
+                        feedback.textContent = 'تم استلام هذا الطلب مسبقاً عند الشركة';
+                        scanInput.value = '';
+                        scanInput.focus();
+                        return;
+                    }
+                    await window.api.orders.markReturnedOrderReceived(order.OrderID);
+                    feedback.style.display = 'block';
+                    feedback.className = 'scan-feedback success';
+                    feedback.textContent = 'تم تسجيل استلام الطلب ' + num + ' عند الشركة بنجاح';
+                    scanInput.value = '';
+                    scanInput.focus();
+                } catch (err) {
+                    feedback.style.display = 'block';
+                    feedback.className = 'scan-feedback error';
+                    feedback.textContent = 'خطأ: ' + (err.message || err);
+                }
+            };
+
+            scanInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); markReceived(); }
+            });
+
+            document.getElementById('btnReceiveReturned').addEventListener('click', markReceived);
+
+            scanInput.focus();
+        }
+    },
+
     reports: {
         async render(container) {
             const drivers = await window.api.drivers.getActive();
@@ -1522,12 +1599,13 @@ const screens = {
                         <div class="report-section-title">تفاصيل الطلبات</div>
                         <div class="report-table-wrap">
                             <table class="report-table">
-                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>اسم المستلم</th><th>هاتف المستلم</th><th class="col-address">العنوان</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>أنشأه</th><th>ملاحظات</th></tr></thead>
+                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>اسم المستلم</th><th>هاتف المستلم</th><th class="col-address">العنوان</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th><th>ملاحظات</th></tr></thead>
                                 <tbody>
                                     ${report.orders.map(o => {
                                         const returned = isOrderReturned(o);
                                         const statusTxt = STATUS_MAP[o.Status || o.status] || (o.Status || o.status) || '-';
                                         const labelPrinted = o.LabelPrinted ? 'تم' : 'لم يُطبع';
+                                        const receiveTxt = returned ? (o.ReturnedOrderReceived ? 'تم' : 'لم يُسلّم') : '-';
                                         return `<tr class="${returned ? 'order-returned' : ''}">
                                             <td>${statusTxt}</td>
                                             <td>${o.AdminOrderNo || '-'}</td>
@@ -1543,6 +1621,7 @@ const screens = {
                                             <td class="iqd">${formatIQD(getAmountDue(o))}</td>
                                             <td><span class="badge ${o.FeesCollected ? 'badge-delivered' : 'badge-new'}">${o.FeesCollected ? 'تم' : 'لم يُسد'}</span></td>
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
+                                            <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
                                             <td title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 30)}</td>
                                         </tr>`;
@@ -1610,12 +1689,13 @@ const screens = {
                         <div class="report-section-title">تفاصيل الطلبات</div>
                         <div class="report-table-wrap">
                             <table class="report-table">
-                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>الهاتف</th><th class="col-address">العنوان</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>أنشأه</th></tr></thead>
+                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>الهاتف</th><th class="col-address">العنوان</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th></tr></thead>
                                 <tbody>
                                     ${allOrders.map(o => {
                                         const returned = isOrderReturned(o);
                                         const statusTxt = STATUS_MAP[o.Status || o.status] || (o.Status || o.status) || '-';
                                         const labelPrinted = o.LabelPrinted ? 'تم' : 'لم يُطبع';
+                                        const receiveTxt = returned ? (o.ReturnedOrderReceived ? 'تم' : 'لم يُسلّم') : '-';
                                         return `<tr class="${returned ? 'order-returned' : ''}">
                                             <td>${statusTxt}</td>
                                             <td>${o.AdminOrderNo || '-'}</td>
@@ -1631,6 +1711,7 @@ const screens = {
                                             <td class="iqd">${formatIQD(getAmountDue(o))}</td>
                                             <td><span class="badge ${o.FeesCollected ? 'badge-delivered' : 'badge-new'}">${o.FeesCollected ? 'تم' : 'لم يُسد'}</span></td>
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
+                                            <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
                                         </tr>`;
                                     }).join('')}
@@ -1653,8 +1734,12 @@ const screens = {
                         <p>التاريخ: ${currentDriverReport.date} | عدد الطلبات: ${currentDriverReport.count}</p>
                         <p>المبلغ النهائي: ${formatIQD(currentDriverReport.net)} د.ع | المبلغ المستحق: ${formatIQD(currentDriverReport.totalDue)} د.ع</p>
                         <table border="1" style="width:100%;border-collapse:collapse;margin-top:16px">
-                        <tr><th>رقم الطلب</th><th>رقم الشحنة</th><th>اسم المستلم</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>الطباعة</th><th>أنشأه</th></tr>
-                        ${currentDriverReport.orders.map(o => `<tr><td>${o.AdminOrderNo || '-'}</td><td>${o.ShipmentNumber}</td><td>${o.CustomerName}</td><td>${o.FreeDelivery ? 'مجاني ' + formatIQD(da(o)) : formatIQD(da(o))}</td><td>${formatIQD(o.TotalIQD)}</td><td>${formatIQD(getAmountDue(o))}</td><td>${o.LabelPrinted ? 'تم' : 'لم يُطبع'}</td><td>${o.CreatedByName || '-'}</td></tr>`).join('')}
+                        <tr><th>رقم الطلب</th><th>رقم الشحنة</th><th>اسم المستلم</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th></tr>
+                        ${currentDriverReport.orders.map(o => {
+                            const ret = isOrderReturned(o);
+                            const rec = ret ? (o.ReturnedOrderReceived ? 'تم' : 'لم يُسلّم') : '-';
+                            return `<tr><td>${o.AdminOrderNo || '-'}</td><td>${o.ShipmentNumber}</td><td>${o.CustomerName}</td><td>${o.FreeDelivery ? 'مجاني ' + formatIQD(da(o)) : formatIQD(da(o))}</td><td>${formatIQD(o.TotalIQD)}</td><td>${formatIQD(getAmountDue(o))}</td><td>${o.LabelPrinted ? 'تم' : 'لم يُطبع'}</td><td>${rec}</td><td>${o.CreatedByName || '-'}</td></tr>`;
+                        }).join('')}
                         </table>
                         </body></html>
                     `);
@@ -1693,12 +1778,12 @@ const screens = {
             } catch (_) {}
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             container.innerHTML = `
-                <div class="screen active">
+                <div class="screen active settings-screen">
                     <h1 class="page-title">الإعدادات</h1>
                     <div class="card settings-section">
                         <h3>المناطق وتكلفة التوصيل</h3>
-                        <p style="color:#64748b;margin-bottom:16px">أضف المناطق وتكلفة توصيل كل منطقة. تظهر في قائمة منسدلة عند إدخال الطلب.</p>
-                        <div class="form-grid" style="margin-bottom:16px">
+                        <p class="section-desc">أضف المناطق وتكلفة توصيل كل منطقة. تظهر في قائمة منسدلة عند إدخال الطلب.</p>
+                        <div class="form-grid">
                             <div class="form-group">
                                 <label>اسم المنطقة</label>
                                 <input type="text" id="newRegionName" placeholder="مثال: الكرادة">
@@ -1708,30 +1793,33 @@ const screens = {
                                 <input type="number" id="newRegionFee" min="0" placeholder="0">
                             </div>
                             <div class="form-group" style="align-items:flex-end">
+                                <label>&nbsp;</label>
                                 <button type="button" class="btn btn-primary" id="btnAddRegion">إضافة منطقة</button>
                             </div>
                         </div>
-                        <div class="drivers-table-wrap">
-                            <table class="drivers-table">
-                                <thead><tr><th>اسم المنطقة</th><th>تكلفة التوصيل</th><th>إجراء</th></tr></thead>
+                        <div class="settings-table-wrap">
+                            <table class="settings-table">
+                                <thead><tr><th>اسم المنطقة</th><th>تكلفة التوصيل (د.ع)</th><th>إجراء</th></tr></thead>
                                 <tbody>
-                                    ${regions.map(r => `
+                                    ${regions.length ? regions.map(r => `
                                         <tr data-id="${r.RegionID}">
-                                            <td><input type="text" class="edit-region-name" value="${esc(r.RegionName)}"></td>
+                                            <td><input type="text" class="edit-region-name" value="${esc(r.RegionName)}" placeholder="اسم المنطقة"></td>
                                             <td><input type="number" class="edit-region-fee" value="${r.DeliveryFeeIQD || 0}" min="0"></td>
                                             <td>
-                                                <button type="button" class="btn btn-secondary btn-sm btn-save-region">حفظ</button>
-                                                <button type="button" class="btn btn-sm btn-delete btn-delete-region" data-id="${r.RegionID}" data-name="${esc(r.RegionName)}">حذف</button>
+                                                <div class="cell-actions">
+                                                    <button type="button" class="btn btn-primary btn-sm btn-save-region">حفظ</button>
+                                                    <button type="button" class="btn btn-sm btn-delete btn-delete-region" data-id="${r.RegionID}" data-name="${esc(r.RegionName)}">حذف</button>
+                                                </div>
                                             </td>
                                         </tr>
-                                    `).join('')}
+                                    `).join('') : '<tr><td colspan="3" class="empty-table-msg">لا توجد مناطق. أضف منطقة جديدة أعلاه.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
                     </div>
                     <div class="card settings-section">
                         <h3>القيم الافتراضية للطلبات</h3>
-                        <p style="color:#64748b;margin-bottom:16px">تُعرض تلقائياً عند إدخال طلب جديد ويمكن تغييرها في نموذج الطلب.</p>
+                        <p class="section-desc">تُعرض تلقائياً عند إدخال طلب جديد ويمكن تغييرها في نموذج الطلب.</p>
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>اسم المتجر الافتراضي</label>
@@ -1741,20 +1829,25 @@ const screens = {
                                 <label>هاتف المتجر الافتراضي</label>
                                 <input type="text" id="defaultStorePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="مثال: 07701234567">
                             </div>
+                            <div class="form-group" style="align-items:flex-end">
+                                <label>&nbsp;</label>
+                                <button type="button" class="btn btn-primary" id="btnSaveDefaults">حفظ القيم الافتراضية</button>
+                            </div>
                         </div>
-                        <button type="button" class="btn btn-primary" id="btnSaveDefaults" style="margin-top:12px">حفظ القيم الافتراضية</button>
                     </div>
                     <div class="card settings-section">
                         <h3>حول النظام</h3>
-                        <p><strong>شركة ديما الحياة</strong> - نظام إدارة التوصيل</p>
-                        <p>الإصدار 1.0</p>
-                        <p>العملة: الدينار العراقي (IQD)</p>
-                        <p class="status-map">
-                            حالات الطلبات: <span class="badge badge-new">جديد</span>
-                            <span class="badge badge-assigned">مع السائق</span>
-                            <span class="badge badge-delivered">تم التوصيل</span>
-                            <span class="badge badge-returned">راجع</span>
-                        </p>
+                        <div class="settings-about">
+                            <p><strong>شركة ديما الحياة</strong> - نظام إدارة التوصيل</p>
+                            <p>الإصدار 1.0 · العملة: الدينار العراقي (IQD)</p>
+                            <div class="badge-group">
+                                <span class="status-map">حالات الطلبات:</span>
+                                <span class="badge badge-new">جديد</span>
+                                <span class="badge badge-assigned">مع السائق</span>
+                                <span class="badge badge-delivered">تم التوصيل</span>
+                                <span class="badge badge-returned">راجع</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -1777,7 +1870,7 @@ const screens = {
                     refreshRegions();
                 } catch (e) { await showMsg('خطأ: ' + (e?.message || e)); }
             });
-            container.querySelector('.drivers-table tbody')?.addEventListener('click', async (e) => {
+            container.querySelector('.settings-table tbody')?.addEventListener('click', async (e) => {
                 const btn = e.target.closest('button');
                 if (!btn) return;
                 const row = btn.closest('tr');
@@ -1812,11 +1905,12 @@ const screens = {
             }
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             container.innerHTML = `
-                <div class="screen active">
+                <div class="screen active users-screen">
                     <h1 class="page-title">إدارة المستخدمين</h1>
-                    <div class="card">
+                    <div class="card users-add-card">
                         <h3>إضافة مستخدم جديد</h3>
-                        <div class="form-grid" style="margin-top:16px">
+                        <p class="section-desc">أضف مستخدماً جديداً للنظام مع تحديد الدور والصلاحيات.</p>
+                        <div class="form-grid">
                             <div class="form-group">
                                 <label>اسم المستخدم</label>
                                 <input type="text" id="newUserUsername" placeholder="مثال: employee1">
@@ -1837,19 +1931,24 @@ const screens = {
                                 </select>
                             </div>
                             <div class="form-group" style="align-items:flex-end">
+                                <label>&nbsp;</label>
                                 <button type="button" class="btn btn-primary" id="btnAddUser">إضافة مستخدم</button>
                             </div>
                         </div>
-                        <div class="drivers-table-wrap" style="margin-top:24px">
-                            <table class="drivers-table">
+                    </div>
+                    <div class="card users-list-card">
+                        <h3>قائمة المستخدمين</h3>
+                        <p class="section-desc">إدارة المستخدمين وتعديل الأدوار والحالة.</p>
+                        <div class="users-table-wrap">
+                            <table class="users-table">
                                 <thead>
                                     <tr><th>اسم المستخدم</th><th>الاسم المعروض</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr>
                                 </thead>
                                 <tbody>
-                                    ${users.map(u => `
-                                        <tr data-id="${u.UserID}">
-                                            <td>${esc(u.Username)}</td>
-                                            <td><input type="text" class="edit-display-name" value="${esc(u.DisplayName || '')}"></td>
+                                    ${users.length ? users.map(u => `
+                                        <tr data-id="${u.UserID}" class="${u.Active ? '' : 'user-inactive'}">
+                                            <td><strong>${esc(u.Username)}</strong></td>
+                                            <td><input type="text" class="edit-display-name" value="${esc(u.DisplayName || '')}" placeholder="الاسم المعروض"></td>
                                             <td>
                                                 <select class="edit-role">
                                                     <option value="employee" ${u.Role === 'employee' ? 'selected' : ''}>موظف</option>
@@ -1858,11 +1957,13 @@ const screens = {
                                             </td>
                                             <td><label class="checkbox-label"><input type="checkbox" class="edit-active" ${u.Active ? 'checked' : ''}> نشط</label></td>
                                             <td>
-                                                <button type="button" class="btn btn-secondary btn-sm btn-save-user">حفظ</button>
-                                                <button type="button" class="btn btn-sm btn-delete btn-delete-user" data-id="${u.UserID}" data-username="${esc(u.Username)}">حذف</button>
+                                                <div class="cell-actions">
+                                                    <button type="button" class="btn btn-primary btn-sm btn-save-user">حفظ</button>
+                                                    <button type="button" class="btn btn-sm btn-delete btn-delete-user" data-id="${u.UserID}" data-username="${esc(u.Username)}">حذف</button>
+                                                </div>
                                             </td>
                                         </tr>
-                                    `).join('')}
+                                    `).join('') : '<tr><td colspan="5" class="empty-table-msg">لا يوجد مستخدمون. أضف مستخدماً جديداً أعلاه.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
@@ -1884,7 +1985,7 @@ const screens = {
                     refresh();
                 } catch (e) { await showMsg('خطأ: ' + (e?.message || e)); }
             };
-            container.querySelector('.drivers-table tbody').onclick = async (e) => {
+            container.querySelector('.users-table tbody').onclick = async (e) => {
                 const btn = e.target.closest('button');
                 if (!btn) return;
                 const row = btn.closest('tr');

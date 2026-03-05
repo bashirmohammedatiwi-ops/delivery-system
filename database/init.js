@@ -125,6 +125,8 @@ async function initSchema() {
     try { nativeDb.run('ALTER TABLE Orders ADD COLUMN ReturnReason TEXT'); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE Orders ADD COLUMN ReturnedDate TEXT'); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE Orders ADD COLUMN ReturnedByDriverID INTEGER'); saveDb(); } catch (e) {}
+    try { nativeDb.run('ALTER TABLE Orders ADD COLUMN ReturnedOrderReceived INTEGER DEFAULT 0'); saveDb(); } catch (e) {}
+    try { nativeDb.run('ALTER TABLE Orders ADD COLUMN ReturnedOrderReceivedAt TEXT'); saveDb(); } catch (e) {}
 
     try {
         nativeDb.run(`CREATE TABLE IF NOT EXISTS Regions (

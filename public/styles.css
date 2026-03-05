@@ -188,6 +188,34 @@ body {
     grid-column: 1 / -1;
 }
 
+.form-group.align-left {
+    flex-direction: row;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.form-group.amounts-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.form-group.amounts-row .amounts-block {
+    flex: 1;
+    min-width: 140px;
+}
+
+.form-group.amounts-row .free-delivery-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin: 0;
+    white-space: nowrap;
+}
+
 .form-group label {
     margin-bottom: 6px;
     font-weight: 500;
@@ -756,8 +784,182 @@ tbody tr:hover {
     font-size: 1.1rem;
 }
 
+/* ─── قسم الإعدادات ─── */
+.settings-screen .page-title {
+    margin-bottom: 28px;
+}
 .settings-section {
-    max-width: 600px;
+    margin-bottom: 28px;
+    overflow: hidden;
+}
+.settings-section:last-child {
+    margin-bottom: 0;
+}
+.settings-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--primary-dark);
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(13, 148, 136, 0.15);
+}
+.settings-section h3::before {
+    content: '';
+    width: 4px;
+    height: 22px;
+    background: linear-gradient(180deg, var(--primary) 0%, var(--primary-dark) 100%);
+    border-radius: 2px;
+}
+.settings-section .section-desc,
+.users-add-card .section-desc,
+.users-list-card .section-desc {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+.settings-section .form-grid {
+    margin-bottom: 20px;
+}
+.settings-about {
+    background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 100%);
+    border: 1px solid rgba(13, 148, 136, 0.2);
+    padding: 24px;
+    border-radius: 12px;
+    margin-top: 8px;
+}
+.settings-about p {
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+.settings-about .badge-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 16px;
+    align-items: center;
+}
+.settings-about .badge-group .status-map {
+    margin: 0;
+    margin-left: 8px;
+}
+
+/* ─── الجداول في الإعدادات والمستخدمين ─── */
+.settings-table-wrap,
+.users-table-wrap {
+    overflow-x: auto;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: #fff;
+    margin-top: 20px;
+}
+.settings-table,
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+.settings-table thead th,
+.users-table thead th {
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    padding: 14px 16px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    border-bottom: 2px solid var(--border);
+}
+.settings-table tbody tr,
+.users-table tbody tr {
+    transition: background 0.15s;
+}
+.settings-table tbody tr:nth-child(even),
+.users-table tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+.settings-table tbody tr:hover,
+.users-table tbody tr:hover {
+    background: #f0fdfa !important;
+}
+.settings-table tbody td,
+.users-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+}
+.settings-table tbody tr:last-child td,
+.users-table tbody tr:last-child td {
+    border-bottom: none;
+}
+.settings-table .edit-region-name,
+.settings-table .edit-region-fee,
+.users-table .edit-display-name,
+.users-table .edit-role {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+.settings-table .edit-region-name:focus,
+.settings-table .edit-region-fee:focus,
+.users-table .edit-display-name:focus,
+.users-table .edit-role:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+}
+.settings-table .cell-actions,
+.users-table .cell-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.users-table .role-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+.users-table .role-badge.admin {
+    background: #ede9fe;
+    color: #6d28d9;
+}
+.users-table .role-badge.employee {
+    background: #e0f2fe;
+    color: #0369a1;
+}
+.users-table .user-inactive {
+    opacity: 0.6;
+}
+
+/* ─── قسم المستخدمين ─── */
+.users-screen .page-title {
+    margin-bottom: 28px;
+}
+.users-add-card {
+    margin-bottom: 24px;
+}
+.users-add-card h3 {
+    color: var(--primary-dark);
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+.users-add-card .form-grid {
+    margin-bottom: 16px;
+}
+.users-list-card h3 {
+    color: var(--primary-dark);
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+}
+.empty-table-msg {
+    padding: 32px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.95rem;
 }
 
 .status-map {

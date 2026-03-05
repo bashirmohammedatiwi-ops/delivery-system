@@ -565,6 +565,18 @@ app.post('/api/orders/:id/mark-label-printed', requireAppAuth, async (req, res) 
     }
 });
 
+app.post('/api/orders/:id/receive-returned', requireAppAuth, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (!id || isNaN(id)) return res.status(400).json({ error: 'رقم الطلب غير صالح' });
+        const result = orderService.markReturnedOrderReceived(id);
+        if (!result.success) return res.status(400).json({ error: result.error });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── API: التقارير (المدير فقط) ───
 app.get('/api/reports/driver', requireAppAuth, requireAdmin, async (req, res) => {
     try {

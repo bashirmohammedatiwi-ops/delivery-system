@@ -397,7 +397,7 @@ async function generateDriverReportPDF(report) {
         { width: 48, label: 'المتجر' },
         { width: 48, label: 'المستلم' },
         { width: 46, label: 'الهاتف' },
-        { width: 88, label: 'العنوان' },
+        { width: 80, label: 'العنوان' },
         { width: 18, label: 'قطع' },
         { width: 48, label: 'فاتورة' },
         { width: 48, label: 'توصيل' },
@@ -405,12 +405,14 @@ async function generateDriverReportPDF(report) {
         { width: 48, label: 'المستحق' },
         { width: 28, label: 'سداد' },
         { width: 34, label: 'طباعة' },
+        { width: 36, label: 'استلام' },
         { width: 42, label: 'أنشأه' },
-        { width: 58, label: 'ملاحظات' }
+        { width: 52, label: 'ملاحظات' }
     ];
     const wrap = (s, n) => (s || '-').toString().slice(0, n);
     const BOTTOM_MARGIN = 85;
     const numericCols = [1, 2, 5, 7, 8, 9, 10, 11, 12];
+    const receiveTxt = (o) => isOrderReturned(o) ? (o.ReturnedOrderReceived ? 'تم' : 'لم يُسلّم') : '-';
 
     y += drawTableHead(doc, cols, y, font, true);
 
@@ -425,7 +427,7 @@ async function generateDriverReportPDF(report) {
             wrap(o.StoreName, 18),
             wrap(o.CustomerName, 16),
             wrap(o.CustomerPhone, 10),
-            wrap(getFullAddress(o), 50),
+            wrap(getFullAddress(o), 45),
             (o.Pieces || 1).toString(),
             formatIQD(o.AmountIQD),
             o.FreeDelivery ? txt('مجاني') + ' ' + formatIQD(driverAmt) : formatIQD(driverAmt),
@@ -433,8 +435,9 @@ async function generateDriverReportPDF(report) {
             formatIQD(due),
             o.FeesCollected ? 'تم' : '-',
             o.LabelPrinted ? 'تم' : '-',
+            receiveTxt(o),
             wrap(o.CreatedByName, 14),
-            wrap(o.Notes, 35)
+            wrap(o.Notes, 30)
         ];
         const rowH = getTableRowHeight(doc, cols, cells, font, null, numericCols);
         if (y + rowH > PAGE_HEIGHT - BOTTOM_MARGIN) {
@@ -640,20 +643,22 @@ async function generateCompanyReportPDF(report) {
         { width: 44, label: 'المتجر' },
         { width: 44, label: 'المستلم' },
         { width: 44, label: 'الهاتف' },
-        { width: 90, label: 'العنوان' },
+        { width: 82, label: 'العنوان' },
         { width: 44, label: 'فاتورة' },
         { width: 44, label: 'توصيل' },
         { width: 46, label: 'النهائي' },
         { width: 46, label: 'المستحق' },
         { width: 26, label: 'سداد' },
         { width: 32, label: 'طباعة' },
-        { width: 40, label: 'أنشأه' }
+        { width: 36, label: 'استلام' },
+        { width: 38, label: 'أنشأه' }
     ];
     const wrap = (s, n) => (s || '-').toString().slice(0, n);
     const BOTTOM_MARGIN = 85;
 
     y += drawTableHead(doc, detCols, y, font, true);
 
+    const receiveTxtCompany = (o) => isOrderReturned(o) ? (o.ReturnedOrderReceived ? 'تم' : 'لم يُسلّم') : '-';
     allOrders.forEach((o, i) => {
         const statusTxt = STATUS_LABELS[o.Status || o.status] || (o.Status || o.status) || '-';
         const driverAmt = getDriverDeliveryAmount(o);
@@ -666,13 +671,14 @@ async function generateCompanyReportPDF(report) {
             wrap(o.StoreName, 18),
             wrap(o.CustomerName, 16),
             wrap(o.CustomerPhone, 10),
-            wrap(getFullAddress(o), 50),
+            wrap(getFullAddress(o), 45),
             formatIQD(o.AmountIQD),
             o.FreeDelivery ? txt('مجاني') + ' ' + formatIQD(driverAmt) : formatIQD(driverAmt),
             formatIQD(o.TotalIQD),
             formatIQD(due),
             o.FeesCollected ? 'تم' : '-',
             o.LabelPrinted ? 'تم' : '-',
+            receiveTxtCompany(o),
             wrap(o.CreatedByName, 14)
         ];
         const detNumericCols = [1, 2, 6, 8, 9, 10, 11];
@@ -728,6 +734,7 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
                o.Pieces, o.AmountIQD,
                o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
                o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate, COALESCE(o.LabelPrinted, 0) AS LabelPrinted,
+               COALESCE(o.ReturnedOrderReceived, 0) AS ReturnedOrderReceived,
                u.DisplayName AS CreatedByName,
                CASE WHEN LOWER(TRIM(o.Status)) IN ('canceled','returned') OR o.Status LIKE '%ملغي%' OR o.Status LIKE '%راجع%'
                     OR o.Status IN ('RejectedByCustomer','Returned','ملغي','Canceled') THEN 'Returned'
@@ -735,9 +742,9 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         FROM Orders o
         LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID
         LEFT JOIN Regions r ON o.RegionID = r.RegionID
-        WHERE o.DriverID = ? AND date(o.CreatedDate) >= date(?) AND date(o.CreatedDate) <= date(?)
+        WHERE (o.DriverID = ? OR o.ReturnedByDriverID = ?) AND date(o.CreatedDate) >= date(?) AND date(o.CreatedDate) <= date(?)
         ORDER BY o.OrderID
-    `).all(driverId, dateFrom, dTo);
+    `).all(driverId, driverId, dateFrom, dTo);
     feeCollectionService.markOrdersWithFeesCollected(orders);
     const validOrders = orders.filter(o => !isOrderReturned(o));
     const countReturned = orders.filter(o => isOrderReturned(o)).length;
@@ -783,18 +790,21 @@ function getCompanyReportByRange(dateFrom, dateTo) {
                o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName,
                o.Pieces, o.AmountIQD,
                o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
-               o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate, d.DriverName,
+               o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate,
+               COALESCE(d.DriverName, rd.DriverName) AS DriverName,
                u.DisplayName AS CreatedByName,
                COALESCE(o.LabelPrinted, 0) AS LabelPrinted,
+               COALESCE(o.ReturnedOrderReceived, 0) AS ReturnedOrderReceived,
                CASE WHEN LOWER(TRIM(o.Status)) IN ('canceled','returned') OR o.Status LIKE '%ملغي%' OR o.Status LIKE '%راجع%'
                     OR o.Status IN ('RejectedByCustomer','Returned','ملغي','Canceled') THEN 'Returned'
                     ELSE COALESCE(o.Status, 'New') END AS Status
         FROM Orders o
         LEFT JOIN Drivers d ON o.DriverID = d.DriverID
+        LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID
         LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID
         LEFT JOIN Regions r ON o.RegionID = r.RegionID
         WHERE date(o.CreatedDate) >= date(?) AND date(o.CreatedDate) <= date(?)
-        ORDER BY d.DriverName, o.OrderID
+        ORDER BY COALESCE(d.DriverName, rd.DriverName), o.OrderID
     `).all(dateFrom, dTo);
     feeCollectionService.markOrdersWithFeesCollected(raw);
     const orders = raw;

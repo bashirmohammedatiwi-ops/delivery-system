@@ -353,6 +353,19 @@ function getDriverReturnedOrders(driverId, date) {
     ).all(driverId, d);
 }
 
+function markReturnedOrderReceived(orderId) {
+    const database = db.getDatabase();
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, error: 'الطلب غير موجود' };
+    const s = String(order.Status || '').trim();
+    if (s !== 'Returned') return { success: false, error: 'الطلب ليس راجعاً - لا يمكن استلامه' };
+
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    database.prepare('UPDATE Orders SET ReturnedOrderReceived = 1, ReturnedOrderReceivedAt = ? WHERE OrderID = ?')
+        .run(now, orderId);
+    return { success: true, order: getOrderById(orderId) };
+}
+
 module.exports = {
     createOrder,
     getOrderByShipmentNumber,
@@ -368,5 +381,6 @@ module.exports = {
     markReturnedByDriver,
     getDriverStats,
     getDriverDeliveredOrders,
-    getDriverReturnedOrders
+    getDriverReturnedOrders,
+    markReturnedOrderReceived
 };

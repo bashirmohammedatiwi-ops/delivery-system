@@ -113,7 +113,8 @@ window.api = {
             const blob = await apiPostBlob('/api/label/pdf', order);
             return URL.createObjectURL(blob);
         },
-        markLabelPrinted: (orderId) => apiPost('/api/orders/' + orderId + '/mark-label-printed', {})
+        markLabelPrinted: (orderId) => apiPost('/api/orders/' + orderId + '/mark-label-printed', {}),
+        markReturnedOrderReceived: (orderId) => apiPost('/api/orders/' + orderId + '/receive-returned', {})
     },
 
     drivers: {
