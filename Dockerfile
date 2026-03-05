@@ -30,6 +30,7 @@ COPY server.js ./
 COPY database ./database
 COPY public ./public
 COPY services ./services
+COPY fonts ./fonts
 
 # Create data directory for SQLite (writable by app)
 RUN mkdir -p data && chown -R nodejs:nodejs /app

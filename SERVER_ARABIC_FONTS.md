@@ -6,6 +6,24 @@
 
 ---
 
+## نشر عبر Docker
+
+تم تكوين المشروع مسبقاً ليشمل الخطوط:
+
+- **Dockerfile**: ينسخ مجلد `fonts/` داخل الصورة.
+- **docker-compose.yml**: يربط مجلد `./fonts` كـ Volume على المسار `/app/fonts`.
+
+عند التشغيل:
+
+```bash
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+تأكد أن مجلد `fonts` وملف `Amiri-Regular.ttf` موجودان في نفس مستوى `docker-compose.yml` قبل التنفيذ.
+
+---
+
 ## خطوات احتياطية على السيرفر (Linux)
 
 إذا لم يُنسخ مجلد `fonts` أو أردت ضمان وجود خطوط عربية في النظام، نفّذ الأوامر التالية على السيرفر:
