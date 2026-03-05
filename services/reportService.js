@@ -39,21 +39,16 @@ function formatIQD(val) {
 }
 
 function getArabicFont(doc) {
-    // 1) خط داخل المشروع أو في node_modules (يعمل على Windows و Linux و Docker)
-    const projectFonts = [
-        path.join(__dirname, '..', 'fonts', 'Amiri-Regular.ttf'),
-        path.join(__dirname, '..', 'node_modules', '@fontsource', 'amiri', 'files', 'amiri-arabic-400-normal.woff'),
-        path.join(__dirname, '..', 'node_modules', '@fontsource', 'amiri', 'files', 'amiri-arabic-400-normal.woff2')
-    ];
-    for (const fp of projectFonts) {
-        if (fs.existsSync(fp)) {
-            doc.registerFont('Arabic', fp);
-            return 'Arabic';
-        }
+    // 1) خط داخل المشروع (يعمل على Windows و Linux و Docker) - PDFKit يدعم TTF فقط
+    const projectFont = path.join(__dirname, '..', 'fonts', 'Amiri-Regular.ttf');
+    if (fs.existsSync(projectFont)) {
+        doc.registerFont('Arabic', projectFont);
+        return 'Arabic';
     }
-    // 2) Linux
+    // 2) Linux: خطوط النظام (يجب تثبيتها على السيرفر)
     const linuxFonts = [
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+        '/usr/share/fonts/truetype/amiri/Amiri-Regular.ttf',     // fonts-amiri
+        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',       // fonts-dejavu-core
         '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'
     ];
     for (const fp of linuxFonts) {
