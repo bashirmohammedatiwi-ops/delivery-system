@@ -730,7 +730,7 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
     const dTo = dateTo || dateFrom;
     const orders = db_.prepare(`
         SELECT o.OrderID, o.AdminOrderNo, o.ShipmentNumber, o.StoreName, o.StorePhone,
-               o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName,
+               o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName, r.RegionArea,
                o.Pieces, o.AmountIQD,
                o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
                o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate, COALESCE(o.LabelPrinted, 0) AS LabelPrinted,
@@ -760,6 +760,8 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         deliveryFeeBreakdown[fee] = (deliveryFeeBreakdown[fee] || 0) + 1;
     });
     const dateStr = dateFrom === dTo ? dateFrom : dateFrom + ' إلى ' + dTo;
+    const countKarkh = validOrders.filter(o => (o.RegionArea || '') === 'الكرخ').length;
+    const countRusafa = validOrders.filter(o => (o.RegionArea || '') === 'الرصافة').length;
     return {
         driver,
         date: dateStr,
@@ -768,6 +770,8 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         orders,
         count: validOrders.length,
         countReturned,
+        countKarkh,
+        countRusafa,
         totalAmount,
         totalDelivery,
         net,
@@ -787,7 +791,7 @@ function getCompanyReportByRange(dateFrom, dateTo) {
     const dTo = dateTo || dateFrom;
     const raw = db_.prepare(`
         SELECT o.OrderID, o.AdminOrderNo, o.ShipmentNumber, o.StoreName, o.StorePhone,
-               o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName,
+               o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName, r.RegionArea,
                o.Pieces, o.AmountIQD,
                o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
                o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate,
@@ -830,6 +834,8 @@ function getCompanyReportByRange(dateFrom, dateTo) {
     const totalReturned = orders.filter(o => isOrderReturned(o)).length;
     const countFreeDelivery = validAll.filter(o => o.FreeDelivery).length;
     const countPaidDelivery = validAll.filter(o => !o.FreeDelivery).length;
+    const countKarkh = validAll.filter(o => (o.RegionArea || '') === 'الكرخ').length;
+    const countRusafa = validAll.filter(o => (o.RegionArea || '') === 'الرصافة').length;
     const deliveryFeeBreakdown = {};
     validAll.filter(o => !o.FreeDelivery).forEach(o => {
         const fee = Math.round(o.DeliveryFeeIQD || 0);

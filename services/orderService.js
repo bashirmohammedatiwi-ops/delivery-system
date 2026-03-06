@@ -33,8 +33,8 @@ function createOrder(orderData) {
 
     const stmt = database.prepare(`
         INSERT INTO Orders (AdminOrderNo, ShipmentNumber, StoreName, StorePhone, CustomerName, CustomerPhone, 
-            Address, RegionID, Pieces, AmountIQD, DeliveryFeeIQD, FreeDelivery, WaivedDeliveryIQD, TotalIQD, Notes, Status, CreatedByUserID)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?)
+            Address, RegionID, Pieces, AmountIQD, DeliveryFeeIQD, FreeDelivery, WaivedDeliveryIQD, TotalIQD, Notes, CustomerLocationLink, Status, CreatedByUserID)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?)
     `);
 
     stmt.run(
@@ -53,6 +53,7 @@ function createOrder(orderData) {
         waivedDeliveryIQD,
         totalIQD,
         orderData.Notes || '',
+        (orderData.CustomerLocationLink || '').trim() || null,
         createdByUserID
     );
 
@@ -117,7 +118,7 @@ function returnOrderFromDriver(shipmentNumber) {
 
 function getOrders(filters = {}) {
     const database = db.getDatabase();
-    let sql = `SELECT o.*, d.DriverName, u.DisplayName AS CreatedByName, r.RegionName 
+    let sql = `SELECT o.*, d.DriverName, u.DisplayName AS CreatedByName, r.RegionName, r.RegionArea 
                FROM Orders o LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
                LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID 
                LEFT JOIN Regions r ON o.RegionID = r.RegionID 
@@ -199,7 +200,7 @@ function updateOrder(orderId, orderData) {
         UPDATE Orders SET
             AdminOrderNo = ?, StoreName = ?, StorePhone = ?, CustomerName = ?, CustomerPhone = ?,
             Address = ?, RegionID = ?, Pieces = ?, AmountIQD = ?, DeliveryFeeIQD = ?, FreeDelivery = ?,
-            WaivedDeliveryIQD = ?, TotalIQD = ?, Notes = ?, Status = ?
+            WaivedDeliveryIQD = ?, TotalIQD = ?, Notes = ?, CustomerLocationLink = ?, Status = ?
         WHERE OrderID = ?
     `).run(
         (orderData.AdminOrderNo ?? order.AdminOrderNo ?? '').trim() || null,
@@ -216,6 +217,7 @@ function updateOrder(orderId, orderData) {
         waivedDeliveryIQD,
         totalIQD,
         orderData.Notes ?? order.Notes ?? '',
+        (orderData.CustomerLocationLink ?? order.CustomerLocationLink ?? '').toString().trim() || null,
         newStatus,
         orderId
     );
@@ -353,6 +355,22 @@ function getDriverReturnedOrders(driverId, date) {
     ).all(driverId, d);
 }
 
+function getPendingOrdersByArea(dateFrom, dateTo) {
+    const database = db.getDatabase();
+    const dTo = dateTo || dateFrom;
+    const rows = database.prepare(`
+        SELECT date(o.CreatedDate) AS orderDate,
+               SUM(CASE WHEN COALESCE(r.RegionArea, 'الرصافة') = 'الكرخ' THEN 1 ELSE 0 END) AS countKarkh,
+               SUM(CASE WHEN COALESCE(r.RegionArea, 'الرصافة') = 'الرصافة' THEN 1 ELSE 0 END) AS countRusafa
+        FROM Orders o
+        LEFT JOIN Regions r ON o.RegionID = r.RegionID
+        WHERE o.Status = 'New' AND date(o.CreatedDate) >= date(?) AND date(o.CreatedDate) <= date(?)
+        GROUP BY date(o.CreatedDate)
+        ORDER BY orderDate DESC
+    `).all(dateFrom, dTo);
+    return rows;
+}
+
 function markReturnedOrderReceived(orderId) {
     const database = db.getDatabase();
     const order = getOrderById(orderId);
@@ -382,5 +400,6 @@ module.exports = {
     getDriverStats,
     getDriverDeliveredOrders,
     getDriverReturnedOrders,
-    markReturnedOrderReceived
+    markReturnedOrderReceived,
+    getPendingOrdersByArea
 };

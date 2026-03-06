@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import OrdersScreen from '../screens/OrdersScreen';
 import ReceiveOrderScreen from '../screens/ReceiveOrderScreen';
+import PendingOrdersScreen from '../screens/PendingOrdersScreen';
 import StatsScreen from '../screens/StatsScreen';
 import OrdersHistoryScreen from '../screens/OrdersHistoryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
@@ -9,6 +10,7 @@ import SettingsScreen from '../screens/SettingsScreen';
 const TABS = [
   { key: 'orders', label: 'طلباتي', icon: '📦' },
   { key: 'receive', label: 'استلام', icon: '📷' },
+  { key: 'pending', label: 'منتظرة', icon: '⏳' },
   { key: 'stats', label: 'إحصائيات', icon: '📊' },
   { key: 'history', label: 'السجل', icon: '📋' },
   { key: 'settings', label: 'إعدادات', icon: '⚙️' },

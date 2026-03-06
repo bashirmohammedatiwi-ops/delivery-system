@@ -133,8 +133,8 @@ window.api = {
 
     regions: {
         getAll: () => apiGet('/api/regions'),
-        create: (regionName, deliveryFeeIQD) => apiPost('/api/regions', { regionName, deliveryFeeIQD }),
-        update: (id, regionName, deliveryFeeIQD) => apiPut('/api/regions/' + id, { regionName, deliveryFeeIQD }),
+        create: (regionName, deliveryFeeIQD, regionArea) => apiPost('/api/regions', { regionName, deliveryFeeIQD, regionArea }),
+        update: (id, regionName, deliveryFeeIQD, regionArea) => apiPut('/api/regions/' + id, { regionName, deliveryFeeIQD, regionArea }),
         delete: (id) => apiDelete('/api/regions/' + id)
     },
 

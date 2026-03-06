@@ -143,6 +143,10 @@ async function showEditOrderModal(container, order, onSuccess) {
                         </label>
                     </div>
                     <div class="form-group full">
+                        <label>رابط موقع الزبون (اختياري)</label>
+                        <input type="url" id="editCustomerLocationLink" placeholder="رابط خرائط جوجل أو موقع التوصيل" value="${(order.CustomerLocationLink || '').replace(/"/g, '&quot;')}">
+                    </div>
+                    <div class="form-group full">
                         <label>ملاحظات</label>
                         <textarea id="editNotes" rows="2">${(order.Notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
                     </div>
@@ -220,6 +224,7 @@ async function showEditOrderModal(container, order, onSuccess) {
             CustomerPhone: document.getElementById('editCustomerPhone').value,
             RegionID: regionEl?.value ? parseInt(regionEl.value) : null,
             Address: document.getElementById('editAddress').value,
+            CustomerLocationLink: (document.getElementById('editCustomerLocationLink')?.value || '').trim() || null,
             Pieces: parseInt(document.getElementById('editPieces').value) || 1,
             AmountIQD: parseFloat(document.getElementById('editAmount').value) || 0,
             DeliveryFeeIQD: parseFloat(document.getElementById('editDeliveryFee').value) || 0,
@@ -271,7 +276,7 @@ async function renderOrdersScreen(container, opts = {}) {
                             <thead>
                                 <tr>
                                     <th>رقم</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>هاتف المستلم</th>
-                                    <th class="col-address">العنوان</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th>
+                                    <th class="col-address">العنوان</th><th>رابط الموقع</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th>
                                     <th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>السائق</th><th>الحالة</th><th>الطباعة</th><th>أنشأه</th><th>التاريخ</th><th>إجراء</th>
                                 </tr>
                             </thead>
@@ -284,6 +289,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                         <td>${o.StoreName || '-'}</td>
                                         <td>${o.CustomerPhone || '-'}</td>
                                         <td class="col-address">${getFullAddress(o)}</td>
+                                        <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="فتح رابط الموقع">📍 رابط</a>` : '-'}</td>
                                         <td>${o.Pieces || 1}</td>
                                         <td class="iqd">${formatIQD(o.AmountIQD)}</td>
                                         <td class="iqd">${o.FreeDelivery ? 'مجاني ' + formatIQD(o.WaivedDeliveryIQD || 0) : formatIQD(o.DeliveryFeeIQD)}</td>
@@ -522,6 +528,8 @@ const screens = {
             const todayOrders = orders.filter(o => (o.CreatedDate || '').startsWith(today));
             const newCount = orders.filter(o => o.Status === 'New').length;
             const assignedCount = orders.filter(o => o.Status === 'AssignedToDriver').length;
+            const todayKarkh = todayOrders.filter(o => (o.RegionArea || '').trim() === 'الكرخ').length;
+            const todayRusafa = todayOrders.filter(o => (o.RegionArea || 'الرصافة').trim() === 'الرصافة').length;
 
             container.innerHTML = `
                 <div class="screen active">
@@ -542,6 +550,14 @@ const screens = {
                         <div class="stat-card">
                             <div class="value">${assignedCount}</div>
                             <div class="label">مع السائقين</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="value">${todayKarkh}</div>
+                            <div class="label">الكرخ اليوم</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="value">${todayRusafa}</div>
+                            <div class="label">الرصافة اليوم</div>
                         </div>
                     </div>
                     <div class="card">
@@ -564,8 +580,6 @@ const screens = {
                 const amt = parseFloat(document.getElementById('amount')?.value || 0);
                 const fee = parseFloat(document.getElementById('deliveryFee')?.value || 0);
                 const freeEl = document.getElementById('freeDelivery');
-                // إذا كان مبلغ الفاتورة 50000 أو أكثر، تحديد التوصيل مجاني تلقائياً
-                if (amt >= 50000 && freeEl) freeEl.checked = true;
                 const free = freeEl?.checked || false;
                 // التوصيل مجاني: النهائي = الفاتورة، المستحق = الفاتورة - أجرة التوصيل | غير مجاني: النهائي = فاتورة + توصيل، المستحق = الفاتورة
                 const total = free ? amt : (amt + fee);
@@ -585,47 +599,47 @@ const screens = {
                         <form id="orderForm">
                             <div class="form-grid">
                                 <div class="form-group">
-                                    <label>رقم الطلب في النظام الإداري</label>
-                                    <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم">
+                                    <label>رقم الطلب في النظام الإداري <span class="required">*</span></label>
+                                    <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>اسم المتجر</label>
+                                    <label>اسم المتجر <span class="required">*</span></label>
                                     <input type="text" id="storeName" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>هاتف المتجر</label>
-                                    <input type="text" id="storePhone">
+                                    <label>هاتف المتجر <span class="required">*</span></label>
+                                    <input type="text" id="storePhone" placeholder="11 رقم" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>اسم المستلم</label>
+                                    <label>اسم المستلم <span class="required">*</span></label>
                                     <input type="text" id="customerName" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>هاتف المستلم</label>
-                                    <input type="text" id="customerPhone">
+                                    <label>هاتف المستلم <span class="required">*</span></label>
+                                    <input type="text" id="customerPhone" placeholder="11 رقم (مثال: 07701234567)" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>المنطقة</label>
-                                    <select id="regionId">
+                                    <label>المنطقة <span class="required">*</span></label>
+                                    <select id="regionId" required>
                                         <option value="">-- اختر المنطقة --</option>
                                         ${regions.map(r => `<option value="${r.RegionID}" data-fee="${r.DeliveryFeeIQD || 0}">${(r.RegionName || '').replace(/</g, '&lt;')} (${formatIQD(r.DeliveryFeeIQD)} د.ع)</option>`).join('')}
                                     </select>
                                 </div>
                                 <div class="form-group full">
-                                    <label>العنوان (تفاصيل العنوان يدوياً)</label>
-                                    <input type="text" id="address" placeholder="اكتب تفاصيل العنوان...">
+                                    <label>العنوان (تفاصيل العنوان يدوياً) <span class="required">*</span></label>
+                                    <input type="text" id="address" placeholder="اكتب تفاصيل العنوان..." required>
                                 </div>
                                 <div class="form-group">
-                                    <label>عدد القطع</label>
-                                    <input type="number" id="pieces" value="1" min="1">
+                                    <label>عدد القطع <span class="required">*</span></label>
+                                    <input type="number" id="pieces" value="1" min="1" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>مبلغ الفاتورة (د.ع)</label>
-                                    <input type="number" id="amount" min="0" step="1" placeholder="0">
+                                    <label>مبلغ الفاتورة (د.ع) <span class="required">*</span></label>
+                                    <input type="number" id="amount" min="0" step="1" placeholder="0" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>أجرة التوصيل (د.ع)</label>
-                                    <input type="number" id="deliveryFee" min="0" step="1" placeholder="0">
+                                    <label>أجرة التوصيل (د.ع) <span class="required">*</span></label>
+                                    <input type="number" id="deliveryFee" min="0" step="1" placeholder="0" required>
                                 </div>
                                 <div class="form-group amounts-row">
                                     <div class="amounts-block">
@@ -639,8 +653,12 @@ const screens = {
                                     </label>
                                 </div>
                                 <div class="form-group full">
-                                    <label>ملاحظات</label>
-                                    <textarea id="notes" rows="2"></textarea>
+                                    <label>رابط موقع الزبون (اختياري)</label>
+                                    <input type="url" id="customerLocationLink" placeholder="رابط خرائط جوجل أو موقع التوصيل">
+                                </div>
+                                <div class="form-group full">
+                                    <label>ملاحظات (اختياري)</label>
+                                    <textarea id="notes" rows="2" placeholder="اكتب ملاحظة إن وجدت"></textarea>
                                 </div>
                             </div>
                             <div class="btn-group">
@@ -683,12 +701,35 @@ const screens = {
             document.getElementById('orderForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 if (isSubmitting || btnSaveOrder?.disabled) return;
+
+                const adminOrderNo = (document.getElementById('adminOrderNo')?.value || '').trim();
+                const storeName = (document.getElementById('storeName')?.value || '').trim();
+                const storePhone = (document.getElementById('storePhone')?.value || '').trim();
+                const customerName = (document.getElementById('customerName')?.value || '').trim();
+                const customerPhone = (document.getElementById('customerPhone')?.value || '').trim();
+                const regionEl = document.getElementById('regionId');
+                const address = (document.getElementById('address')?.value || '').trim();
+                const amount = parseFloat(document.getElementById('amount')?.value || 0);
+                const deliveryFee = parseFloat(document.getElementById('deliveryFee')?.value || 0);
+                const notes = (document.getElementById('notes')?.value || '').trim();
+
+                if (!adminOrderNo) { await showMsg('أدخل رقم الطلب في النظام الإداري'); return; }
+                if (!storeName) { await showMsg('أدخل اسم المتجر'); return; }
+                if (!storePhone) { await showMsg('أدخل هاتف المتجر'); return; }
+                if (!customerName) { await showMsg('أدخل اسم المستلم'); return; }
+                if (!customerPhone) { await showMsg('أدخل هاتف المستلم'); return; }
+                const phoneDigits = (customerPhone || '').replace(/\D/g, '');
+                if (phoneDigits.length !== 11) { await showMsg('هاتف المستلم يجب أن يكون 11 رقماً'); return; }
+                if (!regionEl?.value) { await showMsg('اختر المنطقة'); return; }
+                if (!address) { await showMsg('أدخل العنوان'); return; }
+                if (amount <= 0) { await showMsg('أدخل مبلغ الفاتورة'); return; }
+                if (deliveryFee < 0) { await showMsg('أدخل أجرة التوصيل'); return; }
+
                 isSubmitting = true;
                 if (btnSaveOrder) {
                     btnSaveOrder.disabled = true;
                     btnSaveOrder.classList.add('btn-saved');
                 }
-                const regionEl = document.getElementById('regionId');
                 const data = {
                     AdminOrderNo: document.getElementById('adminOrderNo').value,
                     StoreName: document.getElementById('storeName').value,
@@ -697,6 +738,7 @@ const screens = {
                     CustomerPhone: document.getElementById('customerPhone').value,
                     RegionID: regionEl?.value ? parseInt(regionEl.value) : null,
                     Address: document.getElementById('address').value,
+                    CustomerLocationLink: (document.getElementById('customerLocationLink')?.value || '').trim() || null,
                     Pieces: parseInt(document.getElementById('pieces').value) || 1,
                     AmountIQD: parseFloat(document.getElementById('amount').value) || 0,
                     DeliveryFeeIQD: parseFloat(document.getElementById('deliveryFee').value) || 0,
@@ -1613,8 +1655,9 @@ const screens = {
                                             <td>${o.StoreName || '-'}</td>
                                             <td>${o.CustomerName || '-'}</td>
                                             <td>${o.CustomerPhone || '-'}</td>
-                                            <td class="col-address">${getFullAddress(o)}</td>
-                                            <td>${o.Pieces || 1}</td>
+                                        <td class="col-address">${getFullAddress(o)}</td>
+                                        <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener" title="فتح رابط الموقع">📍 فتح</a>` : '-'}</td>
+                                        <td>${o.Pieces || 1}</td>
                                             <td class="iqd">${formatIQD(o.AmountIQD)}</td>
                                             <td class="iqd">${o.FreeDelivery ? 'مجاني ' + formatIQD(driverAmt(o)) : formatIQD(driverAmt(o))}</td>
                                             <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
@@ -1789,6 +1832,13 @@ const screens = {
                                 <input type="text" id="newRegionName" placeholder="مثال: الكرادة">
                             </div>
                             <div class="form-group">
+                                <label>الجانب</label>
+                                <select id="newRegionArea">
+                                    <option value="الكرخ">الكرخ</option>
+                                    <option value="الرصافة">الرصافة</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
                                 <label>تكلفة التوصيل (د.ع)</label>
                                 <input type="number" id="newRegionFee" min="0" placeholder="0">
                             </div>
@@ -1799,11 +1849,17 @@ const screens = {
                         </div>
                         <div class="settings-table-wrap">
                             <table class="settings-table">
-                                <thead><tr><th>اسم المنطقة</th><th>تكلفة التوصيل (د.ع)</th><th>إجراء</th></tr></thead>
+                                <thead><tr><th>اسم المنطقة</th><th>الجانب</th><th>تكلفة التوصيل (د.ع)</th><th>إجراء</th></tr></thead>
                                 <tbody>
                                     ${regions.length ? regions.map(r => `
                                         <tr data-id="${r.RegionID}">
                                             <td><input type="text" class="edit-region-name" value="${esc(r.RegionName)}" placeholder="اسم المنطقة"></td>
+                                            <td>
+                                                <select class="edit-region-area">
+                                                    <option value="الكرخ" ${(r.RegionArea || '') === 'الكرخ' ? 'selected' : ''}>الكرخ</option>
+                                                    <option value="الرصافة" ${(r.RegionArea || '') === 'الرصافة' ? 'selected' : ''}>الرصافة</option>
+                                                </select>
+                                            </td>
                                             <td><input type="number" class="edit-region-fee" value="${r.DeliveryFeeIQD || 0}" min="0"></td>
                                             <td>
                                                 <div class="cell-actions">
@@ -1812,7 +1868,7 @@ const screens = {
                                                 </div>
                                             </td>
                                         </tr>
-                                    `).join('') : '<tr><td colspan="3" class="empty-table-msg">لا توجد مناطق. أضف منطقة جديدة أعلاه.</td></tr>'}
+                                    `).join('') : '<tr><td colspan="4" class="empty-table-msg">لا توجد مناطق. أضف منطقة جديدة أعلاه.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
@@ -1877,10 +1933,11 @@ const screens = {
                 const id = parseInt(row?.dataset?.id);
                 if (btn.classList.contains('btn-save-region')) {
                     const name = (row?.querySelector('.edit-region-name')?.value || '').trim();
+                    const area = (row?.querySelector('.edit-region-area')?.value || 'الكرخ').trim();
                     const fee = parseFloat(row?.querySelector('.edit-region-fee')?.value || 0);
                     if (!name) { await showMsg('أدخل اسم المنطقة'); return; }
                     try {
-                        await window.api.regions.update(id, name, fee);
+                        await window.api.regions.update(id, name, fee, area);
                         refreshRegions();
                     } catch (err) { await showMsg('خطأ: ' + (err?.message || err)); }
                 } else if (btn.classList.contains('btn-delete-region')) {

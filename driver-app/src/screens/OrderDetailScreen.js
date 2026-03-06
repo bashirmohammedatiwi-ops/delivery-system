@@ -118,6 +118,14 @@ export default function OrderDetailScreen({ route, navigation }) {
           <Text style={styles.label}>العنوان</Text>
           <Text style={styles.value}>{order.Address || '—'}</Text>
         </View>
+        {order.CustomerLocationLink ? (
+          <View style={styles.row}>
+            <Text style={styles.label}>رابط موقع الزبون</Text>
+            <TouchableOpacity onPress={() => Linking.openURL(order.CustomerLocationLink)}>
+              <Text style={[styles.value, styles.link]}>📍 فتح الموقع على الخريطة</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
         {order.RegionName ? (
           <View style={styles.row}>
             <Text style={styles.label}>المنطقة</Text>
