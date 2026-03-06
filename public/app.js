@@ -1945,10 +1945,11 @@ const screens = {
             const refreshRegions = () => screens.settings.render(container);
             container.querySelector('#btnAddRegion')?.addEventListener('click', async () => {
                 const name = (container.querySelector('#newRegionName')?.value || '').trim();
+                const area = (container.querySelector('#newRegionArea')?.value || 'الرصافة').trim();
                 const fee = parseFloat(container.querySelector('#newRegionFee')?.value || 0);
                 if (!name) { await showMsg('أدخل اسم المنطقة'); return; }
                 try {
-                    await window.api.regions.create(name, fee);
+                    await window.api.regions.create(name, fee, area);
                     refreshRegions();
                 } catch (e) { await showMsg('خطأ: ' + (e?.message || e)); }
             });

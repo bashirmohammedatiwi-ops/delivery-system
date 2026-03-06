@@ -98,8 +98,8 @@ app.get('/api/regions', requireAppAuth, (req, res) => {
 
 app.post('/api/regions', requireAppAuth, requireAdmin, (req, res) => {
     try {
-        const { regionName, deliveryFeeIQD } = req.body;
-        const result = regionService.createRegion(regionName, deliveryFeeIQD);
+        const { regionName, deliveryFeeIQD, regionArea } = req.body;
+        const result = regionService.createRegion(regionName, deliveryFeeIQD, regionArea);
         if (!result.success) return res.status(400).json({ error: result.error });
         res.json(result);
     } catch (err) {
@@ -110,8 +110,8 @@ app.post('/api/regions', requireAppAuth, requireAdmin, (req, res) => {
 app.put('/api/regions/:id', requireAppAuth, requireAdmin, (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const { regionName, deliveryFeeIQD } = req.body;
-        const result = regionService.updateRegion(id, regionName, deliveryFeeIQD);
+        const { regionName, deliveryFeeIQD, regionArea } = req.body;
+        const result = regionService.updateRegion(id, regionName, deliveryFeeIQD, regionArea);
         if (!result.success) return res.status(400).json({ error: result.error });
         res.json(result);
     } catch (err) {
