@@ -588,10 +588,18 @@ const screens = {
                 regions = await window.api.regions.getAll();
             } catch (_) {}
 
-            const calcTotal = () => {
+            const FREE_DELIVERY_THRESHOLD = 50000; // التوصيل مجاني تلقائياً عند 50000 أو أكثر
+            let lastAmountForFreeDelivery = 0; // لتتبع تجاوز الحد من الأسفل فقط
+            const calcTotal = (fromInput) => {
                 const amt = parseFloat(document.getElementById('amount')?.value || 0);
                 const fee = parseFloat(document.getElementById('deliveryFee')?.value || 0);
                 const freeEl = document.getElementById('freeDelivery');
+                // عند تجاوز 50000 من الأسفل: يتم التاشير تلقائياً. المستخدم يمكنه إزالته ولن يُعاد التاشير حتى ينزل المبلغ تحت 50000 ثم يعود
+                if (fromInput && freeEl && amt >= FREE_DELIVERY_THRESHOLD && lastAmountForFreeDelivery < FREE_DELIVERY_THRESHOLD) {
+                    freeEl.checked = true;
+                }
+                if (amt < FREE_DELIVERY_THRESHOLD) lastAmountForFreeDelivery = amt;
+                else lastAmountForFreeDelivery = amt;
                 const free = freeEl?.checked || false;
                 // التوصيل مجاني: النهائي = الفاتورة، المستحق = الفاتورة - أجرة التوصيل | غير مجاني: النهائي = فاتورة + توصيل، المستحق = الفاتورة
                 const total = free ? amt : (amt + fee);
@@ -696,9 +704,9 @@ const screens = {
             document.getElementById('storePhone').value = localStorage.getItem('defaultStorePhone') || '';
 
             ['amount', 'deliveryFee'].forEach(id => {
-                document.getElementById(id)?.addEventListener('input', calcTotal);
+                document.getElementById(id)?.addEventListener('input', () => calcTotal(true));
             });
-            document.getElementById('freeDelivery')?.addEventListener('change', calcTotal);
+            document.getElementById('freeDelivery')?.addEventListener('change', () => calcTotal(false));
             document.getElementById('regionId')?.addEventListener('change', () => {
                 const sel = document.getElementById('regionId');
                 const opt = sel?.options[sel.selectedIndex];
@@ -706,9 +714,9 @@ const screens = {
                     const fee = parseFloat(opt.dataset.fee || 0);
                     document.getElementById('deliveryFee').value = fee;
                 }
-                calcTotal();
+                calcTotal(true);
             });
-            calcTotal();
+            calcTotal(false);
 
             let lastOrder = null;
             let isSubmitting = false;

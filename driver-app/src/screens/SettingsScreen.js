@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { THEME } from '../theme';
 
 export default function SettingsScreen() {
   const { driver, logout } = useAuth();
@@ -24,12 +26,16 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
+      <View style={styles.profileCard}>
+        <View style={styles.avatarWrap}>
+          <Ionicons name="person" size={40} color={THEME.primary} />
+        </View>
         <Text style={styles.label}>اسم السائق</Text>
         <Text style={styles.driverName}>{driver?.DriverName || '—'}</Text>
       </View>
 
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
+        <Ionicons name="log-out-outline" size={22} color="#fff" style={styles.logoutIcon} />
         <Text style={styles.logoutText}>تسجيل الخروج</Text>
       </TouchableOpacity>
 
@@ -41,45 +47,58 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
-    padding: 20,
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: THEME.bg,
     padding: 24,
+  },
+  profileCard: {
+    backgroundColor: THEME.bgCard,
+    borderRadius: 20,
+    padding: 28,
     marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    alignItems: 'center',
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  avatarWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(13, 148, 136, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   label: {
     fontSize: 13,
-    color: '#64748b',
+    color: THEME.textMuted,
     marginBottom: 8,
   },
   driverName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontSize: 24,
+    fontWeight: '800',
+    color: THEME.text,
   },
   logoutBtn: {
-    backgroundColor: '#ef4444',
-    borderRadius: 12,
-    padding: 16,
+    flexDirection: 'row',
+    backgroundColor: THEME.danger,
+    borderRadius: 16,
+    padding: 18,
     alignItems: 'center',
+    justifyContent: 'center',
   },
+  logoutIcon: { marginLeft: 10 },
   logoutText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
   },
   footer: {
     marginTop: 32,
     textAlign: 'center',
-    fontSize: 12,
-    color: '#94a3b8',
+    fontSize: 13,
+    color: THEME.textLight,
   },
 });

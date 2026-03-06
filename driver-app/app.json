@@ -3,6 +3,9 @@
     "name": "تطبيق السائق - ديما الحياة",
     "slug": "delivery-driver-app",
     "version": "1.0.0",
+    "updates": {
+      "enabled": false
+    },
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,

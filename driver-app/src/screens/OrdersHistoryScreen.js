@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { THEME } from '../theme';
 import { getDriverDeliveredOrders, getDriverReturnedOrders, getDriverStats } from '../api';
 
 function formatIQD(n) {
@@ -102,7 +104,7 @@ export default function OrdersHistoryScreen() {
   if (loading && orders.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={THEME.primary} />
         <Text style={styles.loadingText}>جاري تحميل السجل...</Text>
       </View>
     );
@@ -161,7 +163,7 @@ export default function OrdersHistoryScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
           }
         />
       )}
@@ -170,7 +172,7 @@ export default function OrdersHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#64748b' },
   dateNav: {
@@ -183,7 +185,7 @@ const styles = StyleSheet.create({
   dateBtn: {
     paddingVertical: 8,
     paddingHorizontal: 14,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.primary,
     borderRadius: 10,
   },
   dateBtnDisabled: { backgroundColor: '#cbd5e1' },
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
   dateLabel: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.bgCard,
     padding: 4,
     margin: 16,
     marginBottom: 8,
@@ -204,11 +206,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
   },
-  tabActive: { backgroundColor: '#0ea5e9' },
+  tabActive: { backgroundColor: THEME.primary },
   tabText: { fontSize: 15, color: '#64748b' },
   tabTextActive: { color: '#fff', fontWeight: '600' },
   totalCountBadge: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.primary,
     borderRadius: 10,
     paddingVertical: 10,
     paddingHorizontal: 16,
@@ -219,7 +221,7 @@ const styles = StyleSheet.create({
   totalCountText: { fontSize: 15, fontWeight: '600', color: '#fff' },
   list: { padding: 16, paddingBottom: 32 },
   card: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.bgCard,
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
@@ -230,8 +232,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  shipment: { fontSize: 16, fontWeight: '700', color: '#0ea5e9' },
-  amount: { fontSize: 14, fontWeight: '600', color: '#10b981' },
+  shipment: { fontSize: 16, fontWeight: '700', color: THEME.primary },
+  amount: { fontSize: 14, fontWeight: '600', color: THEME.success },
   customer: { fontSize: 15, color: '#1e293b', marginBottom: 4 },
   address: { fontSize: 13, color: '#64748b', marginBottom: 4 },
   region: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },

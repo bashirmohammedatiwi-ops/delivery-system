@@ -9,9 +9,11 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { getDriverOrders } from '../api';
 import { useFocusEffect } from '@react-navigation/native';
+import { THEME } from '../theme';
 
 function formatIQD(n) {
   return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
@@ -55,23 +57,33 @@ export default function OrdersScreen({ navigation }) {
       activeOpacity={0.7}
     >
       <View style={styles.cardHeader}>
-        <Text style={styles.shipment}>#{item.ShipmentNumber}</Text>
-        <Text style={styles.amount}>{formatIQD(item.TotalIQD)}</Text>
+        <View style={styles.shipmentBadge}>
+          <Ionicons name="cube" size={16} color={THEME.primary} />
+          <Text style={styles.shipment}>#{item.ShipmentNumber}</Text>
+        </View>
+        <View style={styles.amountBadge}>
+          <Text style={styles.amount}>{formatIQD(item.TotalIQD)}</Text>
+        </View>
       </View>
-      <Text style={styles.customer}>{item.CustomerName || '—'}</Text>
-      <Text style={styles.address} numberOfLines={2}>
-        {item.Address || '—'}
-      </Text>
-      {item.RegionName ? (
-        <Text style={styles.region}>{item.RegionName}</Text>
-      ) : null}
+      <View style={styles.cardBody}>
+        <Text style={styles.customer}>{item.CustomerName || '—'}</Text>
+        <Text style={styles.address} numberOfLines={2}>
+          {item.Address || '—'}
+        </Text>
+        {item.RegionName ? (
+          <View style={styles.regionRow}>
+            <Ionicons name="location" size={12} color={THEME.textLight} />
+            <Text style={styles.region}>{item.RegionName}</Text>
+          </View>
+        ) : null}
+      </View>
     </TouchableOpacity>
   );
 
   if (loading && orders.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={THEME.primary} />
         <Text style={styles.loadingText}>جاري تحميل الطلبات...</Text>
       </View>
     );
@@ -81,6 +93,9 @@ export default function OrdersScreen({ navigation }) {
     <View style={styles.container}>
       {orders.length === 0 ? (
         <View style={styles.empty}>
+          <View style={styles.emptyIcon}>
+            <Ionicons name="cube-outline" size={48} color={THEME.textLight} />
+          </View>
           <Text style={styles.emptyText}>لا توجد طلبات معك حالياً</Text>
         </View>
       ) : (
@@ -90,7 +105,7 @@ export default function OrdersScreen({ navigation }) {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
           }
         />
       )}
@@ -99,31 +114,54 @@ export default function OrdersScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#64748b' },
+  loadingText: { marginTop: 12, color: THEME.textMuted },
   list: { padding: 16, paddingBottom: 24 },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    backgroundColor: THEME.bgCard,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 14,
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 4,
+    borderRightWidth: 4,
+    borderRightColor: THEME.primary,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  shipment: { fontSize: 17, fontWeight: '700', color: '#0ea5e9' },
-  amount: { fontSize: 15, fontWeight: '600', color: '#10b981' },
-  customer: { fontSize: 16, color: '#0f172a', marginBottom: 4 },
-  address: { fontSize: 13, color: '#64748b', marginBottom: 4 },
-  region: { fontSize: 12, color: '#94a3b8' },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  shipmentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(13, 148, 136, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  shipment: { fontSize: 17, fontWeight: '700', color: THEME.primary },
+  amountBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  amount: { fontSize: 15, fontWeight: '700', color: THEME.success },
+  cardBody: {},
+  customer: { fontSize: 16, fontWeight: '600', color: THEME.text, marginBottom: 6 },
+  address: { fontSize: 14, color: THEME.textMuted, marginBottom: 4 },
+  regionRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  region: { fontSize: 12, color: THEME.textLight },
   empty: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyText: { fontSize: 16, color: '#94a3b8' },
+  emptyIcon: {
+    marginBottom: 16,
+    opacity: 0.5,
+  },
+  emptyText: { fontSize: 16, color: THEME.textMuted },
 });

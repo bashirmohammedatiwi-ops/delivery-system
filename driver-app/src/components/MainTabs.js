@@ -1,22 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import OrdersScreen from '../screens/OrdersScreen';
 import ReceiveOrderScreen from '../screens/ReceiveOrderScreen';
 import PendingOrdersScreen from '../screens/PendingOrdersScreen';
 import StatsScreen from '../screens/StatsScreen';
 import OrdersHistoryScreen from '../screens/OrdersHistoryScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import { THEME } from '../theme';
 
 const TABS = [
-  { key: 'orders', label: 'طلباتي', icon: '📦' },
-  { key: 'receive', label: 'استلام', icon: '📷' },
-  { key: 'pending', label: 'منتظرة', icon: '⏳' },
-  { key: 'stats', label: 'إحصائيات', icon: '📊' },
-  { key: 'history', label: 'السجل', icon: '📋' },
-  { key: 'settings', label: 'إعدادات', icon: '⚙️' },
+  { key: 'orders', label: 'طلباتي', icon: 'cube-outline', iconActive: 'cube' },
+  { key: 'receive', label: 'استلام', icon: 'camera-outline', iconActive: 'camera' },
+  { key: 'pending', label: 'منتظرة', icon: 'time-outline', iconActive: 'time' },
+  { key: 'stats', label: 'إحصائيات', icon: 'stats-chart-outline', iconActive: 'stats-chart' },
+  { key: 'history', label: 'السجل', icon: 'document-text-outline', iconActive: 'document-text' },
+  { key: 'settings', label: 'إعدادات', icon: 'settings-outline', iconActive: 'settings' },
 ];
 
 export default function MainTabs({ navigation }) {
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState('orders');
 
   const renderScreen = () => {
@@ -25,6 +29,8 @@ export default function MainTabs({ navigation }) {
         return <OrdersScreen navigation={navigation} />;
       case 'receive':
         return <ReceiveOrderScreen navigation={navigation} />;
+      case 'pending':
+        return <PendingOrdersScreen />;
       case 'stats':
         return <StatsScreen />;
       case 'history':
@@ -36,46 +42,76 @@ export default function MainTabs({ navigation }) {
     }
   };
 
+  const bottomPadding = Math.max(insets.bottom, 12);
+
   return (
     <View style={styles.container}>
       <View style={styles.content}>{renderScreen()}</View>
-      <View style={styles.tabBar}>
-        {TABS.map((t) => (
-          <TouchableOpacity
-            key={t.key}
-            style={[styles.tab, tab === t.key && styles.tabActive]}
-            onPress={() => setTab(t.key)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.tabIcon}>{t.icon}</Text>
-            <Text style={[styles.tabLabel, tab === t.key && styles.tabLabelActive]}>{t.label}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={[styles.tabBar, { paddingBottom: bottomPadding }]}>
+        {TABS.map((t) => {
+          const isActive = tab === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => setTab(t.key)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.iconWrap, isActive && styles.iconWrapActive]}>
+                <Ionicons
+                  name={isActive ? t.iconActive : t.icon}
+                  size={22}
+                  color={isActive ? THEME.primary : THEME.textMuted}
+                />
+              </View>
+              <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   content: { flex: 1 },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: THEME.bgCard,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingBottom: 8,
-    paddingTop: 8,
+    borderTopColor: THEME.border,
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 12,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabActive: {
-    backgroundColor: 'rgba(14, 165, 233, 0.08)',
+  tabActive: {},
+  iconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
-  tabIcon: { fontSize: 20, marginBottom: 2 },
-  tabLabel: { fontSize: 11, color: '#64748b' },
-  tabLabelActive: { color: '#0ea5e9', fontWeight: '600' },
+  iconWrapActive: {
+    backgroundColor: 'rgba(13, 148, 136, 0.12)',
+  },
+  tabLabel: {
+    fontSize: 10,
+    color: THEME.textMuted,
+    fontWeight: '500',
+  },
+  tabLabelActive: {
+    color: THEME.primary,
+    fontWeight: '700',
+  },
 });

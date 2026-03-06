@@ -9,7 +9,9 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import { THEME } from '../theme';
 import { getDriverStats, getDriverDeliveredOrders } from '../api';
 import { calcTotalAmountDue } from '../utils/amountUtils';
 
@@ -83,7 +85,7 @@ export default function StatsScreen() {
   if (loading && !stats) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={THEME.primary} />
         <Text style={styles.loadingText}>جاري تحميل الإحصائيات...</Text>
       </View>
     );
@@ -94,7 +96,7 @@ export default function StatsScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
       }
     >
       <View style={styles.dateNav}>
@@ -162,7 +164,7 @@ export default function StatsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   content: { padding: 16, paddingBottom: 32 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: '#64748b', fontSize: 15 },
@@ -176,8 +178,8 @@ const styles = StyleSheet.create({
   dateBtn: {
     paddingVertical: 10,
     paddingHorizontal: 16,
-    backgroundColor: '#0ea5e9',
-    borderRadius: 10,
+    backgroundColor: THEME.primary,
+    borderRadius: 12,
   },
   dateBtnDisabled: { backgroundColor: '#cbd5e1' },
   dateBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
   cardRed: { backgroundColor: '#ef4444' },
   cardBlue: { backgroundColor: '#0ea5e9' },
   cardPurple: { backgroundColor: '#8b5cf6' },
-  cardTeal: { backgroundColor: '#0d9488' },
+  cardTeal: { backgroundColor: THEME.primary },
   cardGray: { backgroundColor: '#64748b' },
   cardOrange: { backgroundColor: '#f97316' },
   orderCountCard: { marginBottom: 12, alignSelf: 'stretch' },
@@ -232,9 +234,14 @@ const styles = StyleSheet.create({
   totalFooter: {
     marginTop: 24,
     padding: 20,
-    backgroundColor: '#0f172a',
-    borderRadius: 16,
+    backgroundColor: THEME.text,
+    borderRadius: 18,
     alignItems: 'center',
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   totalFooterLabel: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 6 },
   totalFooterValue: { fontSize: 32, fontWeight: '800', color: '#fff' },

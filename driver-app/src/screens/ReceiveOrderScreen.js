@@ -10,9 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAuth } from '../context/AuthContext';
 import { receiveOrder } from '../api';
+import { THEME } from '../theme';
 
 function normalizeBarcode(str) {
   if (!str || typeof str !== 'string') return '';
@@ -84,7 +86,7 @@ export default function ReceiveOrderScreen({ navigation }) {
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={THEME.primary} />
         <Text style={styles.loadingText}>جاري طلب إذن الكاميرا...</Text>
       </View>
     );
@@ -93,8 +95,11 @@ export default function ReceiveOrderScreen({ navigation }) {
   if (!permission.granted) {
     return (
       <View style={styles.center}>
+        <View style={styles.permissionIcon}>
+          <Ionicons name="camera-outline" size={56} color={THEME.primary} />
+        </View>
         <Text style={styles.permissionText}>يجب السماح بالوصول للكاميرا لمسح الباركود</Text>
-        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission}>
+        <TouchableOpacity style={styles.permissionBtn} onPress={requestPermission} activeOpacity={0.85}>
           <Text style={styles.permissionBtnText}>السماح للكاميرا</Text>
         </TouchableOpacity>
       </View>
@@ -107,13 +112,17 @@ export default function ReceiveOrderScreen({ navigation }) {
         <TouchableOpacity
           style={[styles.toggleBtn, scanMode && styles.toggleActive]}
           onPress={() => setScanMode(true)}
+          activeOpacity={0.85}
         >
+          <Ionicons name="barcode-outline" size={20} color={scanMode ? '#fff' : THEME.textMuted} />
           <Text style={[styles.toggleText, scanMode && styles.toggleTextActive]}>مسح الباركود</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.toggleBtn, !scanMode && styles.toggleActive]}
           onPress={() => setScanMode(false)}
+          activeOpacity={0.85}
         >
+          <Ionicons name="keypad-outline" size={20} color={!scanMode ? '#fff' : THEME.textMuted} />
           <Text style={[styles.toggleText, !scanMode && styles.toggleTextActive]}>إدخال الرقم</Text>
         </TouchableOpacity>
       </View>
@@ -141,7 +150,12 @@ export default function ReceiveOrderScreen({ navigation }) {
             </View>
           ) : null}
           <View style={styles.overlay} pointerEvents="none">
-            <View style={styles.scanFrame} />
+            <View style={styles.scanFrame}>
+              <View style={styles.scanCorner} style={[styles.scanCorner, styles.scanCornerTL]} />
+              <View style={[styles.scanCorner, styles.scanCornerTR]} />
+              <View style={[styles.scanCorner, styles.scanCornerBL]} />
+              <View style={[styles.scanCorner, styles.scanCornerBR]} />
+            </View>
             <Text style={styles.overlayText}>وجّه الكاميرا نحو الباركود</Text>
           </View>
         </View>
@@ -153,7 +167,7 @@ export default function ReceiveOrderScreen({ navigation }) {
           <TextInput
             style={styles.input}
             placeholder="أدخل رقم الشحنة"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={THEME.textLight}
             value={manualInput}
             onChangeText={setManualInput}
             keyboardType="number-pad"
@@ -178,12 +192,12 @@ export default function ReceiveOrderScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#64748b' },
   permissionText: { fontSize: 16, color: '#475569', textAlign: 'center', marginBottom: 20 },
   permissionBtn: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.primary,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
@@ -197,7 +211,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#e2e8f0',
   },
-  toggleActive: { backgroundColor: '#0ea5e9' },
+  toggleActive: { backgroundColor: THEME.primary },
   toggleText: { fontSize: 15, color: '#64748b' },
   toggleTextActive: { color: '#fff', fontWeight: '600' },
   cameraWrap: { flex: 1, position: 'relative' },
@@ -211,7 +225,7 @@ const styles = StyleSheet.create({
     width: 260,
     height: 120,
     borderWidth: 2,
-    borderColor: 'rgba(14, 165, 233, 0.8)',
+    borderColor: `rgba(13, 148, 136, 0.9)`,
     borderRadius: 12,
     backgroundColor: 'transparent',
   },
@@ -237,7 +251,7 @@ const styles = StyleSheet.create({
   manualWrap: { padding: 24 },
   input: {
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: THEME.border,
     borderRadius: 12,
     padding: 18,
     fontSize: 18,
@@ -245,7 +259,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   submitBtn: {
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.primary,
     borderRadius: 12,
     padding: 18,
     alignItems: 'center',

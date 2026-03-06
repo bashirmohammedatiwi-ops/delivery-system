@@ -1,11 +1,13 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
 import MainTabs from './src/components/MainTabs';
 import OrderDetailScreen from './src/screens/OrderDetailScreen';
+import { THEME } from './src/theme';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,11 +21,11 @@ function AppNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#0ea5e9' },
+        headerStyle: { backgroundColor: THEME.primary },
         headerTintColor: '#fff',
         headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: '#f8fafc' },
+        contentStyle: { backgroundColor: THEME.bg },
       }}
     >
       {!token ? (
@@ -55,11 +57,13 @@ function AppNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NavigationContainer>
-        <AppNavigator />
-        <StatusBar style="light" />
-      </NavigationContainer>
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider>
+        <NavigationContainer>
+          <AppNavigator />
+          <StatusBar style="light" />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }

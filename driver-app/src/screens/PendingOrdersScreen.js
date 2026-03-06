@@ -8,8 +8,10 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { getPendingOrdersByArea } from '../api';
+import { THEME } from '../theme';
 
 function formatDateAr(d) {
   if (!d) return '';
@@ -79,7 +81,7 @@ export default function PendingOrdersScreen() {
   if (loading && days.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0ea5e9" />
+        <ActivityIndicator size="large" color={THEME.primary} />
         <Text style={styles.loadingText}>جاري تحميل الطلبات المنتظرة...</Text>
       </View>
     );
@@ -102,7 +104,7 @@ export default function PendingOrdersScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#0ea5e9']} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
           }
         />
       )}
@@ -111,9 +113,9 @@ export default function PendingOrdersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#64748b', fontSize: 15 },
+  loadingText: { marginTop: 12, color: THEME.textMuted, fontSize: 15 },
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -130,15 +132,17 @@ const styles = StyleSheet.create({
   },
   list: { padding: 16, paddingBottom: 32 },
   dayCard: {
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 3,
+    backgroundColor: THEME.bgCard,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 14,
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderRightWidth: 4,
+    borderRightColor: THEME.primary,
   },
   dayDate: {
     fontSize: 16,
@@ -157,8 +161,8 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
   },
-  karkhBadge: { backgroundColor: '#dbeafe' },
-  rusafaBadge: { backgroundColor: '#fce7f3' },
+  karkhBadge: { backgroundColor: 'rgba(13, 148, 136, 0.15)' },
+  rusafaBadge: { backgroundColor: 'rgba(139, 92, 246, 0.15)' },
   areaValue: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
   areaLabel: { fontSize: 14, color: '#64748b', marginTop: 4 },
   totalText: { fontSize: 13, color: '#64748b', textAlign: 'center' },

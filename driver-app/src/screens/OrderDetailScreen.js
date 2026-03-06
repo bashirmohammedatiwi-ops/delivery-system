@@ -9,8 +9,10 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { markOrderDelivered, markOrderReturned } from '../api';
+import { THEME } from '../theme';
 
 function formatIQD(n) {
   return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
@@ -98,8 +100,14 @@ export default function OrderDetailScreen({ route, navigation }) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <View style={styles.shipmentHeader}>
+        <View style={styles.shipmentBadge}>
+          <Ionicons name="cube" size={24} color="#fff" />
+          <Text style={styles.shipmentNum}>#{order.ShipmentNumber}</Text>
+        </View>
+      </View>
+
       <View style={styles.card}>
-        <Text style={styles.shipment}>#{order.ShipmentNumber}</Text>
         <View style={styles.row}>
           <Text style={styles.label}>المحل</Text>
           <Text style={styles.value}>{order.StoreName || '—'}</Text>
@@ -111,7 +119,10 @@ export default function OrderDetailScreen({ route, navigation }) {
         <View style={styles.row}>
           <Text style={styles.label}>هاتف العميل</Text>
           <TouchableOpacity onPress={callCustomer}>
-            <Text style={[styles.value, styles.link]}>{order.CustomerPhone || '—'}</Text>
+            <View style={styles.phoneRow}>
+              <Ionicons name="call" size={18} color={THEME.primary} />
+              <Text style={[styles.value, styles.link]}>{order.CustomerPhone || '—'}</Text>
+            </View>
           </TouchableOpacity>
         </View>
         <View style={styles.row}>
@@ -122,7 +133,10 @@ export default function OrderDetailScreen({ route, navigation }) {
           <View style={styles.row}>
             <Text style={styles.label}>رابط موقع الزبون</Text>
             <TouchableOpacity onPress={() => Linking.openURL(order.CustomerLocationLink)}>
-              <Text style={[styles.value, styles.link]}>📍 فتح الموقع على الخريطة</Text>
+              <View style={styles.phoneRow}>
+                <Ionicons name="navigate" size={18} color={THEME.primary} />
+                <Text style={[styles.value, styles.link]}>فتح الموقع على الخريطة</Text>
+              </View>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -153,11 +167,15 @@ export default function OrderDetailScreen({ route, navigation }) {
           style={[styles.btn, styles.btnDeliver, loading && styles.btnDisabled]}
           onPress={handleDeliver}
           disabled={loading}
+          activeOpacity={0.85}
         >
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.btnText}>✓ تم التوصيل</Text>
+            <>
+              <Ionicons name="checkmark-circle" size={24} color="#fff" style={styles.btnIcon} />
+              <Text style={styles.btnText}>تم التوصيل</Text>
+            </>
           )}
         </TouchableOpacity>
 
@@ -165,8 +183,10 @@ export default function OrderDetailScreen({ route, navigation }) {
           style={[styles.btn, styles.btnReturn, loading && styles.btnDisabled]}
           onPress={handleReturn}
           disabled={loading}
+          activeOpacity={0.85}
         >
-          <Text style={styles.btnText}>↩ إرجاع الطلب</Text>
+          <Ionicons name="return-up-back" size={24} color="#fff" style={styles.btnIcon} />
+          <Text style={styles.btnText}>إرجاع الطلب</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -174,40 +194,53 @@ export default function OrderDetailScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc' },
+  container: { flex: 1, backgroundColor: THEME.bg },
   content: { padding: 20, paddingBottom: 40 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: {
-    backgroundColor: '#fff',
+  shipmentHeader: { marginBottom: 20 },
+  shipmentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: THEME.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  shipmentNum: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  card: {
+    backgroundColor: THEME.bgCard,
+    borderRadius: 20,
     padding: 24,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
-  shipment: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0ea5e9',
-    marginBottom: 20,
-    textAlign: 'right',
-  },
-  row: { marginBottom: 14 },
-  label: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },
-  value: { fontSize: 16, color: '#0f172a', textAlign: 'right' },
-  link: { color: '#0ea5e9', textDecorationLine: 'underline' },
-  amount: { fontSize: 20, fontWeight: '700', color: '#10b981' },
+  row: { marginBottom: 16 },
+  label: { fontSize: 12, color: THEME.textLight, marginBottom: 4 },
+  value: { fontSize: 16, color: THEME.text, textAlign: 'right' },
+  link: { color: THEME.primary, fontWeight: '600' },
+  phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'flex-end' },
+  amount: { fontSize: 22, fontWeight: '800', color: THEME.success },
   actions: { gap: 14 },
   btn: {
+    flexDirection: 'row',
     padding: 18,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  btnDeliver: { backgroundColor: '#10b981' },
-  btnReturn: { backgroundColor: '#ef4444' },
+  btnIcon: { marginLeft: 8 },
+  btnDeliver: { backgroundColor: THEME.success },
+  btnReturn: { backgroundColor: THEME.danger },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  btnText: { color: '#fff', fontSize: 18, fontWeight: '700' },
 });

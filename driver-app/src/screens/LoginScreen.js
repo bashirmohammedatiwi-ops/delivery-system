@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { THEME } from '../theme';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -41,44 +42,53 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <View style={styles.card}>
-        <Text style={styles.title}>تطبيق السائق</Text>
-        <Text style={styles.subtitle}>شركة ديما الحياة</Text>
+      <View style={styles.bgShape} />
+      <View style={styles.content}>
+        <View style={styles.logoBlock}>
+          <View style={styles.logoIcon}>
+            <Text style={styles.logoEmoji}>🚚</Text>
+          </View>
+          <Text style={styles.title}>تطبيق السائق</Text>
+          <Text style={styles.subtitle}>شركة ديما الحياة</Text>
+        </View>
 
-        <TextInput
-          style={styles.input}
-          placeholder="اسم المستخدم"
-          placeholderTextColor="#94a3b8"
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!loading}
-        />
+        <View style={styles.card}>
+          <TextInput
+            style={styles.input}
+            placeholder="اسم المستخدم"
+            placeholderTextColor={THEME.textLight}
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!loading}
+          />
 
-        <TextInput
-          style={styles.input}
-          placeholder="كلمة المرور"
-          placeholderTextColor="#94a3b8"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!loading}
-        />
+          <TextInput
+            style={styles.input}
+            placeholder="كلمة المرور"
+            placeholderTextColor={THEME.textLight}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            editable={!loading}
+          />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <TouchableOpacity
-          style={[styles.btn, loading && styles.btnDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.btnText}>تسجيل الدخول</Text>
-          )}
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.btn, loading && styles.btnDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.btnText}>تسجيل الدخول</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -87,61 +97,88 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: THEME.primary,
+  },
+  bgShape: {
+    position: 'absolute',
+    top: -100,
+    right: -80,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  content: {
+    flex: 1,
     justifyContent: 'center',
     padding: 24,
   },
-  card: {
-    backgroundColor: '#fff',
+  logoBlock: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  logoIcon: {
+    width: 72,
+    height: 72,
     borderRadius: 20,
-    padding: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  logoEmoji: {
+    fontSize: 36,
   },
   title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#0f172a',
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
     textAlign: 'center',
     marginBottom: 6,
   },
   subtitle: {
     fontSize: 15,
-    color: '#64748b',
+    color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
-    marginBottom: 32,
+  },
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 28,
+    shadowColor: THEME.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
+    elevation: 12,
   },
   input: {
     borderWidth: 2,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    padding: 16,
+    borderColor: THEME.border,
+    borderRadius: 14,
+    padding: 18,
     fontSize: 16,
     marginBottom: 16,
     textAlign: 'right',
   },
   error: {
-    color: '#ef4444',
+    color: THEME.danger,
     fontSize: 14,
     marginBottom: 12,
     textAlign: 'center',
   },
   btn: {
-    backgroundColor: '#0ea5e9',
-    borderRadius: 12,
+    backgroundColor: THEME.primary,
+    borderRadius: 14,
     padding: 18,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
   btnDisabled: {
     opacity: 0.7,
   },
   btnText: {
     color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });
