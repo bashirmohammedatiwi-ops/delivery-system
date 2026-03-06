@@ -68,25 +68,28 @@ function textRTL(doc, str, x, y, options) {
 }
 
 function getArabicFont(doc) {
-    // 1) خط داخل المشروع (يعمل على Windows و Linux و Docker) - PDFKit يدعم TTF فقط
     const projectFont = path.join(__dirname, '..', 'fonts', 'Amiri-Regular.ttf');
+    const projectFontBold = path.join(__dirname, '..', 'fonts', 'Amiri-Bold.ttf');
     if (fs.existsSync(projectFont)) {
         doc.registerFont('Arabic', projectFont);
+        if (fs.existsSync(projectFontBold)) {
+            doc.registerFont('ArabicBold', projectFontBold);
+            return 'ArabicBold';
+        }
         return 'Arabic';
     }
-    // 2) Linux: خطوط النظام (يجب تثبيتها على السيرفر)
     const linuxFonts = [
-        '/usr/share/fonts/truetype/amiri/Amiri-Regular.ttf',     // fonts-amiri
-        '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',       // fonts-dejavu-core
-        '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf'
+        ['/usr/share/fonts/truetype/amiri/Amiri-Bold.ttf', 'ArabicBold'],
+        ['/usr/share/fonts/truetype/amiri/Amiri-Regular.ttf', 'Arabic'],
+        ['/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 'Arabic'],
+        ['/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf', 'Arabic']
     ];
-    for (const fp of linuxFonts) {
-        if (fs.existsSync(fp)) {
-            doc.registerFont('Arabic', fp);
-            return 'Arabic';
+    for (const [fontPath, fontName] of linuxFonts) {
+        if (fs.existsSync(fontPath)) {
+            doc.registerFont(fontName, fontPath);
+            return fontName;
         }
     }
-    // 3) Windows
     const sysRoot = process.env.SystemRoot || process.env.windir || 'C:\\Windows';
     const winFonts = ['tahoma.ttf', 'arial.ttf', 'segoeui.ttf'];
     for (const f of winFonts) {
@@ -133,7 +136,7 @@ async function createLabelPDF(order) {
 
     const font = getArabicFont(doc);
     const setArabic = () => doc.font(font);
-    const setNumeric = () => doc.font('Helvetica');
+    const setNumericBold = () => doc.font('Helvetica-Bold');
     const MARGIN = 6;
     const cw = w - MARGIN * 2;
     const GAP = 2;
@@ -147,10 +150,10 @@ async function createLabelPDF(order) {
     const headerH = 36;
     doc.rect(MARGIN, y, cw, headerH).fill(COLORS.headerBg);
     doc.rect(MARGIN, y, cw, headerH).lineWidth(0.5).strokeColor(BLACK).stroke();
-    doc.fillColor(COLORS.headerText).fontSize(14);
-    textRTL(doc, 'شركة ديما الحياة', MARGIN + 8, y + 8, { width: cw - 16, align: 'center' });
-    doc.fontSize(9);
-    textRTL(doc, 'نظام إدارة التوصيل', MARGIN + 8, y + 24, { width: cw - 16, align: 'center' });
+    doc.fillColor(COLORS.headerText).fontSize(18);
+    textRTL(doc, 'شركة ديما الحياة', MARGIN + 8, y + 6, { width: cw - 16, align: 'center' });
+    doc.fontSize(12);
+    textRTL(doc, 'نظام إدارة التوصيل', MARGIN + 8, y + 22, { width: cw - 16, align: 'center' });
     y += headerH + GAP;
 
     // ─── صف الباركود و QR ───
@@ -170,9 +173,9 @@ async function createLabelPDF(order) {
 
     const qrData = await generateQRBase64(order.ShipmentNumber);
     doc.image(qrData, MARGIN + barW + GAP + (qrW - 36) / 2, y + 2, { width: 36 });
-    doc.fillColor(BLACK).fontSize(7);
-    setNumeric();
-    doc.text(order.ShipmentNumber, MARGIN + barW + GAP + 4, y + 28, { width: qrW - 8, align: 'right' });
+    setNumericBold();
+    doc.fillColor(BLACK).fontSize(10);
+    doc.text(order.ShipmentNumber, MARGIN + barW + GAP + 4, y + 26, { width: qrW - 8, align: 'right' });
     setArabic();
     y += barH + GAP;
 
@@ -194,19 +197,19 @@ async function createLabelPDF(order) {
         doc.rect(x, y, cellW, cellH).fill(COLORS.labelBg);
         doc.rect(x, y, cellW, cellH).lineWidth(0.4).strokeColor(BLACK).stroke();
         setArabic();
-        doc.fillColor(BLACK).fontSize(7);
-        textRTL(doc, text + ':', x + 4, y + (cellH - 10) / 2 + 2, { width: cellW - 8, align: 'right' });
+        doc.fillColor(BLACK).fontSize(10);
+        textRTL(doc, text + ':', x + 4, y + (cellH - 12) / 2 + 2, { width: cellW - 8, align: 'right' });
     }
 
     function drawValueCell(x, cellW, cellH, text, alt, noRev, noWrap, isNumeric) {
         const bg = alt ? COLORS.rowAlt : COLORS.rowNormal;
         doc.rect(x, y, cellW, cellH).fill(bg);
         doc.rect(x, y, cellW, cellH).lineWidth(0.4).strokeColor(BLACK).stroke();
-        if (isNumeric) setNumeric();
-        else setArabic();
+        if (isNumeric) setNumericBold();
+        else setArabic();  // عربي bold
         const str = String(text ?? '-').slice(0, 40);
-        doc.fillColor(BLACK).fontSize(9);
-        const cy = y + (cellH - 11) / 2 + 2;
+        doc.fillColor(BLACK).fontSize(12);
+        const cy = y + (cellH - 14) / 2 + 2;
         if (noWrap) {
             const displayLine = rev(str);
             const lw = doc.widthOfString(displayLine) || 0;
@@ -236,20 +239,22 @@ async function createLabelPDF(order) {
         doc.rect(MARGIN, y, cw, rh).lineWidth(0.4).strokeColor(BLACK).stroke();
         if (emphasize) {
             setArabic();
-            doc.fillColor(COLORS.headerText).fontSize(9);
-            textRTL(doc, lbl + ':', MARGIN + cw - 101, y + (rh - 12) / 2 + 2, { width: 95, align: 'right' });
-            doc.fontSize(11);
-            if (valNumeric) setNumeric();
-            textRTL(doc, String(val ?? '-').slice(0, 60), MARGIN + 6, y + (rh - 12) / 2, { width: cw - 116, align: 'left' });
+            doc.fillColor(COLORS.headerText).fontSize(11);
+            textRTL(doc, lbl + ':', MARGIN + cw - 101, y + (rh - 14) / 2 + 2, { width: 95, align: 'right' });
+            doc.fontSize(14);
+            if (valNumeric) setNumericBold();
+            else setArabic();
+            textRTL(doc, String(val ?? '-').slice(0, 60), MARGIN + 6, y + (rh - 14) / 2, { width: cw - 116, align: 'left' });
             setArabic();
         } else {
             doc.rect(MARGIN + cw - 90, y, 90, rh).fill(COLORS.labelBg);
             setArabic();
-            doc.fillColor(COLORS.labelText).fontSize(7);
-            textRTL(doc, lbl + ':', MARGIN + cw - 86, y + (rh - 10) / 2 + 2, { width: 82, align: 'right' });
-            doc.fillColor(COLORS.valueText).fontSize(9);
-            if (valNumeric) setNumeric();
-            textRTL(doc, String(val ?? '-'), MARGIN + 6, y + (rh - 10) / 2 + 2, { width: cw - 100, align: 'right' });
+            doc.fillColor(COLORS.labelText).fontSize(10);
+            textRTL(doc, lbl + ':', MARGIN + cw - 86, y + (rh - 12) / 2 + 2, { width: 82, align: 'right' });
+            doc.fillColor(COLORS.valueText).fontSize(12);
+            if (valNumeric) setNumericBold();
+            else setArabic();
+            textRTL(doc, String(val ?? '-'), MARGIN + 6, y + (rh - 12) / 2 + 2, { width: cw - 100, align: 'right' });
             setArabic();
         }
         y += rh + ROW_GAP;
@@ -262,15 +267,17 @@ async function createLabelPDF(order) {
 
     doc.rect(MARGIN, y, cw, rh).fill(COLORS.labelBg);
     doc.rect(MARGIN, y, cw, rh).lineWidth(0.4).strokeColor(BLACK).stroke();
-    doc.fillColor(BLACK).fontSize(8);
-    textRTL(doc, 'عنوان التسليم' + ':', MARGIN + 6, y + (rh - 10) / 2 + 2, { width: cw - 12, align: 'right' });
+    setArabic();
+    doc.fillColor(BLACK).fontSize(11);
+    textRTL(doc, 'عنوان التسليم' + ':', MARGIN + 6, y + (rh - 12) / 2 + 2, { width: cw - 12, align: 'right' });
     y += rh + ROW_GAP;
 
     const fullAddr = (order.RegionName ? order.RegionName + ' - ' : '') + (order.Address || '');
     doc.rect(MARGIN, y, cw, rh).fill(COLORS.rowAlt);
     doc.rect(MARGIN, y, cw, rh).lineWidth(0.4).strokeColor(BLACK).stroke();
-    doc.fillColor(BLACK).fontSize(9);
-    textRTL(doc, (fullAddr || '-').toString().slice(0, 90), MARGIN + 6, y + (rh - 10) / 2 + 2, { width: cw - 12, align: 'right' });
+    setArabic();
+    doc.fillColor(BLACK).fontSize(12);
+    textRTL(doc, (fullAddr || '-').toString().slice(0, 90), MARGIN + 6, y + (rh - 12) / 2 + 2, { width: cw - 12, align: 'right' });
     y += rh + ROW_GAP;
     alt = !alt;
 

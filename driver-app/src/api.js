@@ -112,6 +112,18 @@ export async function getDriverReturnedOrders(token, date) {
   return Array.isArray(data) ? data : [];
 }
 
+export async function getPendingOrdersByArea(token, dateFrom, dateTo) {
+  const from = dateFrom || new Date().toISOString().slice(0, 10);
+  const to = dateTo || from;
+  const res = await fetch(
+    `${API_BASE_URL}/api/driver/pending-orders?dateFrom=${encodeURIComponent(from)}&dateTo=${encodeURIComponent(to)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل تحميل الطلبات المنتظرة');
+  return Array.isArray(data) ? data : [];
+}
+
 export async function receiveOrder(token, shipmentNumber) {
   const num = String(shipmentNumber || '').replace(/\D/g, '').trim() || String(shipmentNumber || '').trim();
   if (!num) throw new Error('أدخل رقم الشحنة');
