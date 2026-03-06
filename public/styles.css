@@ -1076,3 +1076,141 @@ tbody tr:hover {
 .btn-logout:hover {
     background: rgba(255,255,255,0.25);
 }
+
+/* ─── واجهة الموظف المحسّنة ─── */
+.employee-mode .sidebar {
+    background: linear-gradient(180deg, #0d9488 0%, #0f766e 50%, #134e4a 100%);
+}
+
+.employee-mode .nav-item[data-screen="new-order"] {
+    background: rgba(255,255,255,0.08);
+    border-right: 3px solid rgba(255,255,255,0.5);
+    font-weight: 600;
+}
+
+.employee-mode .nav-item[data-screen="new-order"]:hover,
+.employee-mode .nav-item[data-screen="new-order"].active {
+    background: rgba(255,255,255,0.18);
+    border-right-color: var(--accent);
+}
+
+.user-info-employee {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    margin: 12px 16px;
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.user-avatar {
+    width: 44px;
+    height: 44px;
+    background: rgba(255,255,255,0.2);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+}
+
+.user-details {
+    flex: 1;
+}
+
+.user-info-employee .user-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: white;
+}
+
+.user-role-badge {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 2px 10px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: rgba(255,255,255,0.95);
+}
+
+#btnAdminLogin {
+    font-size: 0.85rem;
+    padding: 8px 16px;
+    background: rgba(255,255,255,0.1) !important;
+    color: rgba(255,255,255,0.9) !important;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+
+#btnAdminLogin:hover {
+    background: rgba(255,255,255,0.2) !important;
+    color: white !important;
+}
+
+.employee-mode .content {
+    background: linear-gradient(180deg, #f8fffe 0%, #f1f5f9 100%);
+}
+
+.employee-mode .card {
+    border-radius: 14px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+}
+
+.employee-mode .btn-primary {
+    padding: 12px 24px;
+    font-size: 1rem;
+    border-radius: 10px;
+}
+
+/* نموذج إدخال الطلب - تحسين للموظف */
+.employee-mode [data-current-screen="new-order"] .page-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 16px 24px;
+    border-radius: 12px;
+    border: none;
+    margin-bottom: 24px;
+}
+.employee-mode [data-current-screen="new-order"] .page-title::before {
+    content: "📦";
+    font-size: 1.5rem;
+}
+.employee-mode [data-current-screen="new-order"] .card {
+    border: 1px solid rgba(13, 148, 136, 0.15);
+    box-shadow: 0 4px 20px rgba(13, 148, 136, 0.08);
+}
+.employee-mode [data-current-screen="new-order"] .btn-primary#btnSaveOrder {
+    padding: 14px 28px;
+    font-size: 1.05rem;
+    font-weight: 600;
+}
+
+/* شاشة الطلبات للموظف */
+.employee-mode [data-current-screen="orders"] .page-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--primary-dark);
+    padding: 16px 24px;
+    background: linear-gradient(135deg, #f0fdfa 0%, #e2e8f0 100%);
+    border-radius: 12px;
+    border-right: 4px solid var(--primary);
+}
+.employee-mode [data-current-screen="orders"] .page-title::before {
+    content: "📋";
+    font-size: 1.5rem;
+}
+.employee-mode [data-current-screen="orders"] .card {
+    border: 1px solid rgba(13, 148, 136, 0.12);
+    box-shadow: 0 4px 16px rgba(13, 148, 136, 0.06);
+}
+.employee-mode .search-bar input:focus,
+.employee-mode .search-bar select:focus {
+    border-color: var(--primary);
+}

@@ -16,18 +16,27 @@ async function checkAuth() {
 function showApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-main').style.display = 'flex';
+    const appMain = document.getElementById('app-main');
     if (currentUser) {
-        document.getElementById('sidebarUserInfo').innerHTML = `
-            <div>${(currentUser.DisplayName || currentUser.Username || '').replace(/</g, '&lt;')}</div>
-            <div class="user-role">${currentUser.Role === 'admin' ? 'مدير' : 'موظف'}</div>
-        `;
+        const isEmployee = currentUser.Role === 'employee';
+        appMain?.classList.toggle('employee-mode', isEmployee);
+        document.getElementById('sidebarUserInfo').innerHTML = isEmployee
+            ? `<div class="user-info-employee">
+                <div class="user-avatar">👤</div>
+                <div class="user-details">
+                    <div class="user-name">${(currentUser.DisplayName || currentUser.Username || 'موظف').replace(/</g, '&lt;')}</div>
+                    <div class="user-role-badge">موظف</div>
+                </div>
+               </div>`
+            : `<div>${(currentUser.DisplayName || currentUser.Username || '').replace(/</g, '&lt;')}</div>
+               <div class="user-role">${currentUser.Role === 'admin' ? 'مدير' : 'موظف'}</div>`;
         document.querySelectorAll('.nav-admin').forEach(el => {
             el.style.display = currentUser.Role === 'admin' ? '' : 'none';
         });
         const btnAdmin = document.getElementById('btnAdminLogin');
         if (btnAdmin) btnAdmin.style.display = currentUser.Role === 'admin' ? 'none' : '';
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        const defaultScreen = currentUser.Role === 'admin' ? 'dashboard' : 'orders';
+        const defaultScreen = currentUser.Role === 'admin' ? 'dashboard' : 'new-order';
         const navItem = document.querySelector(`[data-screen="${defaultScreen}"]`);
         if (navItem) navItem.classList.add('active');
         showScreen(defaultScreen);
@@ -518,6 +527,7 @@ function showScreen(screenId) {
     document.querySelector(`[data-screen="${screenId}"]`)?.classList.add('active');
     const container = document.getElementById('screen-container');
     container.innerHTML = '';
+    container.dataset.currentScreen = screenId || '';
     const screen = screens[screenId];
     if (screen) screen.render(container);
 }
@@ -617,8 +627,8 @@ const screens = {
                                     <input type="text" id="storePhone" placeholder="11 رقم" required>
                                 </div>
                                 <div class="form-group">
-                                    <label>اسم المستلم <span class="required">*</span></label>
-                                    <input type="text" id="customerName" required>
+                                    <label>اسم المستلم (اختياري)</label>
+                                    <input type="text" id="customerName" placeholder="اسم المستلم">
                                 </div>
                                 <div class="form-group">
                                     <label>هاتف المستلم <span class="required">*</span></label>
@@ -724,7 +734,6 @@ const screens = {
                 if (!adminOrderNo) { await showMsg('أدخل رقم الطلب في النظام الإداري'); return; }
                 if (!storeName) { await showMsg('أدخل اسم المتجر'); return; }
                 if (!storePhone) { await showMsg('أدخل هاتف المتجر'); return; }
-                if (!customerName) { await showMsg('أدخل اسم المستلم'); return; }
                 if (!customerPhone) { await showMsg('أدخل هاتف المستلم'); return; }
                 const phoneDigits = (customerPhone || '').replace(/\D/g, '');
                 if (phoneDigits.length !== 11) { await showMsg('هاتف المستلم يجب أن يكون 11 رقماً'); return; }
