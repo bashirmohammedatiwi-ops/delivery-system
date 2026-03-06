@@ -129,6 +129,8 @@ async function initSchema() {
     try { nativeDb.run('ALTER TABLE Orders ADD COLUMN ReturnedOrderReceivedAt TEXT'); saveDb(); } catch (e) {}
     try { nativeDb.run("ALTER TABLE Regions ADD COLUMN RegionArea TEXT DEFAULT 'الرصافة'"); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE Orders ADD COLUMN CustomerLocationLink TEXT'); saveDb(); } catch (e) {}
+    try { nativeDb.run('ALTER TABLE AppUsers ADD COLUMN SecretCode TEXT'); saveDb(); } catch (e) {}
+    try { nativeDb.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_appusers_secretcode ON AppUsers(SecretCode) WHERE SecretCode IS NOT NULL AND SecretCode != \'\''); saveDb(); } catch (e) {}
 
     try {
         nativeDb.run(`CREATE TABLE IF NOT EXISTS Regions (

@@ -81,6 +81,7 @@ window.api = {
 
     auth: {
         login: (username, password) => apiPost('/api/auth/login', { username, password }),
+        employeeSession: () => apiPost('/api/auth/employee-session', {}),
         logout: () => apiPost('/api/auth/logout', {}),
         me: () => apiGet('/api/auth/me'),
         getToken: getAuthToken,
@@ -140,7 +141,7 @@ window.api = {
 
     users: {
         getAll: () => apiGet('/api/users'),
-        create: (username, password, displayName, role) => apiPost('/api/users', { username, password, displayName, role }),
+        create: (username, password, displayName, role, secretCode) => apiPost('/api/users', { username, password, displayName, role, secretCode }),
         update: (id, data) => apiPut('/api/users/' + id, data),
         delete: (id) => apiDelete('/api/users/' + id)
     },

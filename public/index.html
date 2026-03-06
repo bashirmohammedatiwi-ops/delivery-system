@@ -8,11 +8,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- شاشة تسجيل الدخول -->
-    <div id="login-screen" class="login-screen">
+    <!-- شاشة تسجيل دخول المدير -->
+    <div id="login-screen" class="login-screen" style="display:none">
         <div class="login-card">
             <div class="login-logo">شركة ديما الحياة</div>
-            <p class="login-subtitle">نظام إدارة التوصيل</p>
+            <p class="login-subtitle">تسجيل دخول المدير</p>
             <form id="login-form">
                 <div class="form-group">
                     <label>اسم المستخدم</label>
@@ -24,6 +24,7 @@
                 </div>
                 <div id="loginError" class="login-error" style="display:none"></div>
                 <button type="submit" class="btn btn-primary btn-block" id="btnLogin">تسجيل الدخول</button>
+                <button type="button" class="btn btn-secondary btn-block" id="btnLoginCancel" style="margin-top:8px">إلغاء</button>
             </form>
         </div>
     </div>
@@ -51,6 +52,7 @@
                     <a href="#" data-screen="settings" class="nav-item nav-admin">الإعدادات</a>
                 </nav>
                 <button type="button" class="btn btn-secondary btn-logout" id="btnLogout">تسجيل الخروج</button>
+                <button type="button" class="btn btn-secondary" id="btnAdminLogin" style="margin-top:8px;display:none">دخول المدير</button>
             </aside>
             <main class="content">
                 <div id="screen-container"></div>

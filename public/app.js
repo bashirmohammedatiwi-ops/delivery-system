@@ -24,6 +24,8 @@ function showApp() {
         document.querySelectorAll('.nav-admin').forEach(el => {
             el.style.display = currentUser.Role === 'admin' ? '' : 'none';
         });
+        const btnAdmin = document.getElementById('btnAdminLogin');
+        if (btnAdmin) btnAdmin.style.display = currentUser.Role === 'admin' ? 'none' : '';
         document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
         const defaultScreen = currentUser.Role === 'admin' ? 'dashboard' : 'orders';
         const navItem = document.querySelector(`[data-screen="${defaultScreen}"]`);
@@ -599,6 +601,10 @@ const screens = {
                         <form id="orderForm">
                             <div class="form-grid">
                                 <div class="form-group">
+                                    <label>رمز الموظف <span class="required">*</span></label>
+                                    <input type="password" id="employeeCode" placeholder="أدخل رمزك السري" required autocomplete="off">
+                                </div>
+                                <div class="form-group">
                                     <label>رقم الطلب في النظام الإداري <span class="required">*</span></label>
                                     <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم" required>
                                 </div>
@@ -713,6 +719,8 @@ const screens = {
                 const deliveryFee = parseFloat(document.getElementById('deliveryFee')?.value || 0);
                 const notes = (document.getElementById('notes')?.value || '').trim();
 
+                const employeeCode = (document.getElementById('employeeCode')?.value || '').trim();
+                if (!employeeCode) { await showMsg('أدخل رمز الموظف'); return; }
                 if (!adminOrderNo) { await showMsg('أدخل رقم الطلب في النظام الإداري'); return; }
                 if (!storeName) { await showMsg('أدخل اسم المتجر'); return; }
                 if (!storePhone) { await showMsg('أدخل هاتف المتجر'); return; }
@@ -731,6 +739,7 @@ const screens = {
                     btnSaveOrder.classList.add('btn-saved');
                 }
                 const data = {
+                    EmployeeCode: employeeCode,
                     AdminOrderNo: document.getElementById('adminOrderNo').value,
                     StoreName: document.getElementById('storeName').value,
                     StorePhone: document.getElementById('storePhone').value,
@@ -1987,6 +1996,10 @@ const screens = {
                                     <option value="admin">مدير</option>
                                 </select>
                             </div>
+                            <div class="form-group">
+                                <label>رمز الموظف (لإدخال الطلبات)</label>
+                                <input type="text" id="newUserSecretCode" placeholder="مثال: 1234">
+                            </div>
                             <div class="form-group" style="align-items:flex-end">
                                 <label>&nbsp;</label>
                                 <button type="button" class="btn btn-primary" id="btnAddUser">إضافة مستخدم</button>
@@ -1999,7 +2012,7 @@ const screens = {
                         <div class="users-table-wrap">
                             <table class="users-table">
                                 <thead>
-                                    <tr><th>اسم المستخدم</th><th>الاسم المعروض</th><th>الدور</th><th>الحالة</th><th>إجراء</th></tr>
+                                    <tr><th>اسم المستخدم</th><th>الاسم المعروض</th><th>الدور</th><th>رمز الموظف</th><th>الحالة</th><th>إجراء</th></tr>
                                 </thead>
                                 <tbody>
                                     ${users.length ? users.map(u => `
@@ -2012,6 +2025,7 @@ const screens = {
                                                     <option value="admin" ${u.Role === 'admin' ? 'selected' : ''}>مدير</option>
                                                 </select>
                                             </td>
+                                            <td><input type="text" class="edit-secret-code" value="${esc(u.SecretCode || '')}" placeholder="رمز الموظف"></td>
                                             <td><label class="checkbox-label"><input type="checkbox" class="edit-active" ${u.Active ? 'checked' : ''}> نشط</label></td>
                                             <td>
                                                 <div class="cell-actions">
@@ -2020,7 +2034,7 @@ const screens = {
                                                 </div>
                                             </td>
                                         </tr>
-                                    `).join('') : '<tr><td colspan="5" class="empty-table-msg">لا يوجد مستخدمون. أضف مستخدماً جديداً أعلاه.</td></tr>'}
+                                    `).join('') : '<tr><td colspan="6" class="empty-table-msg">لا يوجد مستخدمون. أضف مستخدماً جديداً أعلاه.</td></tr>'}
                                 </tbody>
                             </table>
                         </div>
@@ -2033,12 +2047,14 @@ const screens = {
                 const password = (container.querySelector('#newUserPassword').value || '').trim();
                 const displayName = (container.querySelector('#newUserDisplayName').value || '').trim();
                 const role = container.querySelector('#newUserRole').value;
+                const secretCode = (container.querySelector('#newUserSecretCode').value || '').trim() || undefined;
                 if (!username || !password) { await showMsg('أدخل اسم المستخدم وكلمة السر'); return; }
                 try {
-                    await window.api.users.create(username, password, displayName, role);
+                    await window.api.users.create(username, password, displayName, role, secretCode);
                     container.querySelector('#newUserUsername').value = '';
                     container.querySelector('#newUserPassword').value = '';
                     container.querySelector('#newUserDisplayName').value = '';
+                    container.querySelector('#newUserSecretCode').value = '';
                     refresh();
                 } catch (e) { await showMsg('خطأ: ' + (e?.message || e)); }
             };
@@ -2051,6 +2067,7 @@ const screens = {
                     const data = {
                         displayName: row.querySelector('.edit-display-name')?.value?.trim(),
                         role: row.querySelector('.edit-role')?.value,
+                        secretCode: (row.querySelector('.edit-secret-code')?.value || '').trim() || null,
                         active: row.querySelector('.edit-active')?.checked ?? true
                     };
                     const pw = prompt('كلمة سر جديدة (اترك فارغاً للإبقاء على الحالية):');
@@ -2098,7 +2115,24 @@ document.getElementById('btnLogout')?.addEventListener('click', async () => {
         await window.api.auth.logout();
     } catch (_) {}
     window.api.auth.setToken('');
-    showLogin();
+    try {
+        const res = await window.api.auth.employeeSession();
+        if (res && res.token) {
+            window.api.auth.setToken(res.token);
+            currentUser = res.user || { DisplayName: 'موظف', Role: 'employee' };
+            showApp();
+        } else showLogin();
+    } catch (_) { showLogin(); }
+});
+
+document.getElementById('btnAdminLogin')?.addEventListener('click', () => {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app-main').style.display = 'none';
+});
+
+document.getElementById('btnLoginCancel')?.addEventListener('click', () => {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-main').style.display = 'flex';
 });
 
 document.getElementById('login-form')?.addEventListener('submit', async (e) => {
@@ -2128,7 +2162,17 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
 });
 
 (async () => {
-    const ok = await checkAuth();
+    let ok = await checkAuth();
+    if (!ok) {
+        try {
+            const res = await window.api.auth.employeeSession();
+            if (res && res.token) {
+                window.api.auth.setToken(res.token);
+                currentUser = res.user || { DisplayName: 'موظف', Role: 'employee' };
+                ok = true;
+            }
+        } catch (_) {}
+    }
     if (ok) showApp();
     else showLogin();
 })();

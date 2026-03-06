@@ -76,6 +76,17 @@ app.get('/api/auth/me', requireAppAuth, (req, res) => {
     res.json(req.appUser);
 });
 
+// جلسة موظف مشتركة (بدون تسجيل دخول)
+app.post('/api/auth/employee-session', async (req, res) => {
+    try {
+        const token = userAuthService.createEmployeeSession();
+        const user = userAuthService.getUserByToken(token);
+        res.json({ success: true, token, user });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ─── API: المناطق ───
 app.get('/api/regions', requireAppAuth, (req, res) => {
     try {
@@ -130,8 +141,8 @@ app.get('/api/users', requireAppAuth, requireAdmin, (req, res) => {
 
 app.post('/api/users', requireAppAuth, requireAdmin, (req, res) => {
     try {
-        const { username, password, displayName, role } = req.body;
-        const result = userAuthService.createUser(username, password, displayName, role || 'employee');
+        const { username, password, displayName, role, secretCode } = req.body;
+        const result = userAuthService.createUser(username, password, displayName, role || 'employee', secretCode);
         if (!result.success) return res.status(400).json({ error: result.error });
         res.json(result);
     } catch (err) {
@@ -451,7 +462,12 @@ app.post('/api/driver/receive-order', async (req, res) => {
 // ─── API: الطلبات (يتطلب تسجيل الدخول) ───
 app.post('/api/orders', requireAppAuth, async (req, res) => {
     try {
-        const body = { ...req.body, CreatedByUserID: req.appUser.UserID };
+        const employeeCode = (req.body.EmployeeCode || '').trim();
+        if (!employeeCode) return res.status(400).json({ error: 'أدخل رمز الموظف' });
+        const emp = userAuthService.getUserBySecretCode(employeeCode);
+        if (!emp) return res.status(400).json({ error: 'رمز الموظف غير صحيح' });
+        const body = { ...req.body, CreatedByUserID: emp.UserID };
+        delete body.EmployeeCode;
         const order = orderService.createOrder(body);
         res.json(order);
     } catch (err) {

@@ -53,7 +53,7 @@ function logoutUser(token) {
 function getAllUsers() {
     const database = db.getDatabase();
     const rows = database.prepare(
-        'SELECT UserID, Username, DisplayName, Role, Active, CreatedAt FROM AppUsers ORDER BY UserID'
+        'SELECT UserID, Username, DisplayName, Role, Active, SecretCode, CreatedAt FROM AppUsers ORDER BY UserID'
     ).all();
     return rows.map(u => ({ ...u, RoleLabel: u.Role === 'admin' ? 'مدير' : 'موظف' }));
 }
@@ -61,11 +61,36 @@ function getAllUsers() {
 function getUserById(userId) {
     const database = db.getDatabase();
     return database.prepare(
-        'SELECT UserID, Username, DisplayName, Role, Active, CreatedAt FROM AppUsers WHERE UserID = ?'
+        'SELECT UserID, Username, DisplayName, Role, Active, SecretCode, CreatedAt FROM AppUsers WHERE UserID = ?'
     ).get(userId);
 }
 
-function createUser(username, password, displayName, role) {
+function getUserBySecretCode(code) {
+    if (!code || !String(code).trim()) return null;
+    const database = db.getDatabase();
+    const c = String(code).trim();
+    const u = database.prepare('SELECT UserID, DisplayName, Username FROM AppUsers WHERE SecretCode = ? AND Active = 1').get(c);
+    return u || null;
+}
+
+function getOrCreateSharedEmployeeUser() {
+    const database = db.getDatabase();
+    let emp = database.prepare("SELECT UserID FROM AppUsers WHERE Username = 'employee' AND Role = 'employee'").get();
+    if (emp) return emp.UserID;
+    const hash = hashPassword(crypto.randomBytes(16).toString('hex'));
+    database.prepare(
+        "INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active) VALUES ('employee', ?, 'موظف مشترك', 'employee', 1)"
+    ).run(hash);
+    emp = database.prepare("SELECT UserID FROM AppUsers WHERE Username = 'employee'").get();
+    return emp.UserID;
+}
+
+function createEmployeeSession() {
+    const userId = getOrCreateSharedEmployeeUser();
+    return createSession(userId);
+}
+
+function createUser(username, password, displayName, role, secretCode) {
     const database = db.getDatabase();
     const un = (username || '').trim().toLowerCase();
     const pw = (password || '').trim();
@@ -76,12 +101,18 @@ function createUser(username, password, displayName, role) {
     const existing = database.prepare('SELECT UserID FROM AppUsers WHERE Username = ?').get(un);
     if (existing) return { success: false, error: 'اسم المستخدم مستخدم مسبقاً' };
 
+    const sc = secretCode != null ? String(secretCode).trim() || null : null;
+    if (sc) {
+        const dup = database.prepare('SELECT UserID FROM AppUsers WHERE SecretCode = ?').get(sc);
+        if (dup) return { success: false, error: 'الرمز السري مستخدم مسبقاً' };
+    }
+
     const hash = hashPassword(pw);
     database.prepare(
-        'INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active) VALUES (?, ?, ?, ?, 1)'
-    ).run(un, hash, (displayName || un).trim(), role);
+        'INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active, SecretCode) VALUES (?, ?, ?, ?, 1, ?)'
+    ).run(un, hash, (displayName || un).trim(), role, sc);
 
-    const user = database.prepare('SELECT UserID, Username, DisplayName, Role, Active, CreatedAt FROM AppUsers WHERE Username = ?').get(un);
+    const user = database.prepare('SELECT UserID, Username, DisplayName, Role, Active, SecretCode, CreatedAt FROM AppUsers WHERE Username = ?').get(un);
     return { success: true, user };
 }
 
@@ -93,9 +124,15 @@ function updateUser(userId, data) {
     const displayName = data.displayName != null ? String(data.displayName).trim() : user.DisplayName;
     const role = data.role === 'admin' || data.role === 'employee' ? data.role : user.Role;
     const active = data.active !== undefined ? (data.active ? 1 : 0) : (user.Active ? 1 : 0);
+    const secretCode = data.secretCode !== undefined ? (data.secretCode != null ? String(data.secretCode).trim() || null : null) : user.SecretCode;
 
-    let sql = 'UPDATE AppUsers SET DisplayName = ?, Role = ?, Active = ?';
-    const params = [displayName, role, active];
+    if (secretCode) {
+        const dup = database.prepare('SELECT UserID FROM AppUsers WHERE SecretCode = ? AND UserID != ?').get(secretCode, userId);
+        if (dup) return { success: false, error: 'الرمز السري مستخدم مسبقاً' };
+    }
+
+    let sql = 'UPDATE AppUsers SET DisplayName = ?, Role = ?, Active = ?, SecretCode = ?';
+    const params = [displayName, role, active, secretCode];
 
     if (data.password && String(data.password).trim()) {
         sql += ', PasswordHash = ?';
@@ -120,11 +157,17 @@ function deleteUser(userId) {
 function ensureDefaultAdmin() {
     const database = db.getDatabase();
     const count = database.prepare('SELECT COUNT(*) as c FROM AppUsers').get();
-    if (count && count.c > 0) return;
+    if (count && count.c > 0) {
+        const admin = database.prepare("SELECT UserID, SecretCode FROM AppUsers WHERE Role = 'admin' LIMIT 1").get();
+        if (admin && !admin.SecretCode) {
+            database.prepare('UPDATE AppUsers SET SecretCode = ? WHERE UserID = ?').run('0000', admin.UserID);
+        }
+        return;
+    }
     const hash = hashPassword('admin');
     database.prepare(
-        'INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active) VALUES (?, ?, ?, ?, 1)'
-    ).run('admin', hash, 'المدير', 'admin');
+        'INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active, SecretCode) VALUES (?, ?, ?, ?, 1, ?)'
+    ).run('admin', hash, 'المدير', 'admin', 1, '0000');
 }
 
 function getDisplayName(userId) {
@@ -139,7 +182,9 @@ module.exports = {
     hashPassword,
     verifyCredentials,
     createSession,
+    createEmployeeSession,
     getUserByToken,
+    getUserBySecretCode,
     logoutUser,
     getAllUsers,
     getUserById,
