@@ -2062,77 +2062,96 @@ const screens = {
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             container.innerHTML = `
                 <div class="screen active users-screen">
-                    <h1 class="page-title">إدارة المستخدمين</h1>
-                    <div class="card users-add-card">
-                        <h3>إضافة مستخدم جديد</h3>
-                        <p class="section-desc">أضف مستخدماً جديداً للنظام مع تحديد الدور والصلاحيات.</p>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>اسم المستخدم</label>
-                                <input type="text" id="newUserUsername" placeholder="مثال: employee1">
+                    <div class="users-layout">
+                        <header class="users-header">
+                            <div class="users-header-top">
+                                <h1 class="users-title">إدارة المستخدمين</h1>
+                                <span class="users-count" id="usersCount">${users.length} مستخدم</span>
                             </div>
-                            <div class="form-group">
-                                <label>كلمة السر</label>
-                                <input type="password" id="newUserPassword" placeholder="كلمة السر">
-                            </div>
-                            <div class="form-group">
-                                <label>الاسم المعروض</label>
-                                <input type="text" id="newUserDisplayName" placeholder="مثال: أحمد محمد">
-                            </div>
-                            <div class="form-group">
-                                <label>الدور</label>
-                                <select id="newUserRole">
-                                    <option value="employee">موظف</option>
-                                    <option value="admin">مدير</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>رمز الموظف (لإدخال الطلبات)</label>
-                                <input type="text" id="newUserSecretCode" placeholder="مثال: 1234">
-                            </div>
-                            <div class="form-group" style="align-items:flex-end">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-primary" id="btnAddUser">إضافة مستخدم</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card users-list-card">
-                        <h3>قائمة المستخدمين</h3>
-                        <p class="section-desc">إدارة المستخدمين وتعديل الأدوار والحالة.</p>
-                        <div class="users-table-wrap">
-                            <table class="users-table">
-                                <thead>
-                                    <tr><th>اسم المستخدم</th><th>الاسم المعروض</th><th>الدور</th><th>رمز الموظف</th><th>الحالة</th><th>إجراء</th></tr>
-                                </thead>
-                                <tbody>
-                                    ${users.length ? users.map(u => `
-                                        <tr data-id="${u.UserID}" class="${u.Active ? '' : 'user-inactive'}">
-                                            <td><strong>${esc(u.Username)}</strong></td>
-                                            <td><input type="text" class="edit-display-name" value="${esc(u.DisplayName || '')}" placeholder="الاسم المعروض"></td>
-                                            <td>
-                                                <select class="edit-role">
-                                                    <option value="employee" ${u.Role === 'employee' ? 'selected' : ''}>موظف</option>
-                                                    <option value="admin" ${u.Role === 'admin' ? 'selected' : ''}>مدير</option>
-                                                </select>
-                                            </td>
-                                            <td><input type="text" class="edit-secret-code" value="${esc(u.SecretCode || '')}" placeholder="رمز الموظف"></td>
-                                            <td><label class="checkbox-label"><input type="checkbox" class="edit-active" ${u.Active ? 'checked' : ''}> نشط</label></td>
-                                            <td>
-                                                <div class="cell-actions">
-                                                    <button type="button" class="btn btn-primary btn-sm btn-save-user">حفظ</button>
-                                                    <button type="button" class="btn btn-sm btn-delete btn-delete-user" data-id="${u.UserID}" data-username="${esc(u.Username)}">حذف</button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    `).join('') : '<tr><td colspan="6" class="empty-table-msg">لا يوجد مستخدمون. أضف مستخدماً جديداً أعلاه.</td></tr>'}
-                                </tbody>
-                            </table>
+                            <p class="users-subtitle">إضافة وإدارة حسابات المستخدمين مع تحديد الأدوار والصلاحيات</p>
+                        </header>
+                        <div class="users-content">
+                            <section class="users-add-section">
+                                <div class="users-add-card">
+                                    <div class="users-add-head">
+                                        <span class="users-add-icon">👤</span>
+                                        <h3>إضافة مستخدم جديد</h3>
+                                    </div>
+                                    <p class="users-add-desc">أضف مستخدماً جديداً للنظام مع تحديد الدور والصلاحيات.</p>
+                                    <div class="users-add-form">
+                                        <div class="form-group">
+                                            <label>اسم المستخدم</label>
+                                            <input type="text" id="newUserUsername" placeholder="مثال: employee1">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>كلمة السر</label>
+                                            <input type="password" id="newUserPassword" placeholder="كلمة السر">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>الاسم المعروض</label>
+                                            <input type="text" id="newUserDisplayName" placeholder="مثال: أحمد محمد">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>الدور</label>
+                                            <select id="newUserRole">
+                                                <option value="employee">موظف</option>
+                                                <option value="admin">مدير</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>رمز الموظف</label>
+                                            <input type="text" id="newUserSecretCode" placeholder="مثال: 1234">
+                                        </div>
+                                        <button type="button" class="btn btn-primary" id="btnAddUser">إضافة مستخدم</button>
+                                    </div>
+                                </div>
+                            </section>
+                            <section class="users-list-section">
+                                <div class="users-list-card">
+                                    <div class="users-list-head">
+                                        <span class="users-list-icon">📋</span>
+                                        <h3>قائمة المستخدمين</h3>
+                                    </div>
+                                    <p class="users-list-desc">إدارة المستخدمين وتعديل الأدوار والحالة.</p>
+                                    ${users.length > 0 ? `
+                                    <div class="users-table-wrap">
+                                        <table class="users-table">
+                                            <thead>
+                                                <tr><th>اسم المستخدم</th><th>الاسم المعروض</th><th>الدور</th><th>رمز الموظف</th><th>الحالة</th><th>إجراء</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                ${users.map(u => `
+                                                    <tr data-id="${u.UserID}" class="${u.Active ? '' : 'user-inactive'}">
+                                                        <td><strong class="users-username">${esc(u.Username)}</strong></td>
+                                                        <td><input type="text" class="edit-display-name" value="${esc(u.DisplayName || '')}" placeholder="الاسم المعروض"></td>
+                                                        <td>
+                                                            <select class="edit-role">
+                                                                <option value="employee" ${u.Role === 'employee' ? 'selected' : ''}>موظف</option>
+                                                                <option value="admin" ${u.Role === 'admin' ? 'selected' : ''}>مدير</option>
+                                                            </select>
+                                                        </td>
+                                                        <td><input type="text" class="edit-secret-code" value="${esc(u.SecretCode || '')}" placeholder="رمز الموظف"></td>
+                                                        <td><label class="checkbox-label"><input type="checkbox" class="edit-active" ${u.Active ? 'checked' : ''}> نشط</label></td>
+                                                        <td>
+                                                            <div class="cell-actions">
+                                                                <button type="button" class="btn btn-primary btn-sm btn-save-user">حفظ</button>
+                                                                <button type="button" class="btn btn-sm btn-delete btn-delete-user" data-id="${u.UserID}" data-username="${esc(u.Username)}">حذف</button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    ` : '<div class="users-empty"><span class="users-empty-icon">👥</span><p>لا يوجد مستخدمون. أضف مستخدماً جديداً أعلاه.</p></div>'}
+                                </div>
+                            </section>
                         </div>
                     </div>
                 </div>
             `;
             const refresh = () => this.render(container);
-            container.querySelector('#btnAddUser').onclick = async () => {
+            container.querySelector('#btnAddUser')?.addEventListener('click', async () => {
                 const username = (container.querySelector('#newUserUsername').value || '').trim();
                 const password = (container.querySelector('#newUserPassword').value || '').trim();
                 const displayName = (container.querySelector('#newUserDisplayName').value || '').trim();
@@ -2147,8 +2166,8 @@ const screens = {
                     container.querySelector('#newUserSecretCode').value = '';
                     refresh();
                 } catch (e) { await showMsg('خطأ: ' + (e?.message || e)); }
-            };
-            container.querySelector('.users-table tbody').onclick = async (e) => {
+            });
+            container.querySelector('.users-table tbody')?.addEventListener('click', async (e) => {
                 const btn = e.target.closest('button');
                 if (!btn) return;
                 const row = btn.closest('tr');
@@ -2173,7 +2192,7 @@ const screens = {
                         refresh();
                     } catch (err) { await showMsg('خطأ: ' + (err?.message || err)); }
                 }
-            };
+            });
         }
     }
 };

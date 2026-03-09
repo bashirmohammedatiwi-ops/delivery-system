@@ -7,10 +7,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Modal,
+  Pressable,
+  ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { getPendingOrdersByArea } from '../api';
+import { getPendingOrdersByArea, getPendingOrdersList } from '../api';
 import { THEME } from '../theme';
 
 function formatDateAr(d) {
@@ -24,11 +26,40 @@ function formatDateShort(d) {
   return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 }
 
+function formatIQD(n) {
+  return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
+}
+
 export default function PendingOrdersScreen() {
   const { token } = useAuth();
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showOrdersModal, setShowOrdersModal] = useState(false);
+  const [ordersList, setOrdersList] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [selectedArea, setSelectedArea] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+
+  const openAreaOrders = useCallback(
+    async (date, area) => {
+      if (!token) return;
+      setSelectedDate(date);
+      setSelectedArea(area);
+      setShowOrdersModal(true);
+      setOrdersLoading(true);
+      setOrdersList([]);
+      try {
+        const list = await getPendingOrdersList(token, date, area);
+        setOrdersList(Array.isArray(list) ? list : []);
+      } catch (e) {
+        Alert.alert('خطأ', e.message || 'فشل تحميل الطلبات');
+      } finally {
+        setOrdersLoading(false);
+      }
+    },
+    [token]
+  );
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -64,16 +95,24 @@ export default function PendingOrdersScreen() {
       <View style={styles.dayCard}>
         <Text style={styles.dayDate}>{formatDateAr(item.orderDate)}</Text>
         <View style={styles.areaRow}>
-          <View style={[styles.areaBadge, styles.karkhBadge]}>
+          <Pressable
+            style={[styles.areaBadge, styles.karkhBadge]}
+            onPress={() => openAreaOrders(item.orderDate, 'الكرخ')}
+            android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+          >
             <Text style={styles.areaValue}>{item.countKarkh || 0}</Text>
             <Text style={styles.areaLabel}>الكرخ</Text>
-          </View>
-          <View style={[styles.areaBadge, styles.rusafaBadge]}>
+          </Pressable>
+          <Pressable
+            style={[styles.areaBadge, styles.rusafaBadge]}
+            onPress={() => openAreaOrders(item.orderDate, 'الرصافة')}
+            android_ripple={{ color: 'rgba(0,0,0,0.1)' }}
+          >
             <Text style={styles.areaValue}>{item.countRusafa || 0}</Text>
             <Text style={styles.areaLabel}>الرصافة</Text>
-          </View>
+          </Pressable>
         </View>
-        <Text style={styles.totalText}>المجموع: {total} طلب</Text>
+        <Text style={styles.totalText}>المجموع: {total} طلب - اضغط على المنطقة لرؤية الطلبات</Text>
       </View>
     );
   };
@@ -92,7 +131,7 @@ export default function PendingOrdersScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.headerTitle}>الطلبات المنتظرة للاستلام</Text>
-      <Text style={styles.headerSubtitle}>طلبات لم يستلمها أي سائق بعد (حالة: جديد)</Text>
+      <Text style={styles.headerSubtitle}>طلبات لم يستلمها أي سائق بعد - اضغط على الكرخ أو الرصافة لرؤية الطلبات</Text>
       {filteredDays.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyText}>لا توجد طلبات منتظرة حالياً</Text>
@@ -108,6 +147,46 @@ export default function PendingOrdersScreen() {
           }
         />
       )}
+
+      <Modal
+        visible={showOrdersModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowOrdersModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowOrdersModal(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{selectedArea} - {formatDateAr(selectedDate)}</Text>
+              <Pressable onPress={() => setShowOrdersModal(false)}>
+                <Text style={styles.modalClose}>✕ إغلاق</Text>
+              </Pressable>
+            </View>
+            {ordersLoading ? (
+              <View style={styles.modalLoading}>
+                <ActivityIndicator size="large" color={THEME.primary} />
+              </View>
+            ) : ordersList.length === 0 ? (
+              <Text style={styles.emptyText}>لا توجد طلبات</Text>
+            ) : (
+              <ScrollView style={styles.ordersScroll} contentContainerStyle={styles.ordersScrollContent}>
+                {ordersList.map((o) => (
+                  <View key={o.OrderID} style={styles.orderCard}>
+                    <View style={styles.orderCardHeader}>
+                      <Text style={styles.orderShipment}>#{o.ShipmentNumber}</Text>
+                      <Text style={styles.orderAmount}>{formatIQD(o.TotalIQD)}</Text>
+                    </View>
+                    <Text style={styles.orderCustomer}>{o.CustomerName || '—'}</Text>
+                    <Text style={styles.orderAddress}>{o.Address || '—'}</Text>
+                    {o.RegionName ? <Text style={styles.orderRegion}>{o.RegionName}</Text> : null}
+                    {o.StoreName ? <Text style={styles.orderStore}>{o.StoreName}</Text> : null}
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -172,4 +251,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: { fontSize: 16, color: '#94a3b8' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: THEME.bgCard,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
+  modalClose: { fontSize: 16, color: THEME.primary, fontWeight: '600' },
+  modalLoading: { padding: 40, alignItems: 'center' },
+  ordersScroll: { maxHeight: 400 },
+  ordersScrollContent: { paddingBottom: 24 },
+  orderCard: {
+    backgroundColor: THEME.bg,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    borderRightWidth: 4,
+    borderRightColor: THEME.primary,
+  },
+  orderCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  orderShipment: { fontSize: 16, fontWeight: '700', color: THEME.primary },
+  orderAmount: { fontSize: 16, fontWeight: '700', color: THEME.success },
+  orderCustomer: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
+  orderAddress: { fontSize: 14, color: THEME.textMuted, marginBottom: 2 },
+  orderRegion: { fontSize: 13, color: THEME.textMuted },
+  orderStore: { fontSize: 13, color: THEME.textMuted, marginTop: 4 },
 });

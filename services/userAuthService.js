@@ -156,18 +156,14 @@ function deleteUser(userId) {
 
 function ensureDefaultAdmin() {
     const database = db.getDatabase();
-    const count = database.prepare('SELECT COUNT(*) as c FROM AppUsers').get();
-    if (count && count.c > 0) {
-        const admin = database.prepare("SELECT UserID, SecretCode FROM AppUsers WHERE Role = 'admin' LIMIT 1").get();
-        if (admin && !admin.SecretCode) {
-            database.prepare('UPDATE AppUsers SET SecretCode = ? WHERE UserID = ?').run('0000', admin.UserID);
-        }
+    let alhayaa = database.prepare("SELECT UserID, SecretCode FROM AppUsers WHERE Username = 'alhayaa'").get();
+    if (alhayaa) {
         return;
     }
-    const hash = hashPassword('admin');
+    const hash = hashPassword('00000');
     database.prepare(
         'INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active, SecretCode) VALUES (?, ?, ?, ?, 1, ?)'
-    ).run('admin', hash, 'المدير', 'admin', 1, '0000');
+    ).run('alhayaa', hash, 'ديما الحياة', 'admin', 1, '00000');
 }
 
 function getDisplayName(userId) {

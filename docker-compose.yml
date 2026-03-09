@@ -1,8 +1,13 @@
+# شركة ديما الحياة - نظام إدارة التوصيل
+# تشغيل: docker-compose up -d
+# تطبيق الموظفين متاح على البورت 3002
+
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+    image: alhayat-delivery:latest
     container_name: delivery-system
     restart: unless-stopped
     ports:
@@ -20,6 +25,42 @@ services:
       retries: 3
       start_period: 10s
 
+  employee-web:
+    image: alhayat-delivery:latest
+    container_name: delivery-employee-web
+    restart: unless-stopped
+    command: ["node", "server-employee.js"]
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - EMPLOYEE_PORT=3002
+      - MAIN_HOST=app
+      - MAIN_PORT=3000
+    depends_on:
+      app:
+        condition: service_healthy
+
+  driver-web:
+    image: alhayat-delivery:latest
+    container_name: delivery-driver-web
+    restart: unless-stopped
+    command: ["node", "server-driver.js"]
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - DRIVER_PORT=3001
+      - MAIN_HOST=app
+      - MAIN_PORT=3000
+    depends_on:
+      app:
+        condition: service_healthy
+
 volumes:
   app-data:
     driver: local
+
+networks:
+  default:
+    name: alhayat-network

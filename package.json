@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "driver-web": "node server-driver.js",
+    "employee-web": "node server-employee.js"
   },
   "author": "شركة ديما الحياة",
   "license": "MIT",

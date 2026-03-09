@@ -439,6 +439,24 @@ app.get('/api/driver/pending-orders', async (req, res) => {
     }
 });
 
+app.get('/api/driver/pending-orders-list', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const area = (req.query.area || '').trim();
+        if (!area || !['الكرخ', 'الرصافة'].includes(area)) {
+            return res.status(400).json({ error: 'حدد المنطقة: الكرخ أو الرصافة' });
+        }
+        const orders = orderService.getPendingOrdersList(date, area);
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/driver/receive-order', async (req, res) => {
     try {
         const auth = req.headers.authorization || '';

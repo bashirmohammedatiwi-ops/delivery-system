@@ -43,6 +43,18 @@ const res = await fetch(`${API_BASE}/api/orders?driverId=${driverId}&status=Assi
 const orders = await res.json();
 ```
 
+## التشغيل بـ Docker
+
+```bash
+docker-compose up -d --build
+```
+
+- **النظام الإداري:** http://localhost:3000
+- **تطبيق السائق (ويب):** http://localhost:3001
+- **تطبيق الموظفين (ويب):** http://localhost:3002
+
+توجّه تطبيقات السائق والموظفين طلباتها إلى السيرفر الرئيسي تلقائياً داخل Docker.
+
 ## النشر
 
 - ضع الخادم على VPS أو أي استضافة Node.js

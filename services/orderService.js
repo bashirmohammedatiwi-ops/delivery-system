@@ -371,6 +371,21 @@ function getPendingOrdersByArea(dateFrom, dateTo) {
     return rows;
 }
 
+function getPendingOrdersList(date, regionArea) {
+    const database = db.getDatabase();
+    const d = date || new Date().toISOString().slice(0, 10);
+    const area = String(regionArea || '').trim();
+    if (!area || !['الكرخ', 'الرصافة'].includes(area)) return [];
+    return database.prepare(
+        `SELECT o.*, r.RegionName, COALESCE(r.RegionArea, 'الرصافة') AS RegionArea
+         FROM Orders o
+         LEFT JOIN Regions r ON o.RegionID = r.RegionID
+         WHERE o.Status = 'New' AND date(o.CreatedDate) = date(?)
+           AND COALESCE(r.RegionArea, 'الرصافة') = ?
+         ORDER BY o.CreatedDate ASC, o.OrderID ASC`
+    ).all(d, area);
+}
+
 function markReturnedOrderReceived(orderId) {
     const database = db.getDatabase();
     const order = getOrderById(orderId);
@@ -401,5 +416,6 @@ module.exports = {
     getDriverDeliveredOrders,
     getDriverReturnedOrders,
     markReturnedOrderReceived,
-    getPendingOrdersByArea
+    getPendingOrdersByArea,
+    getPendingOrdersList
 };
