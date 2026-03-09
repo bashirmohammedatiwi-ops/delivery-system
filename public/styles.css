@@ -429,7 +429,6 @@ tbody tr:hover {
 
 .modal-subtitle { color: #64748b; margin-bottom: 16px; }
 .credentials-loading { padding: 24px; text-align: center; color: #64748b; }
-.report-table tr.order-returned { background: #fef3c7 !important; color: #b45309; }
 .checkbox-label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
 .drivers-table-wrap { overflow-x: auto; margin-top: 16px; }
 .drivers-table .edit-name, .drivers-table .edit-phone { border: none; background: transparent; width: 100%; padding: 6px 8px; }
@@ -542,85 +541,264 @@ tbody tr:hover {
 }
 
 /* ─── قسم التقارير ─── */
-.reports-screen .card {
-    border: 1px solid rgba(13, 148, 136, 0.12);
-    background: linear-gradient(180deg, #ffffff 0%, #f8fffe 100%);
-    box-shadow: 0 2px 12px rgba(13, 148, 136, 0.08);
+.reports-screen {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-bottom: 32px;
 }
 
-.reports-screen .card h3 {
-    color: var(--primary-dark);
-    font-size: 1.1rem;
+.reports-header {
+    margin-bottom: 32px;
+    padding: 28px 0;
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 45%, #134e4a 100%);
+    border-radius: 16px;
+    color: white;
+    text-align: center;
+    box-shadow: 0 8px 24px rgba(15, 118, 110, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reports-header .page-title {
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-size: 1.6rem;
+    color: white;
     font-weight: 700;
-    padding-bottom: 12px;
-    margin-bottom: 0;
-    border-bottom: 2px solid rgba(13, 148, 136, 0.15);
 }
 
-.reports-screen .card #driverReportContent,
-.reports-screen .card #companyReportContent {
-    margin-top: 20px;
+.reports-subtitle {
+    margin: 8px 0 0;
+    font-size: 0.95rem;
+    opacity: 0.9;
+}
+
+.reports-screen .report-card {
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    border-radius: 14px;
+    margin-bottom: 28px;
+    overflow: hidden;
+    transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.reports-screen .report-card:hover {
+    box-shadow: 0 6px 24px rgba(13, 148, 136, 0.12);
+    border-color: rgba(13, 148, 136, 0.25);
+}
+
+.reports-screen .report-card h3 {
+    color: var(--primary-dark);
+    font-size: 1.15rem;
+    font-weight: 700;
+    padding: 20px 24px;
+    margin: 0;
+    background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 60%, #99f6e4 100%);
+    border-bottom: 2px solid #5eead4;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.reports-screen .report-card h3::before {
+    display: none;
+}
+
+.report-card-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: var(--primary);
+    color: white;
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.report-desc {
+    color: #64748b;
+    margin: 0 0 20px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.reports-screen .report-card > *:not(h3) {
+    padding: 0 24px 24px;
+}
+
+.report-form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+    align-items: end;
+    margin-top: 8px;
+}
+
+.reports-screen .report-card .form-group label {
+    font-weight: 600;
+    color: #334155;
+}
+
+.reports-screen .report-card input,
+.reports-screen .report-card select {
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    font-size: 0.95rem;
+}
+
+.reports-screen .report-card input:focus,
+.reports-screen .report-card select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+}
+
+.reports-screen .report-card .btn {
+    padding: 12px 20px;
+    border-radius: 10px;
+}
+
+/* صندوق استحصال الأجور */
+.report-collect-box {
+    display: none;
+    margin: 20px 0;
+    padding: 24px;
+    background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+    border-radius: 14px;
+    border: 2px solid #5eead4;
+}
+
+.report-collect-label {
+    font-weight: 600;
+    color: #0f766e;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.report-collect-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #134e4a;
+    font-variant-numeric: tabular-nums;
+}
+
+.report-collect-count {
+    font-size: 0.85rem;
+    color: #64748b;
+    margin-top: 6px;
+}
+
+.report-collect-error {
+    display: none;
+    margin-top: 16px;
+    padding: 14px;
+    background: #fef2f2;
+    color: #b91c1c;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.report-feedback {
+    margin-top: 16px;
+}
+
+/* driver checkboxes في التقرير اليومي */
+.reports-screen .driver-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 0;
+}
+
+.reports-screen .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+
+.reports-screen .checkbox-label:hover {
+    background: #f0fdfa;
+}
+
+.reports-screen .report-card #driverReportContent,
+.reports-screen .report-card #companyReportContent,
+.reports-screen .report-card #dailySummaryContent {
+    margin-top: 24px;
+    padding-top: 0 !important;
+    padding-right: 0 !important;
+    padding-left: 0 !important;
 }
 
 /* عرض التقارير */
 .report-view {
-    background: linear-gradient(145deg, #0d9488 0%, #0f766e 35%, #134e4a 100%);
-    border-radius: 20px;
-    padding: 28px;
-    margin-bottom: 24px;
-    color: white;
-    box-shadow: 0 8px 32px rgba(15, 118, 110, 0.35);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 0;
+    margin: 24px 24px 28px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
 }
 
 .report-view-title {
     font-size: 1.2rem;
     font-weight: 700;
-    margin-bottom: 20px;
-    padding-bottom: 14px;
-    letter-spacing: 0.3px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.25);
-    opacity: 0.98;
+    padding: 22px 28px;
+    margin: 0;
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #134e4a 100%);
+    color: white;
+    border-bottom: 2px solid rgba(255, 255, 255, 0.25);
 }
 
 .report-summary-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 14px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 16px;
+    margin: 24px 28px;
+    padding: 0;
 }
 
 .report-fee-cards {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
 }
 
 .report-summary-card {
-    background: rgba(255, 255, 255, 0.98);
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     color: #0f766e;
-    border-radius: 14px;
-    padding: 16px;
+    border-radius: 12px;
+    padding: 18px;
     text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    transition: transform 0.2s, box-shadow 0.2s;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
 }
 
 .report-summary-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+    background: linear-gradient(180deg, #f0fdfa 0%, #ccfbf1 100%);
+    border-color: var(--primary-light);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.15);
 }
 
 .report-summary-card .label {
     font-size: 0.72rem;
-    color: #0d9488;
-    margin-bottom: 6px;
+    color: #64748b;
+    margin-bottom: 8px;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .report-summary-card .value {
-    font-size: 1.05rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: #134e4a;
 }
@@ -628,44 +806,58 @@ tbody tr:hover {
 .report-section-title {
     font-size: 0.95rem;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.95);
-    margin: 22px 0 14px;
-    padding-right: 14px;
-    border-right: 4px solid rgba(255, 255, 255, 0.5);
+    color: var(--primary-dark);
+    margin: 28px 28px 14px;
+    padding: 10px 16px;
+    background: linear-gradient(90deg, #f0fdfa 0%, #ccfbf1 100%);
+    border-right: 4px solid var(--primary);
+    border-radius: 0 8px 8px 0;
 }
 
 .report-table-wrap {
     overflow-x: auto;
-    border-radius: 14px;
-    background: white;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-    margin-bottom: 18px;
-    border: 1px solid rgba(255, 255, 255, 0.4);
+    margin: 0 28px 28px;
+    border-radius: 12px;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    max-height: 450px;
+    overflow-y: auto;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 .report-table {
     width: 100%;
     border-collapse: collapse;
     direction: rtl;
-    font-size: 0.82rem;
+    font-size: 0.875rem;
+    min-width: 900px;
+}
+
+.report-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 2;
 }
 
 .report-table thead th {
-    background: linear-gradient(180deg, #0f766e 0%, #134e4a 100%);
+    background: linear-gradient(180deg, #134e4a 0%, #0f766e 100%);
     color: white;
-    padding: 12px 14px;
+    padding: 14px 16px;
     text-align: right;
     font-weight: 600;
     white-space: nowrap;
     font-size: 0.8rem;
+    border-bottom: 2px solid #0d9488;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    direction: rtl;
 }
 
 .report-table thead th:first-child {
-    border-radius: 0 14px 0 0;
+    border-radius: 0 8px 0 0;
 }
 
 .report-table thead th:last-child {
-    border-radius: 14px 0 0 0;
+    border-radius: 8px 0 0 0;
 }
 
 .report-table tbody tr {
@@ -673,18 +865,36 @@ tbody tr:hover {
 }
 
 .report-table tbody tr:nth-child(even) {
-    background: #f0fdfa;
+    background: #fafafa;
 }
 
 .report-table tbody tr:hover {
-    background: #ccfbf1 !important;
+    background: #ecfdf5 !important;
 }
 
 .report-table tbody td {
-    padding: 11px 14px;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
     text-align: right;
     color: #334155;
+    vertical-align: middle;
+    direction: rtl;
+}
+
+.report-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.report-table tr.order-returned {
+    background: #fffbeb !important;
+}
+
+.report-table tr.order-returned:hover {
+    background: #fef3c7 !important;
+}
+
+.report-table tr.order-returned td {
+    color: #92400e;
 }
 
 .report-table th.col-address,
@@ -693,20 +903,40 @@ tbody tr:hover {
     max-width: 280px;
 }
 
+.report-table th.col-notes,
+.report-table td.col-notes {
+    min-width: 120px;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.report-table .iqd {
+    min-width: 90px;
+    font-variant-numeric: tabular-nums;
+}
+
+.report-table .badge {
+    white-space: nowrap;
+}
+
 .report-actions {
     display: flex;
-    gap: 12px;
-    margin-top: 18px;
+    gap: 14px;
+    margin: 24px 24px 0;
+    padding: 20px 0;
     flex-wrap: wrap;
+    border-top: 2px solid #f0fdfa;
 }
 
 .report-actions .btn {
-    padding: 10px 24px;
+    padding: 12px 24px;
     border-radius: 10px;
 }
 
 .report-actions .btn-primary {
-    box-shadow: 0 3px 10px rgba(13, 148, 136, 0.35);
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.3);
 }
 
 .report-actions .btn-secondary {
@@ -723,23 +953,15 @@ tbody tr:hover {
 
 .report-empty {
     text-align: center;
-    padding: 48px 24px;
+    padding: 48px 32px;
+    margin: 0 24px 24px;
     color: var(--text-muted);
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-    border-radius: 16px;
-    border: 2px dashed rgba(13, 148, 136, 0.3);
-    font-size: 1rem;
+    border-radius: 14px;
+    border: 2px dashed rgba(13, 148, 136, 0.25);
+    font-size: 1.05rem;
 }
 
-.reports-screen .page-title {
-    border-bottom-color: var(--primary);
-}
-
-.reports-screen .form-group input:focus,
-.reports-screen .form-group select:focus {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.18);
-}
 
 .iqd {
     font-weight: 600;

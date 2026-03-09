@@ -288,7 +288,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                 <tr>
                                     <th>رقم</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>هاتف المستلم</th>
                                     <th class="col-address">العنوان</th><th>رابط الموقع</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th>
-                                    <th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>السائق</th><th>الحالة</th><th>الطباعة</th><th>أنشأه</th><th>التاريخ</th><th>إجراء</th>
+                                    <th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>السائق</th><th>الحالة</th><th>الطباعة</th><th>أنشأه</th><th>التاريخ</th><th>ملاحظات</th><th>إجراء</th>
                                 </tr>
                             </thead>
                             <tbody id="ordersTableBody">
@@ -311,6 +311,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                         <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}" title="${o.LabelPrinted ? 'تم طباعة الملصق' : 'لم يُطبع الملصق'}">${o.LabelPrinted ? 'تم' : 'لم يُطبع'}</span></td>
                                         <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
                                         <td>${(o.CreatedDate || '').slice(0, 16)}</td>
+                                        <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 40)}${(o.Notes || '').length > 40 ? '…' : ''}</td>
                                                 <td>
                                                     <div class="order-actions">
                                                         <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
@@ -1325,11 +1326,14 @@ const screens = {
 
             container.innerHTML = `
                 <div class="screen active reports-screen">
-                    <h1 class="page-title">التقارير</h1>
-                    <div class="card">
-                        <h3>استحصال الأجور</h3>
-                        <p style="color:#64748b;margin-bottom:16px;font-size:0.9rem">اختر السائق والتاريخ، ثم اعرض المبلغ المستحق، أدخل المبلغ المستحصل (يجب أن يساوي المبلغ المستحق)، واضغط استحصال الأجور</p>
-                        <div class="form-grid" style="margin-top:16px">
+                    <div class="reports-header">
+                        <h1 class="page-title">التقارير</h1>
+                        <p class="reports-subtitle">استحصال الأجور والتقارير اليومية وتفاصيل السائقين</p>
+                    </div>
+                    <div class="card report-card report-card-collect">
+                        <h3><span class="report-card-num">1</span>استحصال الأجور</h3>
+                        <p class="report-desc">اختر السائق والتاريخ، ثم اعرض المبلغ المستحق، أدخل المبلغ المستحصل (يجب أن يساوي المبلغ المستحق)، واضغط استحصال الأجور</p>
+                        <div class="form-grid report-form-grid">
                             <div class="form-group">
                                 <label>السائق</label>
                                 <select id="collectDriver">
@@ -1345,13 +1349,13 @@ const screens = {
                                 <button type="button" class="btn btn-secondary" id="btnLoadCollectAmount">عرض المبلغ المستحق</button>
                             </div>
                         </div>
-                        <div id="collectAmountBox" style="display:none;margin:16px 0;padding:16px;background:#f0fdfa;border-radius:12px;border:1px solid #99f6e4">
-                            <div style="font-weight:600;color:#0f766e;margin-bottom:8px">المبلغ المستحق لهذا اليوم:</div>
-                            <div id="collectTotalDue" style="font-size:1.25rem;font-weight:700;color:#134e4a"></div>
-                            <div style="font-size:0.85rem;color:#64748b;margin-top:4px" id="collectOrderCount"></div>
-                            <div id="collectAlreadyPaidMsg" style="display:none;margin-top:12px;padding:10px;background:#fef2f2;color:#b91c1c;border-radius:8px;font-weight:600">تم دفع المبلغ - لا يمكن الدفع مرتين</div>
+                        <div id="collectAmountBox" class="report-collect-box">
+                            <div class="report-collect-label">المبلغ المستحق لهذا اليوم:</div>
+                            <div id="collectTotalDue" class="report-collect-value"></div>
+                            <div id="collectOrderCount" class="report-collect-count"></div>
+                            <div id="collectAlreadyPaidMsg" class="report-collect-error">تم دفع المبلغ - لا يمكن الدفع مرتين</div>
                         </div>
-                        <div class="form-grid" style="margin-top:16px">
+                        <div class="form-grid report-form-grid">
                             <div class="form-group" style="max-width:280px">
                                 <label>المبلغ المستحصل (يجب أن يساوي المبلغ أعلاه)</label>
                                 <input type="text" id="collectAmountInput" placeholder="أدخل المبلغ بالأرقام" inputmode="numeric">
@@ -1361,15 +1365,15 @@ const screens = {
                                 <button type="button" class="btn btn-primary" id="btnCollectFees">استحصال الأجور</button>
                             </div>
                         </div>
-                        <div id="collectFeedback" style="margin-top:12px;display:none" class="scan-feedback"></div>
+                        <div id="collectFeedback" class="scan-feedback report-feedback"></div>
                     </div>
-                    <div class="card">
-                        <h3>التقرير اليومي الملخص</h3>
-                        <p style="color:#64748b;margin-bottom:16px;font-size:0.9rem">ملخص يومي لكل سائق (بدون تفاصيل الطلبات) - المبالغ والتسديد وإحصائيات التوصيل</p>
-                        <div class="form-grid" style="margin-top:16px">
+                    <div class="card report-card">
+                        <h3><span class="report-card-num">2</span>التقرير اليومي الملخص</h3>
+                        <p class="report-desc">ملخص يومي لكل سائق (بدون تفاصيل الطلبات) - المبالغ والتسديد وإحصائيات التوصيل</p>
+                        <div class="form-grid report-form-grid">
                             <div class="form-group" style="max-width:320px">
                                 <label>السائقين (اترك الكل لتضمين الجميع)</label>
-                                <div class="driver-checkboxes" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:6px">
+                                <div class="driver-checkboxes">
                                     <label class="checkbox-label"><input type="checkbox" id="dailySummaryAll" checked> الكل</label>
                                     ${drivers.map(d => `<label class="checkbox-label"><input type="checkbox" class="dailySummaryDriver" value="${d.DriverID}" ${drivers.length <= 5 ? 'checked' : ''}> ${(d.DriverName||'').replace(/</g,'&lt;')}</label>`).join('')}
                                 </div>
@@ -1388,13 +1392,14 @@ const screens = {
                             </div>
                         </div>
                         <div id="dailySummaryContent"></div>
-                        <div id="dailySummaryActions" class="report-actions" style="display:none;margin-top:16px">
+                        <div id="dailySummaryActions" class="report-actions" style="display:none">
                             <button type="button" class="btn btn-secondary" id="btnDailySummaryPDF">تصدير PDF</button>
                         </div>
                     </div>
-                    <div class="card">
-                        <h3>تقرير السائق</h3>
-                        <div class="form-grid" style="margin-top:16px">
+                    <div class="card report-card">
+                        <h3><span class="report-card-num">3</span>تقرير السائق</h3>
+                        <p class="report-desc">تفاصيل الطلبات والمبالغ لسائق محدد خلال فترة زمنية</p>
+                        <div class="form-grid report-form-grid">
                             <div class="form-group">
                                 <label>السائق</label>
                                 <select id="reportDriver">
@@ -1420,9 +1425,10 @@ const screens = {
                             <button class="btn btn-secondary" id="btnExportDriverPDF">تصدير PDF</button>
                         </div>
                     </div>
-                    <div class="card">
-                        <h3>التقرير العام</h3>
-                        <div class="form-grid" style="margin-top:16px">
+                    <div class="card report-card">
+                        <h3><span class="report-card-num">4</span>التقرير العام</h3>
+                        <p class="report-desc">ملخص كامل لجميع السائقين والطلبات في الفترة المحددة</p>
+                        <div class="form-grid report-form-grid">
                             <div class="form-group">
                                 <label>من تاريخ</label>
                                 <input type="date" id="companyDateFrom" value="${today}">
@@ -1581,7 +1587,7 @@ const screens = {
                     }
                     actions.style.display = 'flex';
                     content.innerHTML = `
-                        <div class="report-view" style="margin-top:16px">
+                        <div class="report-view">
                             <div class="report-view-title">التقرير اليومي الملخص - ${dateFrom} إلى ${dateTo}</div>
                             <div class="report-table-wrap">
                                 <table class="report-table">
@@ -1667,7 +1673,7 @@ const screens = {
                         <div class="report-section-title">تفاصيل الطلبات</div>
                         <div class="report-table-wrap">
                             <table class="report-table">
-                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>اسم المستلم</th><th>هاتف المستلم</th><th class="col-address">العنوان</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th><th>ملاحظات</th></tr></thead>
+                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>اسم المستلم</th><th>هاتف المستلم</th><th class="col-address">العنوان</th><th>رابط الموقع</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th><th class="col-notes">ملاحظات</th></tr></thead>
                                 <tbody>
                                     ${report.orders.map(o => {
                                         const returned = isOrderReturned(o);
@@ -1681,9 +1687,9 @@ const screens = {
                                             <td>${o.StoreName || '-'}</td>
                                             <td>${o.CustomerName || '-'}</td>
                                             <td>${o.CustomerPhone || '-'}</td>
-                                        <td class="col-address">${getFullAddress(o)}</td>
-                                        <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener" title="فتح رابط الموقع">📍 فتح</a>` : '-'}</td>
-                                        <td>${o.Pieces || 1}</td>
+                                            <td class="col-address">${getFullAddress(o)}</td>
+                                            <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener" title="فتح رابط الموقع">📍 فتح</a>` : '-'}</td>
+                                            <td>${o.Pieces || 1}</td>
                                             <td class="iqd">${formatIQD(o.AmountIQD)}</td>
                                             <td class="iqd">${o.FreeDelivery ? 'مجاني ' + formatIQD(driverAmt(o)) : formatIQD(driverAmt(o))}</td>
                                             <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
@@ -1692,7 +1698,7 @@ const screens = {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
                                             <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                            <td title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 30)}</td>
+                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 30)}</td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>
