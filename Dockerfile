@@ -1,6 +1,6 @@
 # ─── شركة ديما الحياة - نظام إدارة التوصيل ───
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -8,12 +8,13 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev || npm install --omit=dev
 
 # ─── Production stage ───
-FROM node:20-alpine
+FROM node:20-slim
 
 ENV NODE_ENV=production
 ENV PORT=3000
 
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+RUN apt-get update && apt-get install -y --no-install-recommends wget ca-certificates && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 1001 nodejs && useradd -r -u 1001 -g nodejs nodejs
 
 WORKDIR /app
 
@@ -33,7 +34,7 @@ USER nodejs
 
 EXPOSE 3000 3001 3002
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=45s --retries=5 \
-    CMD node -e "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
+    CMD wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1
 
 CMD ["node", "server.js"]

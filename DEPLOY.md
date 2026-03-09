@@ -21,10 +21,17 @@ cd /opt/alhayat-delivery
 
 ### 2. البناء والتشغيل
 ```bash
-# بناء الصور وتشغيل الحاويات (استخدم أحد الأوامر حسب إصدار Docker)
-docker-compose up -d --build
-# أو
+# إيقاف الحاويات القديمة إن وُجدت
+docker compose down
+
+# بناء الصور وتشغيل الحاويات (بدون كاش للبناء النظيف إن لزم)
 docker compose up -d --build
+```
+
+### في حالة فشل healthcheck
+```bash
+# عرض سجلات التطبيق الرئيسي للتشخيص
+docker compose logs app
 ```
 
 ### 3. التحقق

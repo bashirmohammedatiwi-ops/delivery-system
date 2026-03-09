@@ -17,10 +17,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// نقطة فحص الصحة لـ Docker
+// نقطة فحص الصحة لـ Docker (قبل أي مسار آخر)
 app.get('/health', (_req, res) => res.status(200).send('OK'));
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── تهيئة قاعدة البيانات ───
 let dbReady = false;
@@ -719,6 +720,6 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-    console.log(`شركة ديما الحياة - نظام التوصيل (ويب) يعمل على http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`شركة ديما الحياة - نظام التوصيل (ويب) يعمل على http://0.0.0.0:${PORT}`);
 });
