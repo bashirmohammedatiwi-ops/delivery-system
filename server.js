@@ -19,6 +19,9 @@ app.use(cors({ origin: '*' }));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// نقطة فحص الصحة لـ Docker
+app.get('/health', (_req, res) => res.status(200).send('OK'));
+
 // ─── تهيئة قاعدة البيانات ───
 let dbReady = false;
 db.initSchema().then(() => {
