@@ -262,72 +262,87 @@ async function renderOrdersScreen(container, opts = {}) {
         const drivers = await window.api.drivers.getAll();
 
         container.innerHTML = `
-            <div class="screen active">
-                <h1 class="page-title">${title}</h1>
-                <div class="card">
-                    <div class="search-bar">
-                        <input type="text" id="search" placeholder="بحث: رقم الطلب، رقم الشحنة، الهاتف، المتجر" style="flex:1;min-width:200px">
-                        <select id="filterDriver">
-                            <option value="">كل السائقين</option>
-                            ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
-                        </select>
-                        <select id="filterStatus">
-                            <option value="">كل الحالات</option>
-                            <option value="New">جديد</option>
-                            <option value="AssignedToDriver">مع السائق</option>
-                                    <option value="Delivered">تم التوصيل</option>
-                                    <option value="Returned">راجع</option>
-                        </select>
-                        <input type="date" id="dateFrom" placeholder="من تاريخ">
-                        <input type="date" id="dateTo" placeholder="إلى تاريخ">
-                        <button class="btn btn-primary" id="btnSearch">بحث</button>
+            <div class="screen active orders-screen">
+                <div class="orders-layout">
+                    <header class="orders-header">
+                        <div class="orders-header-top">
+                            <h1 class="orders-title">${title}</h1>
+                            <span class="orders-count" id="ordersCount">${list.length} طلب</span>
+                        </div>
+                        <p class="orders-subtitle">إدارة وعرض جميع الطلبات مع البحث والفلترة</p>
+                    </header>
+                    <div class="orders-toolbar">
+                        <div class="orders-search-row">
+                            <div class="orders-search-wrap">
+                                <span class="orders-search-icon">🔍</span>
+                                <input type="text" id="search" placeholder="بحث: رقم الطلب، رقم الشحنة، الهاتف، المتجر..." class="orders-search-input">
+                            </div>
+                            <div class="orders-filters">
+                                <select id="filterDriver" class="orders-filter-select" title="السائق">
+                                    <option value="">كل السائقين</option>
+                                    ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
+                                </select>
+                                <input type="date" id="dateFrom" class="orders-date-input" title="من تاريخ">
+                                <input type="date" id="dateTo" class="orders-date-input" title="إلى تاريخ">
+                                <button class="btn btn-primary" id="btnSearch">بحث</button>
+                            </div>
+                        </div>
+                        <div class="orders-status-chips">
+                            <button type="button" class="orders-chip ${!filters.status ? 'active' : ''}" data-status="">الكل</button>
+                            <button type="button" class="orders-chip ${filters.status === 'New' ? 'active' : ''}" data-status="New">جديد</button>
+                            <button type="button" class="orders-chip ${filters.status === 'AssignedToDriver' ? 'active' : ''}" data-status="AssignedToDriver">مع السائق</button>
+                            <button type="button" class="orders-chip ${filters.status === 'Delivered' ? 'active' : ''}" data-status="Delivered">تم التوصيل</button>
+                            <button type="button" class="orders-chip ${filters.status === 'Returned' ? 'active' : ''}" data-status="Returned">راجع</button>
+                        </div>
                     </div>
-                    <div class="table-wrap">
-                        <table class="report-table">
-                            <thead>
-                                <tr>
-                                    <th>رقم</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>هاتف المستلم</th>
-                                    <th class="col-address">العنوان</th><th>رابط الموقع</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th>
-                                    <th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>السائق</th><th>الحالة</th><th>الطباعة</th><th>أنشأه</th><th>التاريخ</th><th>ملاحظات</th><th>إجراء</th>
-                                </tr>
-                            </thead>
-                            <tbody id="ordersTableBody">
-                                ${list.map(o => `
-                                    <tr data-order-id="${o.OrderID}">
-                                        <td>${o.OrderID}</td>
-                                        <td>${o.AdminOrderNo || '-'}</td>
-                                        <td>${o.ShipmentNumber}</td>
-                                        <td>${o.StoreName || '-'}</td>
-                                        <td>${o.CustomerPhone || '-'}</td>
-                                        <td class="col-address">${getFullAddress(o)}</td>
-                                        <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="فتح رابط الموقع">📍 رابط</a>` : '-'}</td>
-                                        <td>${o.Pieces || 1}</td>
-                                        <td class="iqd">${formatIQD(o.AmountIQD)}</td>
-                                        <td class="iqd">${o.FreeDelivery ? 'مجاني ' + formatIQD(o.WaivedDeliveryIQD || 0) : formatIQD(o.DeliveryFeeIQD)}</td>
-                                        <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
-                                        <td class="iqd">${formatIQD(getAmountDue(o))}</td>
-                                        <td>${o.DriverName || '-'}</td>
-                                        <td><span class="badge badge-${(o.Status || 'new').toLowerCase().replace('assignedtodriver','assigned').replace('delivered','delivered').replace('returned','returned')}">${STATUS_MAP[o.Status] || o.Status}</span></td>
-                                        <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}" title="${o.LabelPrinted ? 'تم طباعة الملصق' : 'لم يُطبع الملصق'}">${o.LabelPrinted ? 'تم' : 'لم يُطبع'}</span></td>
-                                        <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                        <td>${(o.CreatedDate || '').slice(0, 16)}</td>
-                                        <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 40)}${(o.Notes || '').length > 40 ? '…' : ''}</td>
-                                                <td>
-                                                    <div class="order-actions">
-                                                        <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
-                                                        ${currentUser?.Role === 'admin' ? `
-                                                        <div class="status-quick-btns">
-                                                            <button type="button" class="btn-status-sm" data-order-id="${o.OrderID}" data-status="Delivered" title="تم التوصيل">✓</button>
-                                                            <button type="button" class="btn-status-sm" data-order-id="${o.OrderID}" data-status="Returned" title="راجع">⊙</button>
-                                                        </div>
-                                                        <button type="button" class="btn btn-sm btn-delete" data-order-id="${o.OrderID}" title="حذف">حذف</button>
-                                                        ` : ''}
-                                                    </div>
-                                                </td>
+                    <div class="orders-table-card">
+                        ${list.length > 0 ? `<div class="orders-table-wrap">
+                            <table class="orders-table">
+                                <thead>
+                                    <tr>
+                                        <th>رقم</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>هاتف المستلم</th>
+                                        <th class="col-address">العنوان</th><th>رابط</th><th>القطع</th><th>الفاتورة</th><th>التوصيل</th>
+                                        <th>النهائي</th><th>المستحق</th><th>السائق</th><th>الحالة</th><th>الطباعة</th><th>أنشأه</th><th>التاريخ</th><th>ملاحظات</th><th>إجراء</th>
                                     </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody id="ordersTableBody">
+                                    ${list.map(o => `
+                                        <tr data-order-id="${o.OrderID}">
+                                            <td class="orders-id">${o.OrderID}</td>
+                                            <td>${o.AdminOrderNo || '-'}</td>
+                                            <td><strong>${o.ShipmentNumber}</strong></td>
+                                            <td>${o.StoreName || '-'}</td>
+                                            <td>${o.CustomerPhone || '-'}</td>
+                                            <td class="col-address">${getFullAddress(o)}</td>
+                                            <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="فتح رابط الموقع" class="orders-link">📍</a>` : '-'}</td>
+                                            <td>${o.Pieces || 1}</td>
+                                            <td class="iqd">${formatIQD(o.AmountIQD)}</td>
+                                            <td class="iqd">${o.FreeDelivery ? 'مجاني' : formatIQD(o.DeliveryFeeIQD)}</td>
+                                            <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
+                                            <td class="iqd">${formatIQD(getAmountDue(o))}</td>
+                                            <td>${o.DriverName || '-'}</td>
+                                            <td><span class="badge badge-${(o.Status || 'new').toLowerCase().replace('assignedtodriver','assigned').replace('delivered','delivered').replace('returned','returned')}">${STATUS_MAP[o.Status] || o.Status}</span></td>
+                                            <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}" title="${o.LabelPrinted ? 'تم طباعة الملصق' : 'لم يُطبع الملصق'}">${o.LabelPrinted ? 'تم' : '—'}</span></td>
+                                            <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
+                                            <td class="orders-date">${(o.CreatedDate || '').slice(0, 16)}</td>
+                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 40)}${(o.Notes || '').length > 40 ? '…' : ''}</td>
+                                            <td>
+                                                <div class="order-actions">
+                                                    <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
+                                                    ${currentUser?.Role === 'admin' ? `
+                                                    <div class="status-quick-btns">
+                                                        <button type="button" class="btn-status-sm" data-order-id="${o.OrderID}" data-status="Delivered" title="تم التوصيل">✓</button>
+                                                        <button type="button" class="btn-status-sm" data-order-id="${o.OrderID}" data-status="Returned" title="راجع">⊙</button>
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-delete" data-order-id="${o.OrderID}" title="حذف">حذف</button>
+                                                    ` : ''}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>` : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p>لا توجد طلبات تطابق البحث</p></div>'}
                     </div>
                 </div>
             </div>
@@ -335,14 +350,19 @@ async function renderOrdersScreen(container, opts = {}) {
 
         document.getElementById('search').value = filters.search;
         document.getElementById('filterDriver').value = filters.driverId;
-        document.getElementById('filterStatus').value = filters.status;
         document.getElementById('dateFrom').value = filters.dateFrom;
         document.getElementById('dateTo').value = filters.dateTo;
+
+        container.querySelectorAll('.orders-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                filters.status = chip.dataset.status || '';
+                renderOrders();
+            });
+        });
 
         const apply = () => {
             filters.search = document.getElementById('search').value;
             filters.driverId = document.getElementById('filterDriver').value;
-            filters.status = document.getElementById('filterStatus').value;
             filters.dateFrom = document.getElementById('dateFrom').value;
             filters.dateTo = document.getElementById('dateTo').value;
             renderOrders();
@@ -1121,24 +1141,71 @@ const screens = {
         }
     },
 
-    'driver-return': {
+    'support-sections': {
         async render(container) {
             container.innerHTML = `
-                <div class="screen active">
-                    <h1 class="page-title">تبديل السائق</h1>
-                    <div class="card driver-scan-area">
-                        <p style="margin-bottom:16px;color:#64748b;text-align:center">امسح الباركود أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي. يمكنك بعدها تعيينه لسائق آخر من قسم "استلام الطلبات".</p>
-                        <div class="form-group" style="display:flex;gap:8px;align-items:flex-end">
-                            <div style="flex:1">
-                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
-                                <input type="text" id="returnScanInput" placeholder="رقم الشحنة" autocomplete="off">
-                            </div>
-                            <button type="button" class="btn btn-primary" id="btnReturnOrder" style="height:42px;white-space:nowrap">إرجاع الطلب</button>
-                        </div>
-                        <div id="returnFeedback" class="scan-feedback" style="display:none"></div>
+                <div class="screen active support-sections-screen">
+                    <div class="support-sections-layout">
+                        <header class="support-sections-tabs">
+                            <h2 class="support-sections-title">أقسام سانده</h2>
+                            <nav class="support-sections-nav">
+                                <button type="button" class="support-section-tab active" data-tab="driver-return">
+                                    <span class="support-section-tab-icon">🔄</span>
+                                    <span class="support-section-tab-text">تبديل السائق</span>
+                                </button>
+                                <button type="button" class="support-section-tab" data-tab="driver-returned">
+                                    <span class="support-section-tab-icon">↩️</span>
+                                    <span class="support-section-tab-text">طلب راجع</span>
+                                </button>
+                            </nav>
+                        </header>
+                        <main class="support-sections-panel">
+                            <section class="support-section-pane active" id="support-pane-driver-return">
+                                <div class="support-pane-inner">
+                                    <h3 class="support-pane-head">تبديل السائق</h3>
+                                    <p class="support-pane-desc">امسح الباركود أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي. يمكنك بعدها تعيينه لسائق آخر من قسم "استلام الطلبات".</p>
+                                    <div class="driver-scan-area">
+                                        <div class="form-group support-scan-row">
+                                            <div class="support-scan-field">
+                                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
+                                                <input type="text" id="returnScanInput" placeholder="رقم الشحنة" autocomplete="off">
+                                            </div>
+                                            <button type="button" class="btn btn-primary" id="btnReturnOrder">إرجاع الطلب</button>
+                                        </div>
+                                        <div id="returnFeedback" class="scan-feedback" style="display:none"></div>
+                                    </div>
+                                </div>
+                            </section>
+                            <section class="support-section-pane" id="support-pane-driver-returned">
+                                <div class="support-pane-inner">
+                                    <h3 class="support-pane-head">طلب راجع</h3>
+                                    <p class="support-pane-desc">امسح الباركود أو اكتب رقم الشحنة لتسجيل الطلب كراجع (مرفوض من الزبون).</p>
+                                    <div class="driver-scan-area">
+                                        <div class="form-group support-scan-row">
+                                            <div class="support-scan-field">
+                                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
+                                                <input type="text" id="returnedScanInput" placeholder="رقم الشحنة" autocomplete="off">
+                                            </div>
+                                            <button type="button" class="btn btn-primary" id="btnMarkReturned">تسجيل كراجع</button>
+                                        </div>
+                                        <div id="returnedFeedback" class="scan-feedback" style="display:none"></div>
+                                    </div>
+                                </div>
+                            </section>
+                        </main>
                     </div>
                 </div>
             `;
+
+            container.querySelectorAll('.support-section-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tab = btn.dataset.tab;
+                    container.querySelectorAll('.support-section-tab').forEach(b => b.classList.remove('active'));
+                    container.querySelectorAll('.support-section-pane').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    container.querySelector(`#support-pane-${tab}`)?.classList.add('active');
+                });
+            });
 
             const scanInput = document.getElementById('returnScanInput');
             const feedback = document.getElementById('returnFeedback');
@@ -1171,74 +1238,51 @@ const screens = {
                 }
             };
 
-            scanInput.addEventListener('keypress', (e) => {
+            scanInput?.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); doReturn(); }
             });
 
-            document.getElementById('btnReturnOrder').addEventListener('click', doReturn);
+            document.getElementById('btnReturnOrder')?.addEventListener('click', doReturn);
 
-            scanInput.focus();
-        }
-    },
-
-    'driver-returned': {
-        async render(container) {
-            container.innerHTML = `
-                <div class="screen active">
-                    <h1 class="page-title">طلب راجع</h1>
-                    <div class="card driver-scan-area">
-                        <p style="margin-bottom:16px;color:#64748b;text-align:center">امسح الباركود أو اكتب رقم الشحنة لتسجيل الطلب كراجع (مرفوض من الزبون).</p>
-                        <div class="form-group" style="display:flex;gap:8px;align-items:flex-end">
-                            <div style="flex:1">
-                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
-                                <input type="text" id="returnedScanInput" placeholder="رقم الشحنة" autocomplete="off">
-                            </div>
-                            <button type="button" class="btn btn-primary" id="btnMarkReturned" style="height:42px;white-space:nowrap">تسجيل كراجع</button>
-                        </div>
-                        <div id="returnedFeedback" class="scan-feedback" style="display:none"></div>
-                    </div>
-                </div>
-            `;
-
-            const scanInput = document.getElementById('returnedScanInput');
-            const feedback = document.getElementById('returnedFeedback');
+            const returnedScanInput = document.getElementById('returnedScanInput');
+            const returnedFeedback = document.getElementById('returnedFeedback');
 
             const markReturned = async () => {
-                const num = normalizeBarcodeInput(scanInput.value);
+                const num = normalizeBarcodeInput(returnedScanInput.value);
                 if (!num) {
-                    feedback.style.display = 'block';
-                    feedback.className = 'scan-feedback error';
-                    feedback.textContent = 'أدخل رقم الشحنة';
+                    returnedFeedback.style.display = 'block';
+                    returnedFeedback.className = 'scan-feedback error';
+                    returnedFeedback.textContent = 'أدخل رقم الشحنة';
                     return;
                 }
                 try {
                     const order = await window.api.orders.getByShipment(num);
                     if (!order) {
-                        feedback.style.display = 'block';
-                        feedback.className = 'scan-feedback error';
-                        feedback.textContent = 'الطلب غير موجود: ' + num;
+                        returnedFeedback.style.display = 'block';
+                        returnedFeedback.className = 'scan-feedback error';
+                        returnedFeedback.textContent = 'الطلب غير موجود: ' + num;
                         return;
                     }
                     await window.api.orders.updateStatus(order.OrderID, 'Returned');
-                    feedback.style.display = 'block';
-                    feedback.className = 'scan-feedback success';
-                    feedback.textContent = 'تم تسجيل الطلب ' + num + ' كراجع بنجاح';
-                    scanInput.value = '';
-                    scanInput.focus();
+                    returnedFeedback.style.display = 'block';
+                    returnedFeedback.className = 'scan-feedback success';
+                    returnedFeedback.textContent = 'تم تسجيل الطلب ' + num + ' كراجع بنجاح';
+                    returnedScanInput.value = '';
+                    returnedScanInput.focus();
                 } catch (err) {
-                    feedback.style.display = 'block';
-                    feedback.className = 'scan-feedback error';
-                    feedback.textContent = 'خطأ: ' + (err.message || err);
+                    returnedFeedback.style.display = 'block';
+                    returnedFeedback.className = 'scan-feedback error';
+                    returnedFeedback.textContent = 'خطأ: ' + (err.message || err);
                 }
             };
 
-            scanInput.addEventListener('keypress', (e) => {
+            returnedScanInput?.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') { e.preventDefault(); markReturned(); }
             });
 
-            document.getElementById('btnMarkReturned').addEventListener('click', markReturned);
+            document.getElementById('btnMarkReturned')?.addEventListener('click', markReturned);
 
-            scanInput.focus();
+            scanInput?.focus();
         }
     },
 
@@ -1326,129 +1370,116 @@ const screens = {
 
             container.innerHTML = `
                 <div class="screen active reports-screen">
-                    <div class="reports-header">
-                        <h1 class="page-title">التقارير</h1>
-                        <p class="reports-subtitle">استحصال الأجور والتقارير اليومية وتفاصيل السائقين</p>
-                    </div>
-                    <div class="card report-card report-card-collect">
-                        <h3><span class="report-card-num">1</span>استحصال الأجور</h3>
-                        <p class="report-desc">اختر السائق والتاريخ، ثم اعرض المبلغ المستحق، أدخل المبلغ المستحصل (يجب أن يساوي المبلغ المستحق)، واضغط استحصال الأجور</p>
-                        <div class="form-grid report-form-grid">
-                            <div class="form-group">
-                                <label>السائق</label>
-                                <select id="collectDriver">
-                                    ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>تاريخ الطلبات</label>
-                                <input type="date" id="collectOrderDate" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-secondary" id="btnLoadCollectAmount">عرض المبلغ المستحق</button>
-                            </div>
-                        </div>
-                        <div id="collectAmountBox" class="report-collect-box">
-                            <div class="report-collect-label">المبلغ المستحق لهذا اليوم:</div>
-                            <div id="collectTotalDue" class="report-collect-value"></div>
-                            <div id="collectOrderCount" class="report-collect-count"></div>
-                            <div id="collectAlreadyPaidMsg" class="report-collect-error">تم دفع المبلغ - لا يمكن الدفع مرتين</div>
-                        </div>
-                        <div class="form-grid report-form-grid">
-                            <div class="form-group" style="max-width:280px">
-                                <label>المبلغ المستحصل (يجب أن يساوي المبلغ أعلاه)</label>
-                                <input type="text" id="collectAmountInput" placeholder="أدخل المبلغ بالأرقام" inputmode="numeric">
-                            </div>
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-primary" id="btnCollectFees">استحصال الأجور</button>
-                            </div>
-                        </div>
-                        <div id="collectFeedback" class="scan-feedback report-feedback"></div>
-                    </div>
-                    <div class="card report-card">
-                        <h3><span class="report-card-num">2</span>التقرير اليومي الملخص</h3>
-                        <p class="report-desc">ملخص يومي لكل سائق (بدون تفاصيل الطلبات) - المبالغ والتسديد وإحصائيات التوصيل</p>
-                        <div class="form-grid report-form-grid">
-                            <div class="form-group" style="max-width:320px">
-                                <label>السائقين (اترك الكل لتضمين الجميع)</label>
-                                <div class="driver-checkboxes">
-                                    <label class="checkbox-label"><input type="checkbox" id="dailySummaryAll" checked> الكل</label>
-                                    ${drivers.map(d => `<label class="checkbox-label"><input type="checkbox" class="dailySummaryDriver" value="${d.DriverID}" ${drivers.length <= 5 ? 'checked' : ''}> ${(d.DriverName||'').replace(/</g,'&lt;')}</label>`).join('')}
+                    <div class="reports-layout">
+                        <header class="reports-tabs-horizontal">
+                            <h2 class="reports-tabs-title">التقارير</h2>
+                            <nav class="reports-tabs-nav">
+                                <button type="button" class="reports-tab active" data-tab="collect" title="استحصال أجور السائقين">
+                                    <span class="reports-tab-icon">💰</span>
+                                    <span class="reports-tab-text">استحصال الأجور</span>
+                                </button>
+                                <button type="button" class="reports-tab" data-tab="daily" title="ملخص يومي">
+                                    <span class="reports-tab-icon">📋</span>
+                                    <span class="reports-tab-text">التقرير الملخص</span>
+                                </button>
+                                <button type="button" class="reports-tab" data-tab="driver" title="تقرير سائق محدد">
+                                    <span class="reports-tab-icon">👤</span>
+                                    <span class="reports-tab-text">تقرير السائق</span>
+                                </button>
+                                <button type="button" class="reports-tab" data-tab="company" title="التقرير الشامل">
+                                    <span class="reports-tab-icon">📊</span>
+                                    <span class="reports-tab-text">التقرير العام</span>
+                                </button>
+                            </nav>
+                        </header>
+                        <main class="reports-panel">
+                            <section class="report-pane active" id="pane-collect">
+                                <h3 class="report-pane-head">استحصال الأجور</h3>
+                                <p class="report-pane-desc">سجّل استلام أجور التوصيل من السائق بعد إكمال الطلبات</p>
+                                <div class="report-form-row">
+                                    <div class="report-field">
+                                        <label>السائق</label>
+                                        <select id="collectDriver">${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}</select>
+                                    </div>
+                                    <div class="report-field">
+                                        <label>تاريخ الطلبات</label>
+                                        <input type="date" id="collectOrderDate" value="${today}">
+                                    </div>
+                                    <button type="button" class="btn btn-outline" id="btnLoadCollectAmount">عرض المبلغ</button>
                                 </div>
-                            </div>
-                            <div class="form-group">
-                                <label>من تاريخ</label>
-                                <input type="date" id="dailySummaryFrom" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>إلى تاريخ</label>
-                                <input type="date" id="dailySummaryTo" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-primary" id="btnDailySummary">عرض التقرير</button>
-                            </div>
-                        </div>
-                        <div id="dailySummaryContent"></div>
-                        <div id="dailySummaryActions" class="report-actions" style="display:none">
-                            <button type="button" class="btn btn-secondary" id="btnDailySummaryPDF">تصدير PDF</button>
-                        </div>
-                    </div>
-                    <div class="card report-card">
-                        <h3><span class="report-card-num">3</span>تقرير السائق</h3>
-                        <p class="report-desc">تفاصيل الطلبات والمبالغ لسائق محدد خلال فترة زمنية</p>
-                        <div class="form-grid report-form-grid">
-                            <div class="form-group">
-                                <label>السائق</label>
-                                <select id="reportDriver">
-                                    ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>من تاريخ</label>
-                                <input type="date" id="reportDateFrom" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>إلى تاريخ</label>
-                                <input type="date" id="reportDateTo" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <button class="btn btn-primary" id="btnDriverReport">عرض التقرير</button>
-                            </div>
-                        </div>
-                        <div id="driverReportContent"></div>
-                        <div id="driverReportActions" class="report-actions" style="display:none">
-                            <button class="btn btn-primary" id="btnPrintDriverReport">طباعة</button>
-                            <button class="btn btn-secondary" id="btnExportDriverPDF">تصدير PDF</button>
-                        </div>
-                    </div>
-                    <div class="card report-card">
-                        <h3><span class="report-card-num">4</span>التقرير العام</h3>
-                        <p class="report-desc">ملخص كامل لجميع السائقين والطلبات في الفترة المحددة</p>
-                        <div class="form-grid report-form-grid">
-                            <div class="form-group">
-                                <label>من تاريخ</label>
-                                <input type="date" id="companyDateFrom" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>إلى تاريخ</label>
-                                <input type="date" id="companyDateTo" value="${today}">
-                            </div>
-                            <div class="form-group">
-                                <label>&nbsp;</label>
-                                <button class="btn btn-primary" id="btnCompanyReport">عرض التقرير</button>
-                            </div>
-                        </div>
-                        <div id="companyReportContent"></div>
-                        <div id="companyReportActions" class="report-actions" style="display:none">
-                            <button class="btn btn-secondary" id="btnExportCompanyPDF">تصدير PDF</button>
-                        </div>
+                                <div id="collectAmountBox" class="report-collect-box">
+                                    <div class="report-collect-label">المبلغ المستحق لهذا اليوم:</div>
+                                    <div id="collectTotalDue" class="report-collect-value"></div>
+                                    <div id="collectOrderCount" class="report-collect-count"></div>
+                                    <div id="collectAlreadyPaidMsg" class="report-collect-error">تم دفع المبلغ - لا يمكن الدفع مرتين</div>
+                                </div>
+                                <div class="report-form-row" id="collectFormRow">
+                                    <div class="report-field report-field-wide">
+                                        <label>المبلغ المستحصل</label>
+                                        <input type="text" id="collectAmountInput" placeholder="أدخل المبلغ بالأرقام" inputmode="numeric">
+                                    </div>
+                                    <button type="button" class="btn btn-primary btn-lg" id="btnCollectFees">استحصال الأجور</button>
+                                </div>
+                                <div id="collectFeedback" class="scan-feedback report-feedback"></div>
+                            </section>
+                            <section class="report-pane" id="pane-daily">
+                                <h3 class="report-pane-head">التقرير الملخص</h3>
+                                <p class="report-pane-desc">ملخص سريع لكل سائق - المبالغ والتسديد دون تفاصيل الطلبات</p>
+                                <div class="report-form-row report-form-wrap">
+                                    <div class="report-field report-field-drivers">
+                                        <label>السائقين</label>
+                                        <div class="driver-checkboxes">
+                                            <label class="checkbox-label"><input type="checkbox" id="dailySummaryAll" checked> الكل</label>
+                                            ${drivers.map(d => `<label class="checkbox-label"><input type="checkbox" class="dailySummaryDriver" value="${d.DriverID}" ${drivers.length <= 5 ? 'checked' : ''}> ${(d.DriverName||'').replace(/</g,'&lt;')}</label>`).join('')}
+                                        </div>
+                                    </div>
+                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="dailySummaryFrom" value="${today}"></div>
+                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="dailySummaryTo" value="${today}"></div>
+                                    <button type="button" class="btn btn-primary" id="btnDailySummary">عرض التقرير</button>
+                                </div>
+                                <div id="dailySummaryContent"></div>
+                                <div id="dailySummaryActions" class="report-actions" style="display:none"><button type="button" class="btn btn-secondary" id="btnDailySummaryPDF">تصدير PDF</button></div>
+                            </section>
+                            <section class="report-pane" id="pane-driver">
+                                <h3 class="report-pane-head">تقرير السائق</h3>
+                                <p class="report-pane-desc">تفاصيل كاملة لطلبات سائق محدد مع المبالغ والإحصائيات</p>
+                                <div class="report-form-row">
+                                    <div class="report-field">
+                                        <label>السائق</label>
+                                        <select id="reportDriver">${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}</select>
+                                    </div>
+                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="reportDateFrom" value="${today}"></div>
+                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="reportDateTo" value="${today}"></div>
+                                    <button class="btn btn-primary" id="btnDriverReport">عرض التقرير</button>
+                                </div>
+                                <div id="driverReportContent"></div>
+                                <div id="driverReportActions" class="report-actions" style="display:none"><button class="btn btn-primary" id="btnPrintDriverReport">طباعة</button><button class="btn btn-secondary" id="btnExportDriverPDF">تصدير PDF</button></div>
+                            </section>
+                            <section class="report-pane" id="pane-company">
+                                <h3 class="report-pane-head">التقرير العام</h3>
+                                <p class="report-pane-desc">ملخص شامل لجميع السائقين والطلبات في الفترة المحددة</p>
+                                <div class="report-form-row">
+                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="companyDateFrom" value="${today}"></div>
+                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="companyDateTo" value="${today}"></div>
+                                    <button class="btn btn-primary" id="btnCompanyReport">عرض التقرير</button>
+                                </div>
+                                <div id="companyReportContent"></div>
+                                <div id="companyReportActions" class="report-actions" style="display:none"><button class="btn btn-secondary" id="btnExportCompanyPDF">تصدير PDF</button></div>
+                            </section>
+                        </main>
                     </div>
                 </div>
             `;
+
+            document.querySelectorAll('.reports-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const t = tab.dataset.tab;
+                    document.querySelectorAll('.reports-tab').forEach(x => x.classList.remove('active'));
+                    document.querySelectorAll('.report-pane').forEach(x => x.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById('pane-' + t)?.classList.add('active');
+                });
+            });
 
             let collectExpectedAmount = null;
             let collectAlreadyPaid = false;
@@ -1588,7 +1619,7 @@ const screens = {
                     actions.style.display = 'flex';
                     content.innerHTML = `
                         <div class="report-view">
-                            <div class="report-view-title">التقرير اليومي الملخص - ${dateFrom} إلى ${dateTo}</div>
+                            <div class="report-view-title">التقرير الملخص - ${dateFrom} إلى ${dateTo}</div>
                             <div class="report-table-wrap">
                                 <table class="report-table">
                                     <thead><tr>
@@ -1661,8 +1692,8 @@ const screens = {
                             <div class="report-summary-card"><div class="label">عدد المرتجعات</div><div class="value">${report.countReturned || 0}</div></div>
                             <div class="report-summary-card"><div class="label">إجمالي الفواتير</div><div class="value">${formatIQD(report.totalAmount)} د.ع</div></div>
                             <div class="report-summary-card"><div class="label">أجور التوصيل</div><div class="value">${formatIQD(report.totalDelivery)} د.ع</div></div>
-                            <div class="report-summary-card"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(report.net)} د.ع</div></div>
-                            <div class="report-summary-card"><div class="label">المبلغ المستحق</div><div class="value">${formatIQD(report.totalDue)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(report.net)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ المستحق</div><div class="value">${formatIQD(report.totalDue)} د.ع</div></div>
                         </div>
                         <div class="report-section-title">إحصائيات أجور التوصيل</div>
                         <div class="report-summary-cards report-fee-cards">
@@ -1733,8 +1764,8 @@ const screens = {
                             <div class="report-summary-card"><div class="label">عدد السائقين</div><div class="value">${report.summary.length}</div></div>
                             <div class="report-summary-card"><div class="label">إجمالي الفواتير</div><div class="value">${formatIQD(report.summary.reduce((a,x)=>a+x.totalAmount,0))} د.ع</div></div>
                             <div class="report-summary-card"><div class="label">أجور التوصيل</div><div class="value">${formatIQD(report.summary.reduce((a,x)=>a+x.totalDelivery,0))} د.ع</div></div>
-                            <div class="report-summary-card"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(grandTotal)} د.ع</div></div>
-                            <div class="report-summary-card"><div class="label">المبلغ المستحق</div><div class="value">${formatIQD(grandDue)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(grandTotal)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ المستحق</div><div class="value">${formatIQD(grandDue)} د.ع</div></div>
                         </div>
                         <div class="report-section-title">إحصائيات أجور التوصيل</div>
                         <div class="report-summary-cards report-fee-cards">
@@ -1854,91 +1885,126 @@ const screens = {
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             container.innerHTML = `
                 <div class="screen active settings-screen">
-                    <h1 class="page-title">الإعدادات</h1>
-                    <div class="card settings-section">
-                        <h3>المناطق وتكلفة التوصيل</h3>
-                        <p class="section-desc">أضف المناطق وتكلفة توصيل كل منطقة. تظهر في قائمة منسدلة عند إدخال الطلب.</p>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>اسم المنطقة</label>
-                                <input type="text" id="newRegionName" placeholder="مثال: الكرادة">
-                            </div>
-                            <div class="form-group">
-                                <label>الجانب</label>
-                                <select id="newRegionArea">
-                                    <option value="الكرخ">الكرخ</option>
-                                    <option value="الرصافة">الرصافة</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>تكلفة التوصيل (د.ع)</label>
-                                <input type="number" id="newRegionFee" min="0" placeholder="0">
-                            </div>
-                            <div class="form-group" style="align-items:flex-end">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-primary" id="btnAddRegion">إضافة منطقة</button>
-                            </div>
-                        </div>
-                        <div class="settings-table-wrap">
-                            <table class="settings-table">
-                                <thead><tr><th>اسم المنطقة</th><th>الجانب</th><th>تكلفة التوصيل (د.ع)</th><th>إجراء</th></tr></thead>
-                                <tbody>
-                                    ${regions.length ? regions.map(r => `
-                                        <tr data-id="${r.RegionID}">
-                                            <td><input type="text" class="edit-region-name" value="${esc(r.RegionName)}" placeholder="اسم المنطقة"></td>
-                                            <td>
-                                                <select class="edit-region-area">
-                                                    <option value="الكرخ" ${(r.RegionArea || '') === 'الكرخ' ? 'selected' : ''}>الكرخ</option>
-                                                    <option value="الرصافة" ${(r.RegionArea || '') === 'الرصافة' ? 'selected' : ''}>الرصافة</option>
-                                                </select>
-                                            </td>
-                                            <td><input type="number" class="edit-region-fee" value="${r.DeliveryFeeIQD || 0}" min="0"></td>
-                                            <td>
-                                                <div class="cell-actions">
-                                                    <button type="button" class="btn btn-primary btn-sm btn-save-region">حفظ</button>
-                                                    <button type="button" class="btn btn-sm btn-delete btn-delete-region" data-id="${r.RegionID}" data-name="${esc(r.RegionName)}">حذف</button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    `).join('') : '<tr><td colspan="4" class="empty-table-msg">لا توجد مناطق. أضف منطقة جديدة أعلاه.</td></tr>'}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    <div class="card settings-section">
-                        <h3>القيم الافتراضية للطلبات</h3>
-                        <p class="section-desc">تُعرض تلقائياً عند إدخال طلب جديد ويمكن تغييرها في نموذج الطلب.</p>
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>اسم المتجر الافتراضي</label>
-                                <input type="text" id="defaultStoreName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" placeholder="مثال: متجر ديما الحياة">
-                            </div>
-                            <div class="form-group">
-                                <label>هاتف المتجر الافتراضي</label>
-                                <input type="text" id="defaultStorePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="مثال: 07701234567">
-                            </div>
-                            <div class="form-group" style="align-items:flex-end">
-                                <label>&nbsp;</label>
-                                <button type="button" class="btn btn-primary" id="btnSaveDefaults">حفظ القيم الافتراضية</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card settings-section">
-                        <h3>حول النظام</h3>
-                        <div class="settings-about">
-                            <p><strong>شركة ديما الحياة</strong> - نظام إدارة التوصيل</p>
-                            <p>الإصدار 1.0 · العملة: الدينار العراقي (IQD)</p>
-                            <div class="badge-group">
-                                <span class="status-map">حالات الطلبات:</span>
-                                <span class="badge badge-new">جديد</span>
-                                <span class="badge badge-assigned">مع السائق</span>
-                                <span class="badge badge-delivered">تم التوصيل</span>
-                                <span class="badge badge-returned">راجع</span>
-                            </div>
-                        </div>
+                    <div class="settings-layout">
+                        <header class="settings-tabs-horizontal">
+                            <h2 class="settings-tabs-title">الإعدادات</h2>
+                            <nav class="settings-tabs-nav">
+                                <button type="button" class="settings-tab active" data-tab="regions" title="المناطق وتكلفة التوصيل">
+                                    <span class="settings-tab-icon">📍</span>
+                                    <span class="settings-tab-text">المناطق والتوصيل</span>
+                                </button>
+                                <button type="button" class="settings-tab" data-tab="defaults" title="القيم الافتراضية للطلبات">
+                                    <span class="settings-tab-icon">⚙️</span>
+                                    <span class="settings-tab-text">القيم الافتراضية</span>
+                                </button>
+                                <button type="button" class="settings-tab" data-tab="about" title="معلومات النظام">
+                                    <span class="settings-tab-icon">ℹ️</span>
+                                    <span class="settings-tab-text">حول النظام</span>
+                                </button>
+                            </nav>
+                        </header>
+                        <main class="settings-panel">
+                            <section class="settings-pane active" id="settings-pane-regions">
+                                <div class="settings-pane-inner">
+                                    <h3 class="settings-pane-head">المناطق وتكلفة التوصيل</h3>
+                                    <p class="settings-pane-desc">أضف المناطق وتكلفة توصيل كل منطقة. تظهر في قائمة منسدلة عند إدخال الطلب.</p>
+                                    <div class="settings-add-region">
+                                        <div class="form-group">
+                                            <label>اسم المنطقة</label>
+                                            <input type="text" id="newRegionName" placeholder="مثال: الكرادة">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>الجانب</label>
+                                            <select id="newRegionArea">
+                                                <option value="الكرخ">الكرخ</option>
+                                                <option value="الرصافة">الرصافة</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label>تكلفة التوصيل (د.ع)</label>
+                                            <input type="number" id="newRegionFee" min="0" placeholder="0">
+                                        </div>
+                                        <button type="button" class="btn btn-primary" id="btnAddRegion">إضافة منطقة</button>
+                                    </div>
+                                    <div class="settings-table-wrap">
+                                        <table class="settings-table">
+                                            <thead><tr><th>اسم المنطقة</th><th>الجانب</th><th>تكلفة التوصيل (د.ع)</th><th>إجراء</th></tr></thead>
+                                            <tbody>
+                                                ${regions.length ? regions.map(r => `
+                                                    <tr data-id="${r.RegionID}">
+                                                        <td><input type="text" class="edit-region-name" value="${esc(r.RegionName)}" placeholder="اسم المنطقة"></td>
+                                                        <td>
+                                                            <select class="edit-region-area">
+                                                                <option value="الكرخ" ${(r.RegionArea || '') === 'الكرخ' ? 'selected' : ''}>الكرخ</option>
+                                                                <option value="الرصافة" ${(r.RegionArea || '') === 'الرصافة' ? 'selected' : ''}>الرصافة</option>
+                                                            </select>
+                                                        </td>
+                                                        <td><input type="number" class="edit-region-fee" value="${r.DeliveryFeeIQD || 0}" min="0"></td>
+                                                        <td>
+                                                            <div class="cell-actions">
+                                                                <button type="button" class="btn btn-primary btn-sm btn-save-region">حفظ</button>
+                                                                <button type="button" class="btn btn-sm btn-delete btn-delete-region" data-id="${r.RegionID}" data-name="${esc(r.RegionName)}">حذف</button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                `).join('') : '<tr><td colspan="4" class="empty-table-msg">لا توجد مناطق. أضف منطقة جديدة أعلاه.</td></tr>'}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </section>
+                            <section class="settings-pane" id="settings-pane-defaults">
+                                <div class="settings-pane-inner">
+                                    <h3 class="settings-pane-head">القيم الافتراضية للطلبات</h3>
+                                    <p class="settings-pane-desc">تُعرض تلقائياً عند إدخال طلب جديد ويمكن تغييرها في نموذج الطلب.</p>
+                                    <div class="settings-defaults-form">
+                                        <div class="form-group">
+                                            <label>اسم المتجر الافتراضي</label>
+                                            <input type="text" id="defaultStoreName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" placeholder="مثال: متجر ديما الحياة">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>هاتف المتجر الافتراضي</label>
+                                            <input type="text" id="defaultStorePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="مثال: 07701234567">
+                                        </div>
+                                        <button type="button" class="btn btn-primary btn-lg" id="btnSaveDefaults">حفظ القيم الافتراضية</button>
+                                    </div>
+                                </div>
+                            </section>
+                            <section class="settings-pane" id="settings-pane-about">
+                                <div class="settings-pane-inner">
+                                    <h3 class="settings-pane-head">حول النظام</h3>
+                                    <div class="settings-about-card">
+                                        <div class="settings-about-logo">شركة ديما الحياة</div>
+                                        <p class="settings-about-tagline">نظام إدارة التوصيل</p>
+                                        <div class="settings-about-meta">
+                                            <span>الإصدار 1.0</span>
+                                            <span>·</span>
+                                            <span>العملة: الدينار العراقي (IQD)</span>
+                                        </div>
+                                        <div class="settings-about-badges">
+                                            <span class="settings-badges-label">حالات الطلبات:</span>
+                                            <span class="badge badge-new">جديد</span>
+                                            <span class="badge badge-assigned">مع السائق</span>
+                                            <span class="badge badge-delivered">تم التوصيل</span>
+                                            <span class="badge badge-returned">راجع</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </main>
                     </div>
                 </div>
             `;
+
+            container.querySelectorAll('.settings-tab').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tab = btn.dataset.tab;
+                    container.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
+                    container.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    container.querySelector(`#settings-pane-${tab}`)?.classList.add('active');
+                });
+            });
 
             document.getElementById('btnSaveDefaults').addEventListener('click', async () => {
                 const storeName = document.getElementById('defaultStoreName').value.trim();

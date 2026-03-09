@@ -476,7 +476,7 @@ async function generateDriverReportPDF(report) {
     return bufferPromise;
 }
 
-// ─── التقرير اليومي الملخص ───
+// ─── التقرير الملخص ───
 async function generateDailySummaryReportPDF(report) {
     const doc = new PDFDocument({
         size: [PAGE_WIDTH, PAGE_HEIGHT],
@@ -494,7 +494,7 @@ async function generateDailySummaryReportPDF(report) {
 
     const dateStr = report.dateFrom === report.dateTo ? report.dateFrom : report.dateFrom + ' إلى ' + report.dateTo;
     let y = 58;
-    drawHeader(doc, 'التقرير اليومي الملخص', 'شركة ديما الحياة - ' + dateStr, font);
+    drawHeader(doc, 'التقرير الملخص', 'شركة ديما الحياة - ' + dateStr, font);
 
     drawCards(doc, [
         { label: 'الفترة', value: dateStr },
@@ -548,7 +548,7 @@ async function generateDailySummaryReportPDF(report) {
             drawFooter(doc, font);
             doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
             doc.font(font);
-            drawHeader(doc, 'التقرير اليومي الملخص', 'شركة ديما الحياة - ' + dateStr, font);
+            drawHeader(doc, 'التقرير الملخص', 'شركة ديما الحياة - ' + dateStr, font);
             y = 58;
             y += drawTableHead(doc, cols, y, font, true);
         }
