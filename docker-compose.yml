@@ -20,10 +20,10 @@ services:
       - ./fonts:/app/fonts
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
 
   employee-web:
     image: alhayat-delivery:latest
@@ -38,8 +38,7 @@ services:
       - MAIN_HOST=app
       - MAIN_PORT=3000
     depends_on:
-      app:
-        condition: service_healthy
+      - app
 
   driver-web:
     image: alhayat-delivery:latest
@@ -54,8 +53,7 @@ services:
       - MAIN_HOST=app
       - MAIN_PORT=3000
     depends_on:
-      app:
-        condition: service_healthy
+      - app
 
 volumes:
   app-data:
