@@ -28,10 +28,13 @@ docker compose down
 docker compose up -d --build
 ```
 
-### في حالة فشل healthcheck
+### عند عدم عمل البورت 3000
 ```bash
-# عرض سجلات التطبيق الرئيسي للتشخيص
+# عرض سجلات التطبيق الرئيسي
 docker compose logs app
+
+# التحقق من حالة الحاويات
+docker compose ps
 ```
 
 ### 3. التحقق

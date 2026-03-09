@@ -23,16 +23,28 @@ app.get('/health', (_req, res) => res.status(200).send('OK'));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── تهيئة قاعدة البيانات ───
+// ─── تهيئة قاعدة البيانات (مع إعادة المحاولة) ───
 let dbReady = false;
-db.initSchema().then(() => {
-    dbReady = true;
-    userAuthService.ensureDefaultAdmin();
-    console.log('Database ready');
-}).catch(err => {
-    console.error('Database init failed:', err);
-    process.exit(1);
-});
+async function initDbWithRetry(retries = 5, delayMs = 3000) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            await db.initSchema();
+            dbReady = true;
+            userAuthService.ensureDefaultAdmin();
+            console.log('Database ready');
+            return;
+        } catch (err) {
+            console.error('Database init attempt', i + 1, 'failed:', err.message);
+            if (i === retries - 1) {
+                console.error('Database init failed after', retries, 'attempts. Server will run in limited mode.');
+            } else {
+                console.log('Retrying in', delayMs / 1000, 'seconds...');
+                await new Promise(r => setTimeout(r, delayMs));
+            }
+        }
+    }
+}
+initDbWithRetry();
 
 // ─── مصادقة مستخدمي التطبيق (ويب) ───
 function requireAppAuth(req, res, next) {
@@ -50,6 +62,12 @@ function requireAdmin(req, res, next) {
     }
     next();
 }
+
+// التحقق من جاهزية قاعدة البيانات لجميع طلبات API
+app.use('/api', (req, res, next) => {
+    if (!dbReady) return res.status(503).json({ error: 'قاعدة البيانات قيد التهيئة، حاول لاحقاً' });
+    next();
+});
 
 // ─── API: تسجيل الدخول (التطبيق الإداري) ───
 app.post('/api/auth/login', async (req, res) => {
