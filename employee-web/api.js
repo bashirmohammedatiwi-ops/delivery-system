@@ -50,6 +50,21 @@ async function apiPost(url, body) {
     try { return JSON.parse(text); } catch { return text; }
 }
 
+async function apiPut(url, body) {
+    const res = await fetch(API_BASE + url, {
+        method: 'PUT',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body || {})
+    });
+    const text = await res.text().catch(() => '');
+    if (!res.ok) {
+        try { const j = JSON.parse(text); throw new Error(j.error || text || res.statusText); } catch (e) {
+            if (e instanceof Error && e.message) throw e; throw new Error(text || res.statusText);
+        }
+    }
+    return text ? (() => { try { return JSON.parse(text); } catch { return text; } })() : null;
+}
+
 async function apiPostBlob(url, body) {
     const res = await fetch(API_BASE + url, {
         method: 'POST',
@@ -70,6 +85,8 @@ window.api = {
     },
     orders: {
         create: (data) => apiPost('/api/orders', data),
+        getById: (id) => apiGet('/api/orders/' + id),
+        update: (id, data) => apiPut('/api/orders/' + id, data),
         getAll: (filters = {}) => {
             const q = new URLSearchParams();
             if (filters.search) q.set('search', filters.search);
@@ -92,5 +109,8 @@ window.api = {
     },
     regions: {
         getAll: () => apiGet('/api/regions')
+    },
+    settings: {
+        getDefaults: () => apiGet('/api/settings/defaults')
     }
 };

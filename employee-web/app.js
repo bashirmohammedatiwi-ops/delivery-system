@@ -6,6 +6,9 @@
 function formatIQD(n) {
     return new Intl.NumberFormat('ar-IQ').format(Math.round(n || 0)) + ' د.ع';
 }
+function formatIQDEn(n) {
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(n || 0)) + ' د.ع';
+}
 
 const STATUS_MAP = { New: 'جديد', AssignedToDriver: 'مع السائق', Delivered: 'تم التوصيل', Returned: 'راجع' };
 
@@ -14,14 +17,6 @@ const app = {
     currentTab: 'new-order'
 };
 
-function getEmployeeCode() {
-    return localStorage.getItem('empCode') || '';
-}
-
-function setEmployeeCode(c) {
-    if (c) localStorage.setItem('empCode', c);
-    else localStorage.removeItem('empCode');
-}
 
 async function checkAuth() {
     const token = window.api.auth.getToken();
@@ -38,7 +33,10 @@ async function checkAuth() {
 function showMain() {
     document.getElementById('login-screen').classList.remove('active');
     document.getElementById('main-screen').classList.add('active');
-    document.getElementById('empName').textContent = app.user?.DisplayName || app.user?.Username || 'موظف';
+    const name = app.user?.DisplayName || app.user?.Username || 'موظف';
+    document.getElementById('empName').textContent = name;
+    const avatar = document.getElementById('empAvatar');
+    if (avatar) avatar.textContent = (name.charAt(0) || 'م').toUpperCase();
     app.currentTab = 'new-order';
     renderTab();
 }
@@ -48,8 +46,15 @@ function showLogin() {
     document.getElementById('main-screen').classList.remove('active');
 }
 
+function stopBarcodeScanner() {
+    if (app.scanInstance && typeof app.scanInstance.stop === 'function') {
+        app.scanInstance.stop().catch(() => {}).finally(() => { app.scanInstance = null; });
+    }
+}
+
 function renderTab() {
     document.querySelectorAll('.bottom-nav-item').forEach(t => t.classList.toggle('active', t.dataset.tab === app.currentTab));
+    if (app.currentTab !== 'receive') stopBarcodeScanner();
     const content = document.getElementById('empContent');
     if (app.currentTab === 'new-order') renderNewOrder(content);
     else if (app.currentTab === 'receive') renderReceive(content);
@@ -62,16 +67,31 @@ function calcTotal(amt, fee, free) {
     return (amt || 0) + (fee || 0);
 }
 
+async function printOrder(order) {
+    if (!order) return;
+    try {
+        const url = await window.api.orders.print(order);
+        const w = window.open(url, '_blank', 'noopener');
+        if (w) setTimeout(() => w.print(), 500);
+    } catch (err) {
+        alert(err?.message || 'فشلت الطباعة');
+    }
+}
+
 async function renderNewOrder(container) {
     let regions = [];
+    let defaults = { storeName: '', storePhone: '' };
     try { regions = await window.api.regions.getAll(); } catch (_) {}
+    try { defaults = await window.api.settings.getDefaults(); } catch (_) {}
     container.innerHTML = `
-        <div class="card">
-            <h3 style="margin-bottom:16px">إدخال طلب جديد</h3>
+        <div class="screen-hero">
+        </div>
+        <div class="card card-form">
+            <h3 class="card-title">بيانات الطلب</h3>
             <form id="orderForm">
                 <div class="form-group">
                     <label>رمز الموظف <span class="required">*</span></label>
-                    <input type="password" id="empCode" placeholder="رمزك السري" value="${(getEmployeeCode() || '').replace(/"/g, '&quot;')}">
+                    <input type="password" id="empCode" placeholder="رمز الموظف (يُدخل في كل طلب)" required>
                 </div>
                 <div class="form-group">
                     <label>رقم الطلب الإداري</label>
@@ -79,11 +99,11 @@ async function renderNewOrder(container) {
                 </div>
                 <div class="form-group">
                     <label>اسم المتجر <span class="required">*</span></label>
-                    <input type="text" id="storeName" required>
+                    <input type="text" id="storeName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" required>
                 </div>
                 <div class="form-group">
                     <label>هاتف المتجر <span class="required">*</span></label>
-                    <input type="tel" id="storePhone" placeholder="11 رقم" required>
+                    <input type="tel" id="storePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="11 رقم" required>
                 </div>
                 <div class="form-group">
                     <label>اسم المستلم</label>
@@ -113,26 +133,57 @@ async function renderNewOrder(container) {
                     <input type="number" id="deliveryFee" min="0" value="0">
                 </div>
                 <div class="form-group">
-                    <label><input type="checkbox" id="freeDelivery"> توصيل مجاني</label>
+                    <label><input type="checkbox" id="freeDelivery"> توصيل مجاني <span class="form-hint">(تلقائي عند 50,000 د.ع أو أكثر)</span></label>
+                </div>
+                <div class="order-total-box">
+                    <span class="order-total-label">المبلغ النهائي:</span>
+                    <span id="orderTotalDisplay" class="order-total-value">0 د.ع</span>
                 </div>
                 <div class="form-group">
                     <label>ملاحظات</label>
                     <textarea id="notes" rows="2"></textarea>
                 </div>
                 <div id="orderFeedback" class="feedback" style="display:none"></div>
-                <button type="submit" class="btn btn-primary btn-block">حفظ الطلب</button>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary btn-block">حفظ الطلب</button>
+                    <button type="button" class="btn btn-secondary btn-block" id="btnPrintAfterSave" style="display:none; margin-top:8px">
+                        طباعة الملصق
+                    </button>
+                </div>
             </form>
         </div>
     `;
+    const FREE_DELIVERY_THRESHOLD = 50000;
+    let lastAmountForFreeDelivery = 0;
+    const updateOrderTotal = (fromAmountInput) => {
+        const amt = parseFloat(document.getElementById('amount')?.value || 0) || 0;
+        const fee = parseFloat(document.getElementById('deliveryFee')?.value || 0) || 0;
+        const freeEl = document.getElementById('freeDelivery');
+        if (fromAmountInput && freeEl && amt >= FREE_DELIVERY_THRESHOLD && lastAmountForFreeDelivery < FREE_DELIVERY_THRESHOLD) {
+            freeEl.checked = true;
+        }
+        lastAmountForFreeDelivery = amt;
+        const free = freeEl?.checked || false;
+        const total = calcTotal(amt, fee, free);
+        const el = document.getElementById('orderTotalDisplay');
+        if (el) el.textContent = formatIQDEn(total);
+    };
     document.getElementById('regionId')?.addEventListener('change', function() {
         const opt = this.options[this.selectedIndex];
         if (opt?.value) document.getElementById('deliveryFee').value = opt.dataset.fee || 0;
+        updateOrderTotal(false);
     });
+    document.getElementById('amount')?.addEventListener('input', () => updateOrderTotal(true));
+    document.getElementById('amount')?.addEventListener('change', () => updateOrderTotal(true));
+    document.getElementById('deliveryFee')?.addEventListener('input', () => updateOrderTotal(false));
+    document.getElementById('deliveryFee')?.addEventListener('change', () => updateOrderTotal(false));
+    document.getElementById('freeDelivery')?.addEventListener('change', () => updateOrderTotal(false));
+    updateOrderTotal(false);
     document.getElementById('orderForm').onsubmit = async (e) => {
         e.preventDefault();
+        document.getElementById('btnPrintAfterSave')?.style.setProperty('display', 'none');
         const empCode = (document.getElementById('empCode')?.value || '').trim();
         if (!empCode) { alert('أدخل رمز الموظف'); return; }
-        setEmployeeCode(empCode);
         const data = {
             EmployeeCode: empCode,
             AdminOrderNo: document.getElementById('adminOrderNo').value,
@@ -161,7 +212,14 @@ async function renderNewOrder(container) {
             feedback.className = 'feedback success';
             feedback.textContent = 'تم الحفظ! رقم الشحنة: ' + order.ShipmentNumber;
             document.getElementById('orderForm').reset();
-            document.getElementById('empCode').value = empCode;
+            document.getElementById('storeName').value = defaults.storeName || '';
+            document.getElementById('storePhone').value = defaults.storePhone || '';
+            updateOrderTotal(false);
+            const btnPrint = document.getElementById('btnPrintAfterSave');
+            if (btnPrint) {
+                btnPrint.style.display = 'block';
+                btnPrint.onclick = () => printOrder(order);
+            }
         } catch (err) {
             feedback.style.display = 'block';
             feedback.className = 'feedback error';
@@ -179,8 +237,12 @@ async function renderReceive(container) {
     try { drivers = await window.api.drivers.getAll(); } catch (_) {}
     let currentDriver = null;
     container.innerHTML = `
+        <div class="screen-hero screen-hero-sm">
+            <span class="screen-hero-icon">📋</span>
+            <h2 class="screen-hero-title">استلام للسائق</h2>
+        </div>
         <div class="card">
-            <h3 style="margin-bottom:12px">استلام الطلبات للسائق</h3>
+            <h3 class="card-title">تعيين الطلبات</h3>
             <div id="receiveStep1">
                 <div class="form-group">
                     <label>الرمز السري للسائق</label>
@@ -189,9 +251,15 @@ async function renderReceive(container) {
             </div>
             <div id="receiveStep2" style="display:none">
                 <div class="form-group" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
-                    <span style="background:var(--primary);color:#fff;padding:8px 12px;border-radius:8px" id="driverBadge"></span>
+                    <span class="driver-badge" id="driverBadge"></span>
                     <button type="button" class="btn btn-secondary" id="btnOther">سائق آخر</button>
                 </div>
+                <div class="receive-scan-area">
+                    <div id="receiveScanner" class="receive-scanner"></div>
+                    <button type="button" class="btn btn-primary btn-block receive-scan-btn" id="btnStartScan">📷 مسح الباركود بالكاميرا</button>
+                    <button type="button" class="btn btn-block receive-scan-btn receive-scan-stop" id="btnStopScan" style="display:none">⏹ إيقاف المسح</button>
+                </div>
+                <div class="receive-divider">أو أدخل يدوياً</div>
                 <div class="form-group">
                     <label>رقم الشحنة</label>
                     <input type="text" id="scanInput" placeholder="امسح أو اكتب ثم Enter">
@@ -242,14 +310,15 @@ async function renderReceive(container) {
         }
     };
 
-    document.getElementById('btnOther').onclick = () => { currentDriver = null; feedback.style.display = 'none'; updateUI(); };
+    document.getElementById('btnOther').onclick = () => { currentDriver = null; feedback.style.display = 'none'; stopBarcodeScanner(); updateUI(); };
 
-    const doAssign = async () => {
-        const num = normalizeBarcodeInput(scanInput?.value);
+    const doAssign = async (scannedValue) => {
+        const num = normalizeBarcodeInput(scannedValue !== undefined ? scannedValue : scanInput?.value);
         if (!num) { feedback.style.display = 'block'; feedback.className = 'feedback error'; feedback.textContent = 'أدخل رقم الشحنة'; return; }
         if (!currentDriver) { feedback.style.display = 'block'; feedback.className = 'feedback error'; feedback.textContent = 'أدخل الرمز السري أولاً'; return; }
+        feedback.style.display = 'none';
         try {
-            const res = await window.api.orders.assignDriver(num, currentDriver.DriverID);
+            await window.api.orders.assignDriver(num, currentDriver.DriverID);
             feedback.style.display = 'block';
             feedback.className = 'feedback success';
             feedback.textContent = 'تم تعيين #' + num + ' لـ ' + currentDriver.DriverName;
@@ -262,33 +331,263 @@ async function renderReceive(container) {
     };
 
     scanInput.onkeypress = (e) => { if (e.key === 'Enter') { e.preventDefault(); doAssign(); } };
-    document.getElementById('btnAssign').onclick = doAssign;
+    document.getElementById('btnAssign').onclick = () => doAssign();
+
+    const btnStart = document.getElementById('btnStartScan');
+    const btnStop = document.getElementById('btnStopScan');
+    btnStart?.addEventListener('click', async () => {
+        if (typeof Html5Qrcode === 'undefined') {
+            feedback.style.display = 'block'; feedback.className = 'feedback error';
+            feedback.textContent = 'المكتبة غير محمّلة. حدّث الصفحة.';
+            return;
+        }
+        app.scanInstance = new Html5Qrcode('receiveScanner');
+        try {
+            await app.scanInstance.start(
+                { facingMode: 'environment' },
+                { fps: 8, qrbox: { width: 280, height: 120 } },
+                (decodedText) => {
+                    stopBarcodeScanner();
+                    doAssign(decodedText);
+                    btnStart.style.display = 'block';
+                    btnStop.style.display = 'none';
+                },
+                () => {}
+            );
+            btnStart.style.display = 'none';
+            btnStop.style.display = 'block';
+        } catch (e) {
+            feedback.style.display = 'block'; feedback.className = 'feedback error';
+            feedback.textContent = e?.message || 'فشل تشغيل الكاميرا. تحقق من صلاحيات الكاميرا.';
+        }
+    });
+    btnStop?.addEventListener('click', () => {
+        stopBarcodeScanner();
+        btnStart.style.display = 'block';
+        btnStop.style.display = 'none';
+    });
 }
 
 async function renderOrders(container) {
     container.innerHTML = '<div class="loading-state">جاري التحميل...</div>';
     try {
-        const today = new Date().toISOString().slice(0, 10);
-        const orders = await window.api.orders.getAll({ dateFrom: today, dateTo: today, limit: 100 });
+        const orders = await window.api.orders.getAll({ limit: 500 });
         const list = Array.isArray(orders) ? orders : [];
         if (!list.length) {
-            container.innerHTML = '<div class="empty-state"><p>لا توجد طلبات اليوم</p></div>';
+            container.innerHTML = `
+                <div class="screen-hero screen-hero-sm">
+                    <span class="screen-hero-icon">📄</span>
+                    <h2 class="screen-hero-title">الطلبات</h2>
+                </div>
+                <div class="empty-state"><p>لا توجد طلبات</p></div>
+            `;
             return;
         }
-        container.innerHTML = list.map(o => `
-            <div class="order-card">
+        const renderOrdersList = (ordersToShow) => {
+            const listEl = document.getElementById('ordersList');
+            if (!listEl) return;
+            listEl.innerHTML = ordersToShow.map(o => `
+            <div class="order-card" data-order-id="${o.OrderID}">
                 <div class="order-card-header">
                     <span class="order-shipment">#${o.ShipmentNumber}</span>
                     <span class="order-amount">${formatIQD(o.TotalIQD)}</span>
                 </div>
                 <div>${o.CustomerName || '—'}</div>
-                <div style="font-size:0.9rem;color:var(--text-muted)">${o.Address || ''}</div>
-                <div style="font-size:0.8rem;margin-top:4px;color:var(--text-muted)">${STATUS_MAP[o.Status] || o.Status}</div>
+                <div class="order-card-addr">${o.Address || ''}</div>
+                <div class="order-card-meta">${STATUS_MAP[o.Status] || o.Status} · ${o.CreatedDate || ''}</div>
+                <div class="order-card-actions">
+                    <button type="button" class="btn-order-action btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
+                    <button type="button" class="btn-order-action btn-print" data-order-id="${o.OrderID}" title="طباعة">طباعة</button>
+                </div>
             </div>
         `).join('');
+            listEl.querySelectorAll('.btn-edit').forEach(btn => {
+                btn.onclick = () => {
+                    const id = parseInt(btn.dataset.orderId);
+                    const order = list.find(o => o.OrderID === id) || { OrderID: id };
+                    showEditOrderModalEmp(order, () => renderOrders(container));
+                };
+            });
+            listEl.querySelectorAll('.btn-print').forEach(btn => {
+                btn.onclick = async () => {
+                    const id = parseInt(btn.dataset.orderId);
+                    const order = list.find(o => o.OrderID === id);
+                    if (!order) return;
+                    const fullOrder = order.RegionName ? order : await window.api.orders.getById(id).catch(() => order);
+                    printOrder(fullOrder || order);
+                };
+            });
+        };
+        const filterOrders = (q) => {
+            const s = (q || '').trim().toLowerCase();
+            if (!s) return list;
+            const searchDigits = s.replace(/\D/g, '');
+            return list.filter(o => {
+                const sn = (o.ShipmentNumber || '').toLowerCase();
+                const snDigits = (o.ShipmentNumber || '').replace(/\D/g, '');
+                const cn = (o.CustomerName || '').toLowerCase();
+                const cp = (o.CustomerPhone || '').replace(/\D/g, '');
+                const addr = (o.Address || '').toLowerCase();
+                const store = (o.StoreName || '').toLowerCase();
+                const admin = (o.AdminOrderNo || '').toLowerCase();
+                const matchShipment = sn.includes(s) ||
+                    (searchDigits && (snDigits.includes(searchDigits) || snDigits.endsWith(searchDigits)));
+                return matchShipment || cn.includes(s) || addr.includes(s) || store.includes(s) || admin.includes(s) ||
+                    (searchDigits && cp.includes(searchDigits));
+            });
+        };
+        container.innerHTML = `
+            <div class="screen-hero screen-hero-sm">
+                <span class="screen-hero-icon">📄</span>
+                <h2 class="screen-hero-title">الطلبات</h2>
+            </div>
+            <div class="orders-search-wrap">
+                <input type="text" id="ordersSearchInput" placeholder="بحث برقم الشحنة أو آخره، الاسم، الهاتف، العنوان..." class="orders-search-input">
+            </div>
+            <div id="ordersList">` + list.map(o => `
+            <div class="order-card" data-order-id="${o.OrderID}">
+                <div class="order-card-header">
+                    <span class="order-shipment">#${o.ShipmentNumber}</span>
+                    <span class="order-amount">${formatIQD(o.TotalIQD)}</span>
+                </div>
+                <div>${o.CustomerName || '—'}</div>
+                <div class="order-card-addr">${o.Address || ''}</div>
+                <div class="order-card-meta">${STATUS_MAP[o.Status] || o.Status} · ${o.CreatedDate || ''}</div>
+                <div class="order-card-actions">
+                    <button type="button" class="btn-order-action btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
+                    <button type="button" class="btn-order-action btn-print" data-order-id="${o.OrderID}" title="طباعة">طباعة</button>
+                </div>
+            </div>
+        `).join('') + '</div>';
+        container.querySelectorAll('.btn-edit').forEach(btn => {
+            btn.onclick = () => {
+                const id = parseInt(btn.dataset.orderId);
+                const order = list.find(o => o.OrderID === id) || { OrderID: id };
+                showEditOrderModalEmp(order, () => renderOrders(container));
+            };
+        });
+        container.querySelectorAll('.btn-print').forEach(btn => {
+            btn.onclick = async () => {
+                const id = parseInt(btn.dataset.orderId);
+                const order = list.find(o => o.OrderID === id);
+                if (!order) return;
+                const fullOrder = order.RegionName ? order : await window.api.orders.getById(id).catch(() => order);
+                printOrder(fullOrder || order);
+            };
+        });
+        document.getElementById('ordersSearchInput').addEventListener('input', function() {
+            const filtered = filterOrders(this.value);
+            renderOrdersList(filtered);
+            const listEl = document.getElementById('ordersList');
+            if (listEl && filtered.length === 0) {
+                listEl.innerHTML = '<div class="empty-state"><p>لا توجد نتائج للبحث</p></div>';
+            }
+        });
     } catch (e) {
         container.innerHTML = '<div class="empty-state"><p class="feedback error">' + (e.message || 'فشل التحميل') + '</p></div>';
     }
+}
+
+async function showEditOrderModalEmp(order, onSuccess) {
+    let regions = [];
+    try { regions = await window.api.regions.getAll(); } catch (_) {}
+    let o = order;
+    if (!o.RegionName && o.OrderID) {
+        try { o = await window.api.orders.getById(o.OrderID); } catch (_) {}
+    }
+    const driverDelivery = o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-card">
+            <h3>تعديل الطلب ${o.ShipmentNumber}</h3>
+            <form id="editOrderFormEmp">
+                <div class="form-group">
+                    <label>رقم الطلب الإداري</label>
+                    <input type="text" id="editAdminOrderNo" value="${(o.AdminOrderNo || '').replace(/"/g, '&quot;')}">
+                </div>
+                <div class="form-group">
+                    <label>المتجر</label>
+                    <input type="text" id="editStoreName" value="${(o.StoreName || '').replace(/"/g, '&quot;')}" required>
+                </div>
+                <div class="form-group">
+                    <label>هاتف المتجر</label>
+                    <input type="text" id="editStorePhone" value="${(o.StorePhone || '').replace(/"/g, '&quot;')}">
+                </div>
+                <div class="form-group">
+                    <label>اسم المستلم</label>
+                    <input type="text" id="editCustomerName" value="${(o.CustomerName || '').replace(/"/g, '&quot;')}" required>
+                </div>
+                <div class="form-group">
+                    <label>هاتف المستلم</label>
+                    <input type="text" id="editCustomerPhone" value="${(o.CustomerPhone || '').replace(/"/g, '&quot;')}">
+                </div>
+                <div class="form-group">
+                    <label>المنطقة</label>
+                    <select id="editRegionId">
+                        <option value="">-- لا منطقة --</option>
+                        ${(regions || []).map(r => `<option value="${r.RegionID}" data-fee="${r.DeliveryFeeIQD || 0}" ${(o.RegionID && r.RegionID === o.RegionID) ? 'selected' : ''}>${(r.RegionName || '').replace(/</g, '&lt;')} (${formatIQD(r.DeliveryFeeIQD)})</option>`).join('')}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>العنوان</label>
+                    <input type="text" id="editAddress" value="${(o.Address || '').replace(/"/g, '&quot;')}">
+                </div>
+                <div class="form-group">
+                    <label>مبلغ الفاتورة (د.ع)</label>
+                    <input type="number" id="editAmount" value="${o.AmountIQD || 0}" min="0">
+                </div>
+                <div class="form-group">
+                    <label>أجرة التوصيل (د.ع)</label>
+                    <input type="number" id="editDeliveryFee" value="${driverDelivery || 0}" min="0">
+                </div>
+                <div class="form-group">
+                    <label><input type="checkbox" id="editFreeDelivery" ${o.FreeDelivery ? 'checked' : ''}> توصيل مجاني</label>
+                </div>
+                <div class="form-group">
+                    <label>ملاحظات</label>
+                    <textarea id="editNotes" rows="2">${(o.Notes || '').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+                </div>
+                <div id="editFeedbackEmp" class="feedback" style="display:none"></div>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">حفظ</button>
+                    <button type="button" class="btn btn-secondary" id="editModalCloseEmp">إلغاء</button>
+                </div>
+            </form>
+        </div>
+    `;
+    document.body.appendChild(modal);
+    const closeModal = () => modal.remove();
+    modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+    document.getElementById('editModalCloseEmp').onclick = closeModal;
+    document.getElementById('editRegionId')?.addEventListener('change', function() {
+        const opt = this.options[this.selectedIndex];
+        if (opt?.value) document.getElementById('editDeliveryFee').value = opt.dataset.fee || 0;
+    });
+    document.getElementById('editOrderFormEmp').onsubmit = async (e) => {
+        e.preventDefault();
+        const fb = document.getElementById('editFeedbackEmp');
+        const data = {
+            AdminOrderNo: document.getElementById('editAdminOrderNo').value,
+            StoreName: document.getElementById('editStoreName').value.trim(),
+            StorePhone: document.getElementById('editStorePhone').value,
+            CustomerName: document.getElementById('editCustomerName').value.trim(),
+            CustomerPhone: document.getElementById('editCustomerPhone').value,
+            RegionID: document.getElementById('editRegionId').value ? parseInt(document.getElementById('editRegionId').value) : null,
+            Address: document.getElementById('editAddress').value.trim(),
+            AmountIQD: parseFloat(document.getElementById('editAmount').value) || 0,
+            DeliveryFeeIQD: parseFloat(document.getElementById('editDeliveryFee').value) || 0,
+            FreeDelivery: document.getElementById('editFreeDelivery').checked,
+            Notes: document.getElementById('editNotes').value
+        };
+        try {
+            await window.api.orders.update(o.OrderID, data);
+            fb.style.display = 'block'; fb.className = 'feedback success'; fb.textContent = 'تم الحفظ';
+            setTimeout(() => { closeModal(); if (onSuccess) onSuccess(); }, 600);
+        } catch (err) {
+            fb.style.display = 'block'; fb.className = 'feedback error'; fb.textContent = err?.message || 'فشل الحفظ';
+        }
+    };
 }
 
 function renderSettings(container) {
@@ -298,18 +597,8 @@ function renderSettings(container) {
             <div class="settings-driver-name">${app.user?.DisplayName || app.user?.Username || 'موظف'}</div>
             <div style="font-size:0.9rem;color:var(--text-muted);margin-top:4px">${app.user?.Role === 'admin' ? 'مدير' : 'موظف'}</div>
         </div>
-        <div class="card">
-            <label>رمز الموظف (لإدخال الطلبات)</label>
-            <input type="password" id="settingsEmpCode" value="${(getEmployeeCode() || '').replace(/"/g, '&quot;')}" style="width:100%;padding:12px;border-radius:8px;margin-top:8px">
-            <button type="button" class="btn btn-primary btn-block" id="btnSaveCode" style="margin-top:12px">حفظ الرمز</button>
-        </div>
         <button type="button" class="btn-logout" id="btnLogout">تسجيل الخروج</button>
     `;
-    document.getElementById('btnSaveCode').onclick = () => {
-        const c = (document.getElementById('settingsEmpCode')?.value || '').trim();
-        setEmployeeCode(c);
-        alert('تم حفظ الرمز');
-    };
     document.getElementById('btnLogout').onclick = async () => {
         if (!confirm('تسجيل الخروج؟')) return;
         try { await window.api.auth.logout(); } catch (_) {}

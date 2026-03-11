@@ -163,7 +163,7 @@ function ensureDefaultAdmin() {
     const hash = hashPassword('00000');
     database.prepare(
         'INSERT INTO AppUsers (Username, PasswordHash, DisplayName, Role, Active, SecretCode) VALUES (?, ?, ?, ?, 1, ?)'
-    ).run('alhayaa', hash, 'ديما الحياة', 'admin', 1, '00000');
+    ).run('alhayaa', hash, 'ديما الحياة', 'admin', '00000');
 }
 
 function getDisplayName(userId) {

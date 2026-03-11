@@ -31,7 +31,7 @@ function createStatement(sql) {
         get: (...params) => {
             const stmt = nativeDb.prepare(sql);
             try {
-                stmt.bind(params);
+                if (params.length > 0) stmt.bind(params);
                 if (stmt.step()) return stmt.getAsObject();
                 return undefined;
             } finally {
@@ -42,7 +42,7 @@ function createStatement(sql) {
             const stmt = nativeDb.prepare(sql);
             const rows = [];
             try {
-                stmt.bind(params);
+                if (params.length > 0) stmt.bind(params);
                 while (stmt.step()) rows.push(stmt.getAsObject());
                 return rows;
             } finally {
@@ -52,7 +52,7 @@ function createStatement(sql) {
         run: (...params) => {
             const stmt = nativeDb.prepare(sql);
             try {
-                stmt.bind(params);
+                if (params.length > 0) stmt.bind(params);
                 stmt.step();
             } finally {
                 stmt.free();
@@ -133,6 +133,14 @@ async function initSchema() {
     try { nativeDb.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_appusers_secretcode ON AppUsers(SecretCode) WHERE SecretCode IS NOT NULL AND SecretCode != \'\''); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE AppUsers ADD COLUMN StoreName TEXT'); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE AppUsers ADD COLUMN StorePhone TEXT'); saveDb(); } catch (e) {}
+
+    try {
+        nativeDb.run(`CREATE TABLE IF NOT EXISTS AppSettings (
+            SettingKey TEXT PRIMARY KEY,
+            SettingValue TEXT
+        )`);
+        saveDb();
+    } catch (e) {}
 
     try {
         nativeDb.run(`CREATE TABLE IF NOT EXISTS Regions (

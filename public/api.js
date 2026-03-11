@@ -132,6 +132,10 @@ window.api = {
         getFeesCollectedStatus: (driverId, orderDate) => apiGet(`/api/drivers/fees-collected-status?driverId=${driverId}&orderDate=${encodeURIComponent(orderDate)}`)
     },
 
+    settings: {
+        getDefaults: () => apiGet('/api/settings/defaults'),
+        updateDefaults: (data) => apiPut('/api/settings/defaults', data)
+    },
     regions: {
         getAll: () => apiGet('/api/regions'),
         create: (regionName, deliveryFeeIQD, regionArea) => apiPost('/api/regions', { regionName, deliveryFeeIQD, regionArea }),

@@ -18,6 +18,18 @@ function showApp() {
     document.getElementById('app-main').style.display = 'flex';
     const appMain = document.getElementById('app-main');
     if (currentUser) {
+        // مزامنة القيم الافتراضية من localStorage إلى السيرفر (لويب الموظفين)
+        if (currentUser.Role === 'admin') {
+            const localStore = localStorage.getItem('defaultStoreName') || '';
+            const localPhone = localStorage.getItem('defaultStorePhone') || '';
+            if (localStore || localPhone) {
+                window.api.settings.getDefaults().then(s => {
+                    if (!(s?.storeName || s?.storePhone)) {
+                        window.api.settings.updateDefaults({ storeName: localStore, storePhone: localPhone }).catch(() => {});
+                    }
+                }).catch(() => {});
+            }
+        }
         const isEmployee = currentUser.Role === 'employee';
         appMain?.classList.toggle('employee-mode', isEmployee);
         document.getElementById('sidebarUserInfo').innerHTML = isEmployee
@@ -2015,10 +2027,14 @@ const screens = {
 
     settings: {
         async render(container) {
-            const defaults = {
-                storeName: localStorage.getItem('defaultStoreName') || '',
-                storePhone: localStorage.getItem('defaultStorePhone') || ''
-            };
+            let defaults = { storeName: localStorage.getItem('defaultStoreName') || '', storePhone: localStorage.getItem('defaultStorePhone') || '' };
+            try {
+                const s = await window.api.settings.getDefaults();
+                if (s.storeName || s.storePhone) defaults = s;
+                else if (defaults.storeName || defaults.storePhone) {
+                    window.api.settings.updateDefaults(defaults).catch(() => {});
+                }
+            } catch (_) {}
             let regions = [];
             try {
                 regions = await window.api.regions.getAll();
@@ -2143,6 +2159,7 @@ const screens = {
                 const storePhone = document.getElementById('defaultStorePhone').value;
                 localStorage.setItem('defaultStoreName', storeName);
                 localStorage.setItem('defaultStorePhone', storePhone);
+                try { await window.api.settings.updateDefaults({ storeName, storePhone }); } catch (_) {}
                 await showMsg('تم حفظ القيم الافتراضية');
             });
 

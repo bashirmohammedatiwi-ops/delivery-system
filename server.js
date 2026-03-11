@@ -141,6 +141,41 @@ app.put('/api/regions/:id', requireAppAuth, requireAdmin, (req, res) => {
     }
 });
 
+// ─── API: القيم الافتراضية (لويب الموظفين) ───
+function getAppSettings() {
+    try {
+        const database = db.getDatabase();
+        const rows = database.prepare('SELECT SettingKey, SettingValue FROM AppSettings').all();
+        const obj = {};
+        (rows || []).forEach(r => { obj[r.SettingKey] = r.SettingValue || ''; });
+        return obj;
+    } catch (e) { return {}; }
+}
+function setAppSetting(key, value) {
+    const database = db.getDatabase();
+    database.prepare('INSERT OR REPLACE INTO AppSettings (SettingKey, SettingValue) VALUES (?, ?)').run(key, value || '');
+}
+
+app.get('/api/settings/defaults', requireAppAuth, (req, res) => {
+    try {
+        const s = getAppSettings();
+        res.json({ storeName: s.defaultStoreName || '', storePhone: s.defaultStorePhone || '' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/settings/defaults', requireAppAuth, requireAdmin, (req, res) => {
+    try {
+        const { storeName, storePhone } = req.body;
+        setAppSetting('defaultStoreName', storeName || '');
+        setAppSetting('defaultStorePhone', storePhone || '');
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.delete('/api/regions/:id', requireAppAuth, requireAdmin, (req, res) => {
     try {
         const id = parseInt(req.params.id);
