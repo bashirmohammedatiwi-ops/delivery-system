@@ -35,10 +35,9 @@ function showApp() {
         });
         const btnAdmin = document.getElementById('btnAdminLogin');
         if (btnAdmin) btnAdmin.style.display = currentUser.Role === 'admin' ? 'none' : '';
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+        initSidebarNav();
         const defaultScreen = currentUser.Role === 'admin' ? 'dashboard' : 'new-order';
-        const navItem = document.querySelector(`[data-screen="${defaultScreen}"]`);
-        if (navItem) navItem.classList.add('active');
+        setNavActive(defaultScreen);
         showScreen(defaultScreen);
     }
 }
@@ -328,6 +327,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                             <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 40)}${(o.Notes || '').length > 40 ? '…' : ''}</td>
                                             <td>
                                                 <div class="order-actions">
+                                                    <button type="button" class="btn btn-sm btn-print-order" data-order-id="${o.OrderID}" title="طباعة الملصق"><i class="bi bi-printer"></i></button>
                                                     <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
                                                     ${currentUser?.Role === 'admin' ? `
                                                     <div class="status-quick-btns">
@@ -391,6 +391,23 @@ async function renderOrdersScreen(container, opts = {}) {
                 }
             });
         }
+
+        container.querySelectorAll('.btn-print-order').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = parseInt(btn.dataset.orderId);
+                try {
+                    const order = await window.api.orders.getById(id);
+                    if (!order) { await showMsg('الطلب غير موجود'); return; }
+                    const path = await window.api.orders.print(order);
+                    const w = window.open(path, 'printLabel', 'width=800,height=700,scrollbars=yes,resizable=yes');
+                    if (w) { w.onload = () => { try { w.focus(); w.print(); } catch (e) {} }; }
+                    await window.api.orders.markLabelPrinted(order.OrderID).catch(() => {});
+                    await renderOrders();
+                } catch (err) {
+                    await showMsg('خطأ في الطباعة: ' + (err.message || err));
+                }
+            });
+        });
 
         container.querySelectorAll('.btn-edit').forEach(btn => {
             btn.addEventListener('click', async () => {
@@ -543,12 +560,60 @@ async function openViewCredentialsModal(driverId, driverName, onClose) {
     }
 }
 
-function showScreen(screenId) {
+function setNavActive(screenId, subTab) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-    document.querySelector(`[data-screen="${screenId}"]`)?.classList.add('active');
+    document.querySelectorAll('.nav-group').forEach(g => g.classList.remove('expanded'));
+    if (subTab) {
+        const parent = document.querySelector(`.nav-parent[data-screen="${screenId}"]`);
+        const child = document.querySelector(`.nav-child[data-screen="${screenId}"][data-tab="${subTab}"]`);
+        if (parent) {
+            parent.closest('.nav-group')?.classList.add('expanded');
+            parent.classList.add('active');
+        }
+        if (child) child.classList.add('active');
+    } else {
+        const item = document.querySelector(`.nav-item[data-screen="${screenId}"]:not(.nav-child)`);
+        if (item) {
+            item.classList.add('active');
+            item.closest('.nav-group')?.classList.add('expanded');
+        }
+    }
+}
+
+function initSidebarNav() {
+    document.querySelectorAll('.nav-parent').forEach(parent => {
+        parent.addEventListener('click', (e) => {
+            e.preventDefault();
+            const group = parent.closest('.nav-group');
+            const screen = parent.dataset.screen;
+            group?.classList.toggle('expanded');
+            if (group?.classList.contains('expanded') && screen && screens[screen]) {
+                const firstChild = group.querySelector('.nav-child');
+                const tab = firstChild?.dataset.tab;
+                setNavActive(screen, tab);
+                showScreen(screen, tab || undefined);
+            }
+        });
+    });
+    document.querySelectorAll('.nav-item:not(.nav-parent)').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const screen = item.dataset.screen;
+            const tab = item.dataset.tab;
+            if (screen && screens[screen]) {
+                setNavActive(screen, tab);
+                showScreen(screen, tab);
+            }
+        });
+    });
+}
+
+function showScreen(screenId, subTab) {
+    setNavActive(screenId, subTab);
     const container = document.getElementById('screen-container');
     container.innerHTML = '';
     container.dataset.currentScreen = screenId || '';
+    container.dataset.initialTab = subTab || '';
     const screen = screens[screenId];
     if (screen) screen.render(container);
 }
@@ -622,9 +687,9 @@ const screens = {
                 if (amt < FREE_DELIVERY_THRESHOLD) lastAmountForFreeDelivery = amt;
                 else lastAmountForFreeDelivery = amt;
                 const free = freeEl?.checked || false;
-                // التوصيل مجاني: النهائي = الفاتورة، المستحق = الفاتورة - أجرة التوصيل | غير مجاني: النهائي = فاتورة + توصيل، المستحق = الفاتورة
+                // التوصيل مجاني: النهائي = الفاتورة، المستحق = الفاتورة - أجرة التوصيل (لا يقل عن صفر)
                 const total = free ? amt : (amt + fee);
-                const due = free ? Math.max(0, amt - fee) : amt;
+                const due = Math.max(0, free ? (amt - fee) : amt);
                 document.getElementById('totalDisplay').textContent = formatIQD(total);
                 const dueEl = document.getElementById('totalDue');
                 if (dueEl) {
@@ -634,90 +699,123 @@ const screens = {
             };
 
             container.innerHTML = `
-                <div class="screen active">
-                    <h1 class="page-title">إدخال طلب جديد</h1>
-                    <div class="card">
-                        <form id="orderForm">
-                            <div class="form-grid">
-                                <div class="form-group">
-                                    <label>رمز الموظف <span class="required">*</span></label>
-                                    <input type="password" id="employeeCode" placeholder="أدخل رمزك السري" required autocomplete="off">
-                                </div>
-                                <div class="form-group">
-                                    <label>رقم الطلب في النظام الإداري <span class="required">*</span></label>
-                                    <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>اسم المتجر <span class="required">*</span></label>
-                                    <input type="text" id="storeName" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>هاتف المتجر <span class="required">*</span></label>
-                                    <input type="text" id="storePhone" placeholder="11 رقم" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>اسم المستلم (اختياري)</label>
-                                    <input type="text" id="customerName" placeholder="اسم المستلم">
-                                </div>
-                                <div class="form-group">
-                                    <label>هاتف المستلم <span class="required">*</span></label>
-                                    <input type="text" id="customerPhone" placeholder="11 رقم (مثال: 07701234567)" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>المنطقة <span class="required">*</span></label>
-                                    <select id="regionId" required>
-                                        <option value="">-- اختر المنطقة --</option>
-                                        ${regions.map(r => `<option value="${r.RegionID}" data-fee="${r.DeliveryFeeIQD || 0}">${(r.RegionName || '').replace(/</g, '&lt;')} (${formatIQD(r.DeliveryFeeIQD)} د.ع)</option>`).join('')}
-                                    </select>
-                                </div>
-                                <div class="form-group full">
-                                    <label>العنوان (تفاصيل العنوان يدوياً) <span class="required">*</span></label>
-                                    <input type="text" id="address" placeholder="اكتب تفاصيل العنوان..." required>
-                                </div>
-                                <div class="form-group">
-                                    <label>عدد القطع <span class="required">*</span></label>
-                                    <input type="number" id="pieces" value="1" min="1" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>مبلغ الفاتورة (د.ع) <span class="required">*</span></label>
-                                    <input type="number" id="amount" min="0" step="1" placeholder="0" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>أجرة التوصيل (د.ع) <span class="required">*</span></label>
-                                    <input type="number" id="deliveryFee" min="0" step="1" placeholder="0" required>
-                                </div>
-                                <div class="form-group amounts-row">
-                                    <div class="amounts-block">
-                                        <label>المبلغ النهائي (د.ع)</label>
-                                        <div id="totalDisplay" class="total-display">0</div>
-                                        <div id="totalDue" class="final-price-box">المبلغ المستحق: <strong>0</strong> د.ع</div>
+                <div class="screen active new-order-screen">
+                    <form id="orderForm" class="new-order-form">
+                        <div class="new-order-cards">
+                            <div class="new-order-card new-order-card-store">
+                                <div class="new-order-card-header"><i class="bi bi-shop"></i><span>بيانات المتجر</span></div>
+                                <div class="new-order-card-body">
+                                    <div class="new-order-field">
+                                        <label>اسم المتجر <span class="required">*</span></label>
+                                        <input type="text" id="storeName" required>
                                     </div>
-                                    <label class="free-delivery-label">
-                                        <input type="checkbox" id="freeDelivery">
-                                        توصيل مجاني
-                                    </label>
+                                    <div class="new-order-field">
+                                        <label>هاتف المتجر <span class="required">*</span></label>
+                                        <input type="text" id="storePhone" placeholder="11 رقم" required>
+                                    </div>
                                 </div>
-                                <div class="form-group full">
+                            </div>
+                            <div class="new-order-credentials-customer-row">
+                                <div class="new-order-card new-order-card-credentials">
+                                    <div class="new-order-card-header"><i class="bi bi-key"></i><span>بيانات الدخول</span></div>
+                                    <div class="new-order-card-body">
+                                        <div class="new-order-field">
+                                            <label>رمز الموظف <span class="required">*</span></label>
+                                            <input type="password" id="employeeCode" placeholder="أدخل رمزك السري" required autocomplete="off">
+                                        </div>
+                                        <div class="new-order-field">
+                                            <label>رقم الطلب في النظام الإداري <span class="required">*</span></label>
+                                            <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="new-order-card new-order-card-customer">
+                                    <div class="new-order-card-header"><i class="bi bi-person"></i><span>بيانات المستلم</span></div>
+                                    <div class="new-order-card-body">
+                                        <div class="new-order-field">
+                                            <label>اسم المستلم (اختياري)</label>
+                                            <input type="text" id="customerName" placeholder="اسم المستلم">
+                                        </div>
+                                        <div class="new-order-field">
+                                            <label>هاتف المستلم <span class="required">*</span></label>
+                                            <input type="text" id="customerPhone" placeholder="07701234567 (11 رقم)" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="new-order-delivery-amounts-row">
+                            <div class="new-order-card new-order-card-delivery">
+                                <div class="new-order-card-header"><i class="bi bi-geo-alt"></i><span>التوصيل</span></div>
+                                <div class="new-order-card-body">
+                                    <div class="new-order-field">
+                                        <label>المنطقة <span class="required">*</span></label>
+                                        <div class="region-search-wrap">
+                                            <input type="text" id="regionSearchInput" class="region-search-input" placeholder="-- اختر المنطقة -- ابحث بالكتابة..." autocomplete="off">
+                                            <span class="region-search-chevron"><i class="bi bi-chevron-down"></i></span>
+                                            <input type="hidden" id="regionId" required>
+                                            <div id="regionSearchDropdown" class="region-search-dropdown" style="display:none"></div>
+                                        </div>
+                                    </div>
+                                    <div class="new-order-field new-order-field-full">
+                                        <label>العنوان (تفاصيل العنوان) <span class="required">*</span></label>
+                                        <input type="text" id="address" placeholder="اكتب تفاصيل العنوان..." required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="new-order-card new-order-card-amounts">
+                                <div class="new-order-card-header"><i class="bi bi-cash-stack"></i><span>المبالغ</span></div>
+                                <div class="new-order-card-body">
+                                    <div class="new-order-field">
+                                        <label>عدد القطع <span class="required">*</span></label>
+                                        <input type="number" id="pieces" value="1" min="1" required>
+                                    </div>
+                                    <div class="new-order-field">
+                                        <label>مبلغ الفاتورة (د.ع) <span class="required">*</span></label>
+                                        <input type="number" id="amount" min="0" step="1" placeholder="0" required>
+                                    </div>
+                                    <div class="new-order-field">
+                                        <label>أجرة التوصيل (د.ع) <span class="required">*</span></label>
+                                        <input type="number" id="deliveryFee" min="0" step="1" placeholder="0" required>
+                                    </div>
+                                    <div class="new-order-totals">
+                                        <div class="new-order-total-row">
+                                            <label>المبلغ النهائي</label>
+                                            <div id="totalDisplay" class="new-order-total-value">0</div>
+                                        </div>
+                                        <div class="new-order-total-due" id="totalDue">المبلغ المستحق: <strong>0</strong> د.ع</div>
+                                        <label class="new-order-free-label">
+                                            <input type="checkbox" id="freeDelivery">
+                                            <span>توصيل مجاني</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            </div>
+                        </div>
+                        <div class="new-order-card new-order-card-extra new-order-extra-above">
+                            <div class="new-order-card-header"><i class="bi bi-link-45deg"></i><span>إضافي</span></div>
+                            <div class="new-order-card-body">
+                                <div class="new-order-field new-order-field-full">
                                     <label>رابط موقع الزبون (اختياري)</label>
                                     <input type="url" id="customerLocationLink" placeholder="رابط خرائط جوجل أو موقع التوصيل">
                                 </div>
-                                <div class="form-group full">
+                                <div class="new-order-field new-order-field-full">
                                     <label>ملاحظات (اختياري)</label>
                                     <textarea id="notes" rows="2" placeholder="اكتب ملاحظة إن وجدت"></textarea>
                                 </div>
                             </div>
-                            <div class="btn-group">
-                                <button type="submit" class="btn btn-primary" id="btnSaveOrder">حفظ الطلب</button>
-                                <button type="button" class="btn btn-primary" id="btnPrint">طباعة الملصق</button>
-                                <button type="button" class="btn btn-secondary" id="btnClear">مسح الحقول</button>
-                            </div>
-                            <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-                                <input type="text" id="printShipmentNum" placeholder="رقم الشحنة لطباعة ملصق لطلب موجود" style="flex:1;max-width:300px;padding:8px">
-                                <button type="button" class="btn btn-secondary" id="btnPrintExisting">طباعة</button>
-                            </div>
-                        </form>
-                    </div>
-                    <div id="lastOrderInfo" class="card" style="display:none"></div>
+                        </div>
+                        <div class="new-order-actions">
+                            <button type="submit" class="btn new-order-btn-save" id="btnSaveOrder"><i class="bi bi-check2-circle"></i><span>حفظ الطلب</span></button>
+                            <button type="button" class="btn new-order-btn-print" id="btnPrint"><i class="bi bi-printer"></i><span>طباعة الملصق</span></button>
+                            <button type="button" class="btn btn-secondary" id="btnClear"><i class="bi bi-x-circle"></i><span>مسح الحقول</span></button>
+                        </div>
+                        <div class="new-order-print-existing">
+                            <input type="text" id="printShipmentNum" placeholder="رقم الشحنة لطباعة ملصق لطلب موجود">
+                            <button type="button" class="btn btn-secondary" id="btnPrintExisting"><i class="bi bi-printer-fill"></i> طباعة</button>
+                        </div>
+                    </form>
+                    <div id="lastOrderInfo" class="new-order-success-card" style="display:none"></div>
                 </div>
             `;
 
@@ -728,15 +826,92 @@ const screens = {
                 document.getElementById(id)?.addEventListener('input', () => calcTotal(true));
             });
             document.getElementById('freeDelivery')?.addEventListener('change', () => calcTotal(false));
-            document.getElementById('regionId')?.addEventListener('change', () => {
-                const sel = document.getElementById('regionId');
-                const opt = sel?.options[sel.selectedIndex];
-                if (opt && opt.value) {
-                    const fee = parseFloat(opt.dataset.fee || 0);
-                    document.getElementById('deliveryFee').value = fee;
-                }
-                calcTotal(true);
-            });
+            (() => {
+                const regionSearchInput = document.getElementById('regionSearchInput');
+                const regionIdInput = document.getElementById('regionId');
+                const dropdown = document.getElementById('regionSearchDropdown');
+                const deliveryFeeInput = document.getElementById('deliveryFee');
+
+                const applyRegionSelection = (r) => {
+                    regionIdInput.value = r.RegionID;
+                    regionSearchInput.value = (r.RegionName || '') + ' (' + formatIQD(r.DeliveryFeeIQD) + ' د.ع)';
+                    regionSearchInput.dataset.fee = r.DeliveryFeeIQD || 0;
+                    deliveryFeeInput.value = r.DeliveryFeeIQD || 0;
+                    dropdown.style.display = 'none';
+                    calcTotal(true);
+                };
+
+                const filterRegions = (q) => {
+                    const qn = (q || '').trim().toLowerCase();
+                    if (!qn) return regions;
+                    return regions.filter(r => {
+                        const name = (r.RegionName || '').toLowerCase();
+                        const area = (r.RegionArea || '').toLowerCase();
+                        return name.includes(qn) || area.includes(qn);
+                    });
+                };
+
+                const renderDropdown = (list) => {
+                    dropdown.innerHTML = list.length
+                        ? list.map(r => `<div class="region-search-item" data-id="${r.RegionID}" data-fee="${r.DeliveryFeeIQD || 0}">${(r.RegionName || '').replace(/</g, '&lt;')} (${formatIQD(r.DeliveryFeeIQD)} د.ع)</div>`).join('')
+                        : '<div class="region-search-item region-search-empty">لا توجد نتائج</div>';
+                    dropdown.style.display = 'block';
+                };
+
+                regionSearchInput?.addEventListener('input', () => {
+                    regionIdInput.value = '';
+                    regionSearchInput.dataset.fee = '';
+                    const list = filterRegions(regionSearchInput.value);
+                    renderDropdown(list);
+                });
+
+                regionSearchInput?.addEventListener('focus', () => {
+                    const list = regionIdInput.value ? regions : filterRegions(regionSearchInput.value);
+                    renderDropdown(list);
+                });
+                regionSearchInput?.closest('.region-search-wrap')?.addEventListener('click', (e) => {
+                    if (!dropdown?.contains(e.target)) {
+                        regionSearchInput?.focus();
+                    }
+                });
+
+                regionSearchInput?.addEventListener('keydown', (e) => {
+                    const items = dropdown.querySelectorAll('.region-search-item:not(.region-search-empty)');
+                    const focused = dropdown.querySelector('.region-search-item.focused');
+                    if (e.key === 'Escape') {
+                        dropdown.style.display = 'none';
+                        return;
+                    }
+                    if (e.key === 'Enter' && focused && focused.dataset.id) {
+                        e.preventDefault();
+                        const r = regions.find(x => x.RegionID == focused.dataset.id);
+                        if (r) applyRegionSelection(r);
+                        return;
+                    }
+                    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        let idx = Array.from(items).indexOf(focused);
+                        if (e.key === 'ArrowDown') idx = Math.min(idx + 1, items.length - 1);
+                        else idx = Math.max(idx - 1, 0);
+                        items.forEach(el => el.classList.remove('focused'));
+                        if (items[idx]) items[idx].classList.add('focused');
+                    }
+                });
+
+                document.addEventListener('click', (e) => {
+                    if (!regionSearchInput?.contains(e.target) && !dropdown?.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                    }
+                });
+
+                dropdown?.addEventListener('click', (e) => {
+                    const item = e.target.closest('.region-search-item');
+                    if (item?.dataset.id) {
+                        const r = regions.find(x => x.RegionID == item.dataset.id);
+                        if (r) applyRegionSelection(r);
+                    }
+                });
+            })();
             calcTotal(false);
 
             let lastOrder = null;
@@ -768,7 +943,7 @@ const screens = {
                 if (phoneDigits.length !== 11) { await showMsg('هاتف المستلم يجب أن يكون 11 رقماً'); return; }
                 if (!regionEl?.value) { await showMsg('اختر المنطقة'); return; }
                 if (!address) { await showMsg('أدخل العنوان'); return; }
-                if (amount <= 0) { await showMsg('أدخل مبلغ الفاتورة'); return; }
+                if (amount < 0) { await showMsg('مبلغ الفاتورة لا يمكن أن يكون سالباً'); return; }
                 if (deliveryFee < 0) { await showMsg('أدخل أجرة التوصيل'); return; }
 
                 isSubmitting = true;
@@ -851,6 +1026,8 @@ const screens = {
                 document.getElementById('amount').value = '';
                 document.getElementById('deliveryFee').value = '';
                 document.getElementById('freeDelivery').checked = false;
+                document.getElementById('regionSearchInput').value = '';
+                document.getElementById('regionId').value = '';
                 document.getElementById('storeName').value = localStorage.getItem('defaultStoreName') || '';
                 document.getElementById('storePhone').value = localStorage.getItem('defaultStorePhone') || '';
                 calcTotal();
@@ -1146,50 +1323,47 @@ const screens = {
             container.innerHTML = `
                 <div class="screen active support-sections-screen">
                     <div class="support-sections-layout">
-                        <header class="support-sections-tabs">
-                            <h2 class="support-sections-title"><i class="bi bi-headset"></i> أقسام سانده</h2>
-                            <nav class="support-sections-nav">
-                                <button type="button" class="support-section-tab active" data-tab="driver-return">
-                                    <span class="support-section-tab-icon-wrap support-section-icon-swap"><i class="bi bi-arrow-left-right support-section-tab-icon"></i></span>
-                                    <span class="support-section-tab-text">تبديل السائق</span>
-                                </button>
-                                <button type="button" class="support-section-tab" data-tab="driver-returned">
-                                    <span class="support-section-tab-icon-wrap support-section-icon-returned"><i class="bi bi-arrow-return-left support-section-tab-icon"></i></span>
-                                    <span class="support-section-tab-text">طلب راجع</span>
-                                </button>
-                            </nav>
-                        </header>
                         <main class="support-sections-panel">
-                            <section class="support-section-pane active" id="support-pane-driver-return">
-                                <div class="support-pane-inner">
-                                    <h3 class="support-pane-head">تبديل السائق</h3>
-                                    <p class="support-pane-desc">امسح الباركود أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي. يمكنك بعدها تعيينه لسائق آخر من قسم "استلام الطلبات".</p>
-                                    <div class="driver-scan-area">
-                                        <div class="form-group support-scan-row">
-                                            <div class="support-scan-field">
-                                                <label><i class="bi bi-upc-scan"></i> امسح الباركود أو اكتب رقم الشحنة</label>
-                                                <input type="text" id="returnScanInput" placeholder="أدخل رقم الشحنة..." autocomplete="off">
-                                            </div>
-                                            <button type="button" class="btn btn-primary" id="btnReturnOrder"><i class="bi bi-arrow-return-left"></i> إرجاع الطلب</button>
-                                        </div>
-                                        <div id="returnFeedback" class="scan-feedback" style="display:none"></div>
+                            <section class="support-section-pane support-pane-driver-return" id="support-pane-driver-return">
+                                <div class="support-pane-hero">
+                                    <div class="support-pane-icon-wrap"><i class="bi bi-arrow-left-right"></i></div>
+                                    <h2 class="support-pane-title">تبديل السائق</h2>
+                                    <p class="support-pane-lead">امسح الباركود أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي. يمكنك بعدها تعيينه لسائق آخر من قسم "استلام الطلبات".</p>
+                                </div>
+                                <div class="support-scan-card">
+                                    <div class="support-scan-header">
+                                        <i class="bi bi-upc-scan"></i>
+                                        <span>مسح أو إدخال رقم الشحنة</span>
                                     </div>
+                                    <div class="support-scan-body">
+                                        <input type="text" id="returnScanInput" placeholder="رقم الشحنة..." autocomplete="off" class="support-scan-input">
+                                        <button type="button" class="btn support-action-btn" id="btnReturnOrder">
+                                            <i class="bi bi-arrow-return-left"></i>
+                                            <span>إرجاع الطلب</span>
+                                        </button>
+                                    </div>
+                                    <div id="returnFeedback" class="support-scan-feedback" style="display:none"></div>
                                 </div>
                             </section>
-                            <section class="support-section-pane" id="support-pane-driver-returned">
-                                <div class="support-pane-inner">
-                                    <h3 class="support-pane-head">طلب راجع</h3>
-                                    <p class="support-pane-desc">امسح الباركود أو اكتب رقم الشحنة لتسجيل الطلب كراجع (مرفوض من الزبون).</p>
-                                    <div class="driver-scan-area">
-                                        <div class="form-group support-scan-row">
-                                            <div class="support-scan-field">
-                                                <label><i class="bi bi-upc-scan"></i> امسح الباركود أو اكتب رقم الشحنة</label>
-                                                <input type="text" id="returnedScanInput" placeholder="أدخل رقم الشحنة..." autocomplete="off">
-                                            </div>
-                                            <button type="button" class="btn btn-primary" id="btnMarkReturned"><i class="bi bi-x-circle"></i> تسجيل كراجع</button>
-                                        </div>
-                                        <div id="returnedFeedback" class="scan-feedback" style="display:none"></div>
+                            <section class="support-section-pane support-pane-driver-returned" id="support-pane-driver-returned">
+                                <div class="support-pane-hero">
+                                    <div class="support-pane-icon-wrap"><i class="bi bi-x-circle-fill"></i></div>
+                                    <h2 class="support-pane-title">طلب راجع</h2>
+                                    <p class="support-pane-lead">امسح الباركود أو اكتب رقم الشحنة لتسجيل الطلب كراجع (مرفوض من الزبون).</p>
+                                </div>
+                                <div class="support-scan-card">
+                                    <div class="support-scan-header">
+                                        <i class="bi bi-upc-scan"></i>
+                                        <span>مسح أو إدخال رقم الشحنة</span>
                                     </div>
+                                    <div class="support-scan-body">
+                                        <input type="text" id="returnedScanInput" placeholder="رقم الشحنة..." autocomplete="off" class="support-scan-input">
+                                        <button type="button" class="btn support-action-btn" id="btnMarkReturned">
+                                            <i class="bi bi-check2-circle"></i>
+                                            <span>تسجيل كراجع</span>
+                                        </button>
+                                    </div>
+                                    <div id="returnedFeedback" class="support-scan-feedback" style="display:none"></div>
                                 </div>
                             </section>
                         </main>
@@ -1197,15 +1371,9 @@ const screens = {
                 </div>
             `;
 
-            container.querySelectorAll('.support-section-tab').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tab = btn.dataset.tab;
-                    container.querySelectorAll('.support-section-tab').forEach(b => b.classList.remove('active'));
-                    container.querySelectorAll('.support-section-pane').forEach(p => p.classList.remove('active'));
-                    btn.classList.add('active');
-                    container.querySelector(`#support-pane-${tab}`)?.classList.add('active');
-                });
-            });
+            const initialTab = container.dataset.initialTab || 'driver-return';
+            container.querySelectorAll('.support-section-pane').forEach(p => p.classList.remove('active'));
+            container.querySelector(`#support-pane-${initialTab}`)?.classList.add('active');
 
             const scanInput = document.getElementById('returnScanInput');
             const feedback = document.getElementById('returnFeedback');
@@ -1214,7 +1382,7 @@ const screens = {
                 const num = normalizeBarcodeInput(scanInput.value);
                 if (!num) {
                     feedback.style.display = 'block';
-                    feedback.className = 'scan-feedback error';
+                    feedback.className = 'support-scan-feedback error';
                     feedback.textContent = 'أدخل رقم الشحنة';
                     return;
                 }
@@ -1222,18 +1390,18 @@ const screens = {
                     const result = await window.api.orders.returnFromDriver(num);
                     if (result.success) {
                         feedback.style.display = 'block';
-                        feedback.className = 'scan-feedback success';
+                        feedback.className = 'support-scan-feedback success';
                         feedback.textContent = 'تم إرجاع الطلب ' + num + ' بنجاح. يمكنك الآن تعيينه لسائق آخر من قسم "استلام الطلبات".';
                         scanInput.value = '';
                         scanInput.focus();
                     } else {
                         feedback.style.display = 'block';
-                        feedback.className = 'scan-feedback error';
+                        feedback.className = 'support-scan-feedback error';
                         feedback.textContent = result.error || 'فشل الإرجاع';
                     }
                 } catch (err) {
                     feedback.style.display = 'block';
-                    feedback.className = 'scan-feedback error';
+                    feedback.className = 'support-scan-feedback error';
                     feedback.textContent = 'خطأ: ' + (err.message || err);
                 }
             };
@@ -1259,20 +1427,20 @@ const screens = {
                     const order = await window.api.orders.getByShipment(num);
                     if (!order) {
                         returnedFeedback.style.display = 'block';
-                        returnedFeedback.className = 'scan-feedback error';
+                        returnedFeedback.className = 'support-scan-feedback error';
                         returnedFeedback.textContent = 'الطلب غير موجود: ' + num;
                         return;
                     }
                     await window.api.orders.updateStatus(order.OrderID, 'Returned');
                     returnedFeedback.style.display = 'block';
-                    returnedFeedback.className = 'scan-feedback success';
-                    returnedFeedback.textContent = 'تم تسجيل الطلب ' + num + ' كراجع بنجاح';
+                        returnedFeedback.className = 'support-scan-feedback success';
+                        returnedFeedback.textContent = 'تم تسجيل الطلب ' + num + ' كراجع بنجاح';
                     returnedScanInput.value = '';
                     returnedScanInput.focus();
                 } catch (err) {
                     returnedFeedback.style.display = 'block';
-                    returnedFeedback.className = 'scan-feedback error';
-                    returnedFeedback.textContent = 'خطأ: ' + (err.message || err);
+                        returnedFeedback.className = 'support-scan-feedback error';
+                        returnedFeedback.textContent = 'خطأ: ' + (err.message || err);
                 }
             };
 
@@ -1371,29 +1539,8 @@ const screens = {
             container.innerHTML = `
                 <div class="screen active reports-screen">
                     <div class="reports-layout">
-                        <header class="reports-tabs-horizontal">
-                            <h2 class="reports-tabs-title">التقارير</h2>
-                            <nav class="reports-tabs-nav">
-                                <button type="button" class="reports-tab active" data-tab="collect" title="استحصال أجور السائقين">
-                                    <span class="reports-tab-icon-wrap reports-tab-icon-collect"><i class="bi bi-cash-stack reports-tab-icon"></i></span>
-                                    <span class="reports-tab-text">استحصال الأجور</span>
-                                </button>
-                                <button type="button" class="reports-tab" data-tab="daily" title="ملخص يومي">
-                                    <span class="reports-tab-icon-wrap reports-tab-icon-daily"><i class="bi bi-clipboard-data reports-tab-icon"></i></span>
-                                    <span class="reports-tab-text">التقرير الملخص</span>
-                                </button>
-                                <button type="button" class="reports-tab" data-tab="driver" title="تقرير سائق محدد">
-                                    <span class="reports-tab-icon-wrap reports-tab-icon-driver"><i class="bi bi-person-vcard reports-tab-icon"></i></span>
-                                    <span class="reports-tab-text">تقرير السائق</span>
-                                </button>
-                                <button type="button" class="reports-tab" data-tab="company" title="التقرير الشامل">
-                                    <span class="reports-tab-icon-wrap reports-tab-icon-company"><i class="bi bi-pie-chart-fill reports-tab-icon"></i></span>
-                                    <span class="reports-tab-text">التقرير العام</span>
-                                </button>
-                            </nav>
-                        </header>
                         <main class="reports-panel">
-                            <section class="report-pane active" id="pane-collect">
+                            <section class="report-pane" id="pane-collect">
                                 <h3 class="report-pane-head">استحصال الأجور</h3>
                                 <p class="report-pane-desc">سجّل استلام أجور التوصيل من السائق بعد إكمال الطلبات</p>
                                 <div class="report-form-row">
@@ -1471,15 +1618,9 @@ const screens = {
                 </div>
             `;
 
-            document.querySelectorAll('.reports-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    const t = tab.dataset.tab;
-                    document.querySelectorAll('.reports-tab').forEach(x => x.classList.remove('active'));
-                    document.querySelectorAll('.report-pane').forEach(x => x.classList.remove('active'));
-                    tab.classList.add('active');
-                    document.getElementById('pane-' + t)?.classList.add('active');
-                });
-            });
+            const initialTab = container.dataset.initialTab || 'collect';
+            container.querySelectorAll('.report-pane').forEach(x => x.classList.remove('active'));
+            container.querySelector('#pane-' + initialTab)?.classList.add('active');
 
             let collectExpectedAmount = null;
             let collectAlreadyPaid = false;
@@ -1886,46 +2027,36 @@ const screens = {
             container.innerHTML = `
                 <div class="screen active settings-screen">
                     <div class="settings-layout">
-                        <header class="settings-tabs-horizontal">
-                            <h2 class="settings-tabs-title">الإعدادات</h2>
-                            <nav class="settings-tabs-nav">
-                                <button type="button" class="settings-tab active" data-tab="regions" title="المناطق وتكلفة التوصيل">
-                                    <span class="settings-tab-icon">📍</span>
-                                    <span class="settings-tab-text">المناطق والتوصيل</span>
-                                </button>
-                                <button type="button" class="settings-tab" data-tab="defaults" title="القيم الافتراضية للطلبات">
-                                    <span class="settings-tab-icon">⚙️</span>
-                                    <span class="settings-tab-text">القيم الافتراضية</span>
-                                </button>
-                                <button type="button" class="settings-tab" data-tab="about" title="معلومات النظام">
-                                    <span class="settings-tab-icon">ℹ️</span>
-                                    <span class="settings-tab-text">حول النظام</span>
-                                </button>
-                            </nav>
-                        </header>
                         <main class="settings-panel">
-                            <section class="settings-pane active" id="settings-pane-regions">
-                                <div class="settings-pane-inner">
-                                    <h3 class="settings-pane-head">المناطق وتكلفة التوصيل</h3>
-                                    <p class="settings-pane-desc">أضف المناطق وتكلفة توصيل كل منطقة. تظهر في قائمة منسدلة عند إدخال الطلب.</p>
+                            <section class="settings-pane settings-pane-regions" id="settings-pane-regions">
+                                <div class="settings-pane-hero">
+                                    <div class="settings-pane-icon-wrap"><i class="bi bi-geo-alt-fill"></i></div>
+                                    <h2 class="settings-pane-title">المناطق وتكلفة التوصيل</h2>
+                                    <p class="settings-pane-lead">أضف المناطق وتكلفة توصيل كل منطقة. تظهر في قائمة منسدلة عند إدخال الطلب.</p>
+                                </div>
+                                <div class="settings-form-card">
+                                    <div class="settings-form-header"><i class="bi bi-plus-circle"></i><span>إضافة منطقة جديدة</span></div>
                                     <div class="settings-add-region">
-                                        <div class="form-group">
+                                        <div class="settings-field">
                                             <label>اسم المنطقة</label>
                                             <input type="text" id="newRegionName" placeholder="مثال: الكرادة">
                                         </div>
-                                        <div class="form-group">
+                                        <div class="settings-field">
                                             <label>الجانب</label>
                                             <select id="newRegionArea">
                                                 <option value="الكرخ">الكرخ</option>
                                                 <option value="الرصافة">الرصافة</option>
                                             </select>
                                         </div>
-                                        <div class="form-group">
+                                        <div class="settings-field">
                                             <label>تكلفة التوصيل (د.ع)</label>
                                             <input type="number" id="newRegionFee" min="0" placeholder="0">
                                         </div>
-                                        <button type="button" class="btn btn-primary" id="btnAddRegion">إضافة منطقة</button>
+                                        <button type="button" class="btn settings-action-btn" id="btnAddRegion"><i class="bi bi-plus-lg"></i><span>إضافة</span></button>
                                     </div>
+                                </div>
+                                <div class="settings-table-card">
+                                    <div class="settings-table-header"><i class="bi bi-list-ul"></i><span>قائمة المناطق</span></div>
                                     <div class="settings-table-wrap">
                                         <table class="settings-table">
                                             <thead><tr><th>اسم المنطقة</th><th>الجانب</th><th>تكلفة التوصيل (د.ع)</th><th>إجراء</th></tr></thead>
@@ -1953,36 +2084,43 @@ const screens = {
                                     </div>
                                 </div>
                             </section>
-                            <section class="settings-pane" id="settings-pane-defaults">
-                                <div class="settings-pane-inner">
-                                    <h3 class="settings-pane-head">القيم الافتراضية للطلبات</h3>
-                                    <p class="settings-pane-desc">تُعرض تلقائياً عند إدخال طلب جديد ويمكن تغييرها في نموذج الطلب.</p>
+                            <section class="settings-pane settings-pane-defaults" id="settings-pane-defaults">
+                                <div class="settings-pane-hero">
+                                    <div class="settings-pane-icon-wrap"><i class="bi bi-sliders"></i></div>
+                                    <h2 class="settings-pane-title">القيم الافتراضية للطلبات</h2>
+                                    <p class="settings-pane-lead">تُعرض تلقائياً عند إدخال طلب جديد ويمكن تغييرها في نموذج الطلب.</p>
+                                </div>
+                                <div class="settings-form-card">
+                                    <div class="settings-form-header"><i class="bi bi-pencil-square"></i><span>تعديل القيم الافتراضية</span></div>
                                     <div class="settings-defaults-form">
-                                        <div class="form-group">
+                                        <div class="settings-field">
                                             <label>اسم المتجر الافتراضي</label>
                                             <input type="text" id="defaultStoreName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" placeholder="مثال: متجر ديما الحياة">
                                         </div>
-                                        <div class="form-group">
+                                        <div class="settings-field">
                                             <label>هاتف المتجر الافتراضي</label>
                                             <input type="text" id="defaultStorePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="مثال: 07701234567">
                                         </div>
-                                        <button type="button" class="btn btn-primary btn-lg" id="btnSaveDefaults">حفظ القيم الافتراضية</button>
+                                        <button type="button" class="btn settings-action-btn" id="btnSaveDefaults"><i class="bi bi-check2-circle"></i><span>حفظ القيم الافتراضية</span></button>
                                     </div>
                                 </div>
                             </section>
-                            <section class="settings-pane" id="settings-pane-about">
-                                <div class="settings-pane-inner">
-                                    <h3 class="settings-pane-head">حول النظام</h3>
-                                    <div class="settings-about-card">
-                                        <div class="settings-about-logo">شركة ديما الحياة</div>
-                                        <p class="settings-about-tagline">نظام إدارة التوصيل</p>
-                                        <div class="settings-about-meta">
-                                            <span>الإصدار 1.0</span>
-                                            <span>·</span>
-                                            <span>العملة: الدينار العراقي (IQD)</span>
-                                        </div>
-                                        <div class="settings-about-badges">
-                                            <span class="settings-badges-label">حالات الطلبات:</span>
+                            <section class="settings-pane settings-pane-about" id="settings-pane-about">
+                                <div class="settings-pane-hero">
+                                    <div class="settings-pane-icon-wrap"><i class="bi bi-info-circle-fill"></i></div>
+                                    <h2 class="settings-pane-title">حول النظام</h2>
+                                    <p class="settings-pane-lead">معلومات عن نظام إدارة التوصيل</p>
+                                </div>
+                                <div class="settings-about-card">
+                                    <div class="settings-about-logo"><i class="bi bi-building"></i> شركة ديما الحياة</div>
+                                    <p class="settings-about-tagline">نظام إدارة التوصيل</p>
+                                    <div class="settings-about-meta">
+                                        <span><i class="bi bi-tag"></i> الإصدار 1.0</span>
+                                        <span><i class="bi bi-currency-exchange"></i> الدينار العراقي (IQD)</span>
+                                    </div>
+                                    <div class="settings-about-badges">
+                                        <span class="settings-badges-label">حالات الطلبات</span>
+                                        <div class="settings-badges-list">
                                             <span class="badge badge-new">جديد</span>
                                             <span class="badge badge-assigned">مع السائق</span>
                                             <span class="badge badge-delivered">تم التوصيل</span>
@@ -1996,15 +2134,9 @@ const screens = {
                 </div>
             `;
 
-            container.querySelectorAll('.settings-tab').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const tab = btn.dataset.tab;
-                    container.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
-                    container.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
-                    btn.classList.add('active');
-                    container.querySelector(`#settings-pane-${tab}`)?.classList.add('active');
-                });
-            });
+            const initialTab = container.dataset.initialTab || 'regions';
+            container.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
+            container.querySelector(`#settings-pane-${initialTab}`)?.classList.add('active');
 
             document.getElementById('btnSaveDefaults').addEventListener('click', async () => {
                 const storeName = document.getElementById('defaultStoreName').value.trim();
@@ -2196,14 +2328,6 @@ const screens = {
         }
     }
 };
-
-document.querySelectorAll('.nav-item').forEach(item => {
-    item.addEventListener('click', (e) => {
-        e.preventDefault();
-        const screenId = item.dataset.screen;
-        if (screenId && screens[screenId]) showScreen(screenId);
-    });
-});
 
 const SIDEBAR_STORAGE = 'appSidebarCollapsed';
 document.getElementById('sidebarToggle')?.addEventListener('click', () => {

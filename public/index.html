@@ -40,16 +40,37 @@
                 <div class="logo">شركة ديما الحياة</div>
                 <div class="user-info" id="sidebarUserInfo"></div>
                 <nav class="nav" id="mainNav">
-                    <a href="#" data-screen="dashboard" class="nav-item active nav-admin">لوحة التحكم</a>
-                    <a href="#" data-screen="orders" class="nav-item">الطلبات</a>
-                    <a href="#" data-screen="new-order" class="nav-item">إدخال طلب جديد</a>
-                    <a href="#" data-screen="drivers" class="nav-item nav-admin">السائقين</a>
-                    <a href="#" data-screen="driver-receive" class="nav-item">استلام الطلبات</a>
-                    <a href="#" data-screen="support-sections" class="nav-item nav-admin">أقسام سانده</a>
-                    <a href="#" data-screen="receive-returned" class="nav-item nav-admin">استلام الطلب الراجع</a>
-                    <a href="#" data-screen="reports" class="nav-item nav-admin">التقارير</a>
-                    <a href="#" data-screen="users" class="nav-item nav-admin">المستخدمين</a>
-                    <a href="#" data-screen="settings" class="nav-item nav-admin">الإعدادات</a>
+                    <a href="#" data-screen="dashboard" class="nav-item nav-admin"><i class="bi bi-grid-1x2"></i><span>لوحة التحكم</span></a>
+                    <a href="#" data-screen="orders" class="nav-item"><i class="bi bi-box-seam"></i><span>الطلبات</span></a>
+                    <a href="#" data-screen="new-order" class="nav-item"><i class="bi bi-plus-circle"></i><span>إدخال طلب جديد</span></a>
+                    <a href="#" data-screen="drivers" class="nav-item nav-admin"><i class="bi bi-truck"></i><span>السائقين</span></a>
+                    <a href="#" data-screen="driver-receive" class="nav-item"><i class="bi bi-box-arrow-in-down"></i><span>استلام الطلبات</span></a>
+                    <div class="nav-group nav-admin">
+                        <a href="#" data-screen="support-sections" class="nav-item nav-parent"><i class="bi bi-tools"></i><span>أقسام سانده</span><i class="bi bi-chevron-down nav-chevron"></i></a>
+                        <div class="nav-sub">
+                            <a href="#" data-screen="support-sections" data-tab="driver-return" class="nav-item nav-child"><span>تبديل السائق</span></a>
+                            <a href="#" data-screen="support-sections" data-tab="driver-returned" class="nav-item nav-child"><span>طلب راجع</span></a>
+                        </div>
+                    </div>
+                    <a href="#" data-screen="receive-returned" class="nav-item nav-admin"><i class="bi bi-arrow-return-left"></i><span>استلام الطلب الراجع</span></a>
+                    <div class="nav-group nav-admin">
+                        <a href="#" data-screen="reports" class="nav-item nav-parent"><i class="bi bi-graph-up"></i><span>التقارير</span><i class="bi bi-chevron-down nav-chevron"></i></a>
+                        <div class="nav-sub">
+                            <a href="#" data-screen="reports" data-tab="collect" class="nav-item nav-child"><span>استحصال الأجور</span></a>
+                            <a href="#" data-screen="reports" data-tab="daily" class="nav-item nav-child"><span>التقرير الملخص</span></a>
+                            <a href="#" data-screen="reports" data-tab="driver" class="nav-item nav-child"><span>تقرير السائق</span></a>
+                            <a href="#" data-screen="reports" data-tab="company" class="nav-item nav-child"><span>التقرير العام</span></a>
+                        </div>
+                    </div>
+                    <a href="#" data-screen="users" class="nav-item nav-admin"><i class="bi bi-people"></i><span>المستخدمين</span></a>
+                    <div class="nav-group nav-admin">
+                        <a href="#" data-screen="settings" class="nav-item nav-parent"><i class="bi bi-gear"></i><span>الإعدادات</span><i class="bi bi-chevron-down nav-chevron"></i></a>
+                        <div class="nav-sub">
+                            <a href="#" data-screen="settings" data-tab="regions" class="nav-item nav-child"><span>المناطق</span></a>
+                            <a href="#" data-screen="settings" data-tab="defaults" class="nav-item nav-child"><span>القيم الافتراضية</span></a>
+                            <a href="#" data-screen="settings" data-tab="about" class="nav-item nav-child"><span>حول النظام</span></a>
+                        </div>
+                    </div>
                 </nav>
                 <button type="button" class="btn btn-secondary btn-logout" id="btnLogout">تسجيل الخروج</button>
                 <button type="button" class="btn btn-secondary" id="btnAdminLogin" style="margin-top:8px;display:none">دخول المدير</button>
