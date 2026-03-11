@@ -1,0 +1,10 @@
+# استخدم عندما البورت 80 محجوز لتطبيق آخر
+# شغّل: docker-compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https up -d
+# الوصول: https://IP-السيرفر:8443 و https://IP-السيرفر:8443/driver و /employee
+
+services:
+  caddy:
+    ports:
+      - "8443:443"   # HTTPS فقط (بورت بديل عن 443 إن لزم)
+    volumes:
+      - ./Caddyfile.alt-ports:/etc/caddy/Caddyfile

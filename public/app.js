@@ -1147,14 +1147,14 @@ const screens = {
                 <div class="screen active support-sections-screen">
                     <div class="support-sections-layout">
                         <header class="support-sections-tabs">
-                            <h2 class="support-sections-title">أقسام سانده</h2>
+                            <h2 class="support-sections-title"><i class="bi bi-headset"></i> أقسام سانده</h2>
                             <nav class="support-sections-nav">
                                 <button type="button" class="support-section-tab active" data-tab="driver-return">
-                                    <span class="support-section-tab-icon">🔄</span>
+                                    <span class="support-section-tab-icon-wrap support-section-icon-swap"><i class="bi bi-arrow-left-right support-section-tab-icon"></i></span>
                                     <span class="support-section-tab-text">تبديل السائق</span>
                                 </button>
                                 <button type="button" class="support-section-tab" data-tab="driver-returned">
-                                    <span class="support-section-tab-icon">↩️</span>
+                                    <span class="support-section-tab-icon-wrap support-section-icon-returned"><i class="bi bi-arrow-return-left support-section-tab-icon"></i></span>
                                     <span class="support-section-tab-text">طلب راجع</span>
                                 </button>
                             </nav>
@@ -1167,10 +1167,10 @@ const screens = {
                                     <div class="driver-scan-area">
                                         <div class="form-group support-scan-row">
                                             <div class="support-scan-field">
-                                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
-                                                <input type="text" id="returnScanInput" placeholder="رقم الشحنة" autocomplete="off">
+                                                <label><i class="bi bi-upc-scan"></i> امسح الباركود أو اكتب رقم الشحنة</label>
+                                                <input type="text" id="returnScanInput" placeholder="أدخل رقم الشحنة..." autocomplete="off">
                                             </div>
-                                            <button type="button" class="btn btn-primary" id="btnReturnOrder">إرجاع الطلب</button>
+                                            <button type="button" class="btn btn-primary" id="btnReturnOrder"><i class="bi bi-arrow-return-left"></i> إرجاع الطلب</button>
                                         </div>
                                         <div id="returnFeedback" class="scan-feedback" style="display:none"></div>
                                     </div>
@@ -1183,10 +1183,10 @@ const screens = {
                                     <div class="driver-scan-area">
                                         <div class="form-group support-scan-row">
                                             <div class="support-scan-field">
-                                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
-                                                <input type="text" id="returnedScanInput" placeholder="رقم الشحنة" autocomplete="off">
+                                                <label><i class="bi bi-upc-scan"></i> امسح الباركود أو اكتب رقم الشحنة</label>
+                                                <input type="text" id="returnedScanInput" placeholder="أدخل رقم الشحنة..." autocomplete="off">
                                             </div>
-                                            <button type="button" class="btn btn-primary" id="btnMarkReturned">تسجيل كراجع</button>
+                                            <button type="button" class="btn btn-primary" id="btnMarkReturned"><i class="bi bi-x-circle"></i> تسجيل كراجع</button>
                                         </div>
                                         <div id="returnedFeedback" class="scan-feedback" style="display:none"></div>
                                     </div>
@@ -1375,19 +1375,19 @@ const screens = {
                             <h2 class="reports-tabs-title">التقارير</h2>
                             <nav class="reports-tabs-nav">
                                 <button type="button" class="reports-tab active" data-tab="collect" title="استحصال أجور السائقين">
-                                    <span class="reports-tab-icon">💰</span>
+                                    <span class="reports-tab-icon-wrap reports-tab-icon-collect"><i class="bi bi-cash-stack reports-tab-icon"></i></span>
                                     <span class="reports-tab-text">استحصال الأجور</span>
                                 </button>
                                 <button type="button" class="reports-tab" data-tab="daily" title="ملخص يومي">
-                                    <span class="reports-tab-icon">📋</span>
+                                    <span class="reports-tab-icon-wrap reports-tab-icon-daily"><i class="bi bi-clipboard-data reports-tab-icon"></i></span>
                                     <span class="reports-tab-text">التقرير الملخص</span>
                                 </button>
                                 <button type="button" class="reports-tab" data-tab="driver" title="تقرير سائق محدد">
-                                    <span class="reports-tab-icon">👤</span>
+                                    <span class="reports-tab-icon-wrap reports-tab-icon-driver"><i class="bi bi-person-vcard reports-tab-icon"></i></span>
                                     <span class="reports-tab-text">تقرير السائق</span>
                                 </button>
                                 <button type="button" class="reports-tab" data-tab="company" title="التقرير الشامل">
-                                    <span class="reports-tab-icon">📊</span>
+                                    <span class="reports-tab-icon-wrap reports-tab-icon-company"><i class="bi bi-pie-chart-fill reports-tab-icon"></i></span>
                                     <span class="reports-tab-text">التقرير العام</span>
                                 </button>
                             </nav>

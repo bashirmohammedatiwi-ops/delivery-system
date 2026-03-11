@@ -55,8 +55,28 @@ services:
     depends_on:
       - app
 
+  # Caddy - HTTPS (شغّله فقط عند وجود دومين: docker-compose --profile https up -d)
+  caddy:
+    image: caddy:2-alpine
+    container_name: delivery-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    depends_on:
+      - app
+    profiles:
+      - https
+
 volumes:
   app-data:
+    driver: local
+  caddy-data:
     driver: local
 
 networks:
