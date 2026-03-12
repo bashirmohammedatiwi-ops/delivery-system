@@ -1,7 +1,8 @@
 # استخدم هذا الملف عندما البورت 80 محجوز
 # شهادة ذاتية (المتصفح قد يحذّر) - Let's Encrypt لا يعمل بدون البورت 80
+# الوصول: https://demaalhayaadelivery.online:8443 و /employee و /driver
 
-:443 {
+https://{$DOMAIN:localhost} {
     tls internal
     handle /driver* {
         uri strip_prefix /driver
