@@ -4,11 +4,17 @@
 
 https://{$DOMAIN:localhost} {
     tls internal
-    handle /driver* {
+    handle /driver {
+        redir /driver /driver/ 308
+    }
+    handle /driver/* {
         uri strip_prefix /driver
         reverse_proxy driver-web:3001
     }
-    handle /employee* {
+    handle /employee {
+        redir /employee /employee/ 308
+    }
+    handle /employee/* {
         uri strip_prefix /employee
         reverse_proxy employee-web:3002
     }
