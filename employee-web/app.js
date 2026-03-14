@@ -84,7 +84,10 @@ async function renderNewOrder(container) {
     try { regions = await window.api.regions.getAll(); } catch (_) {}
     try { defaults = await window.api.settings.getDefaults(); } catch (_) {}
     container.innerHTML = `
-        <div class="screen-hero">
+        <div class="screen-hero screen-hero-sm">
+            <span class="screen-hero-icon">✨</span>
+            <h2 class="screen-hero-title">طلب جديد</h2>
+            <p class="screen-hero-sub">أدخل بيانات الطلب للحفظ</p>
         </div>
         <div class="card card-form">
             <h3 class="card-title">بيانات الطلب</h3>
@@ -97,13 +100,13 @@ async function renderNewOrder(container) {
                     <label>رقم الطلب الإداري</label>
                     <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="display:none" data-hidden-store>
                     <label>اسم المتجر <span class="required">*</span></label>
-                    <input type="text" id="storeName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" required>
+                    <input type="text" id="storeName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="display:none" data-hidden-store>
                     <label>هاتف المتجر <span class="required">*</span></label>
-                    <input type="tel" id="storePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="11 رقم" required>
+                    <input type="tel" id="storePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="11 رقم">
                 </div>
                 <div class="form-group">
                     <label>اسم المستلم</label>
@@ -199,7 +202,8 @@ async function renderNewOrder(container) {
             FreeDelivery: document.getElementById('freeDelivery').checked,
             Notes: document.getElementById('notes').value
         };
-        if (!data.StoreName || !data.StorePhone || !data.CustomerPhone || !data.Address || data.AmountIQD <= 0) {
+        if (!data.StoreName || !data.StorePhone) { data.StoreName = defaults.storeName || ''; data.StorePhone = defaults.storePhone || ''; }
+        if (!data.CustomerPhone || !data.Address || data.AmountIQD <= 0) {
             alert('أكمل الحقول المطلوبة');
             return;
         }
@@ -506,11 +510,11 @@ async function showEditOrderModalEmp(order, onSuccess) {
                     <label>رقم الطلب الإداري</label>
                     <input type="text" id="editAdminOrderNo" value="${(o.AdminOrderNo || '').replace(/"/g, '&quot;')}">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="display:none">
                     <label>المتجر</label>
-                    <input type="text" id="editStoreName" value="${(o.StoreName || '').replace(/"/g, '&quot;')}" required>
+                    <input type="text" id="editStoreName" value="${(o.StoreName || '').replace(/"/g, '&quot;')}">
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="display:none">
                     <label>هاتف المتجر</label>
                     <input type="text" id="editStorePhone" value="${(o.StorePhone || '').replace(/"/g, '&quot;')}">
                 </div>

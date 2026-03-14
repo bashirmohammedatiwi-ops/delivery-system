@@ -1,41 +1,43 @@
 /**
- * تطبيق الموظفين - شركة ديما الحياة
- * تصميم جديد — ألوان أنيقة لموظفات نساء (محفوظة)
+ * تطبيق الموظفين — ديما الحياة
+ * تصميم مميز — أنيق وعصري
  */
 
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Amiri:wght@400;700&display=swap');
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-    /* لوحة ألوان — محفوظة */
-    --primary: #C026D3;
-    --primary-dark: #A21CAF;
-    --primary-light: #E879F9;
-    --primary-soft: #F5D0FE;
-    --bg: #FDF4FF;
+    --primary: #B91C7B;
+    --primary-dark: #9D1659;
+    --primary-light: #E879B4;
+    --primary-soft: #FCE7F6;
+    --accent: #D97706;
+    --accent-soft: #FEF3C7;
+    --bg: linear-gradient(180deg, #FFF7ED 0%, #FDF2F8 50%, #FAF5FF 100%);
+    --bg-solid: #FFFBF7;
     --bg-card: #FFFFFF;
-    --text: #581C87;
-    --text-muted: #64748B;
-    --border: #E9D5FF;
-    --border-input: #E2E8F0;
+    --text: #4C1D95;
+    --text-muted: #6B7280;
+    --border: rgba(185, 28, 123, 0.15);
+    --border-input: #E5E7EB;
     --success: #059669;
     --success-soft: #D1FAE5;
-    --danger: #DB2777;
-    --danger-soft: #FCE7F3;
-    --accent: #EC4899;
-    --accent-soft: #FDF2F8;
-    --shadow-soft: 0 2px 12px rgba(192, 38, 211, 0.08);
-    --shadow: 0 4px 24px rgba(192, 38, 211, 0.12);
-    --shadow-lg: 0 12px 40px rgba(192, 38, 211, 0.18);
-    --radius: 12px;
-    --radius-lg: 20px;
+    --danger: #DC2626;
+    --danger-soft: #FEE2E2;
+    --shadow-soft: 0 2px 20px rgba(185, 28, 123, 0.06);
+    --shadow: 0 8px 32px rgba(185, 28, 123, 0.1);
+    --shadow-lg: 0 20px 50px rgba(185, 28, 123, 0.15);
+    --radius: 16px;
+    --radius-lg: 24px;
+    --radius-xl: 32px;
     --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 body {
     font-family: 'Cairo', sans-serif;
-    background: var(--bg);
+    background: var(--bg-solid);
+    background-attachment: fixed;
     color: var(--text);
     direction: rtl;
     min-height: 100vh;
@@ -51,121 +53,121 @@ body {
     width: 100%;
 }
 
-/* ─── الشاشات ─── */
+/* ═══════════════════════════════════════════════════════════
+   الشاشات
+   ═══════════════════════════════════════════════════════════ */
 .screen { display: none !important; flex: 1; min-height: 0; }
 #login-screen.screen.active { display: flex !important; }
 #main-screen.screen.active { display: flex !important; flex-direction: column; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
 /* ═══════════════════════════════════════════════════════════
-   شاشة تسجيل الدخول — تصميم جديد
+   شاشة تسجيل الدخول — تصميم مميز
    ═══════════════════════════════════════════════════════════ */
 #login-screen {
     flex: 1;
     min-height: 100%;
-    align-items: stretch;
+    align-items: center;
     justify-content: center;
-    padding: 0;
-    background: linear-gradient(165deg, #7C3AED 0%, #C026D3 50%, #EC4899 100%);
+    padding: 32px 24px;
+    background: linear-gradient(145deg, #831843 0%, #B91C7B 35%, #D97706 100%);
     position: relative;
+    overflow: hidden;
 }
 
-.login-bg {
+#login-screen::before {
+    content: '';
     position: absolute;
     inset: 0;
+    background-image: 
+        radial-gradient(circle at 20% 80%, rgba(255,255,255,0.12) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(253,186,116,0.2) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(255,255,255,0.05) 0%, transparent 70%);
     pointer-events: none;
 }
 
-.login-bg-pattern {
+#login-screen::after {
+    content: '';
     position: absolute;
-    inset: 0;
-    opacity: 0.15;
-    background-image: 
-        radial-gradient(circle at 10% 90%, rgba(255,255,255,0.2) 0%, transparent 40%),
-        radial-gradient(circle at 90% 10%, rgba(255,255,255,0.15) 0%, transparent 40%);
-}
-
-.login-bg-gradient {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(165deg, #6D28D9 0%, #A21CAF 45%, #DB2777 100%);
-}
-
-.login-wrap {
-    position: relative;
-    z-index: 1;
+    bottom: -50%;
+    right: -50%;
     width: 100%;
-    padding: 40px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+    pointer-events: none;
 }
 
-.login-content {
-    width: 100%;
-    max-width: 360px;
-}
+.login-wrap { position: relative; z-index: 1; width: 100%; max-width: 380px; }
+
+.login-content { width: 100%; }
 
 .login-brand {
     text-align: center;
-    margin-bottom: 36px;
+    margin-bottom: 40px;
 }
 
 .login-logo {
-    width: 72px;
-    height: 72px;
-    margin: 0 auto 20px;
+    width: 88px;
+    height: 88px;
+    margin: 0 auto 24px;
+    background: rgba(255,255,255,0.25);
+    backdrop-filter: blur(12px);
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     color: #fff;
+    border: 2px solid rgba(255,255,255,0.3);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    animation: float 3s ease-in-out infinite;
 }
 
-.login-logo svg { width: 100%; height: 100%; }
+.login-logo svg { width: 48px; height: 48px; }
 
 .login-title {
-    font-size: 1.9rem;
-    font-weight: 900;
+    font-family: 'Amiri', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
     color: #fff;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.2);
 }
 
 .login-subtitle {
     font-size: 1rem;
     color: rgba(255,255,255,0.9);
-    margin-top: 6px;
+    margin-top: 8px;
+    font-weight: 500;
 }
 
 .login-card {
-    background: rgba(255,255,255,0.98);
-    backdrop-filter: blur(20px);
-    border-radius: 28px;
+    background: rgba(255,255,255,0.97);
+    backdrop-filter: blur(24px);
+    border-radius: var(--radius-xl);
     padding: 0;
-    box-shadow: 0 24px 60px rgba(0,0,0,0.15);
-    overflow: hidden;
+    box-shadow: 0 32px 64px rgba(0,0,0,0.2), 0 0 0 1px rgba(255,255,255,0.2);
 }
 
-.login-card-body {
-    padding: 36px 28px;
-}
+.login-card-body { padding: 40px 32px; }
 
 .login-card input {
     width: 100%;
-    padding: 16px 20px;
-    border: none;
-    border-bottom: 2px solid var(--border-input);
-    border-radius: 0;
+    padding: 18px 20px;
+    border: 2px solid var(--border-input);
+    border-radius: 14px;
     font-size: 1rem;
-    margin-bottom: 0;
-    background: transparent;
+    margin-bottom: 16px;
+    background: #fff;
+    transition: all 0.25s ease;
 }
-
-.login-card input:first-of-type { margin-bottom: 4px; }
-
-.login-card input::placeholder { color: var(--text-muted); }
 
 .login-card input:focus {
     outline: none;
-    border-bottom-color: var(--primary);
-    box-shadow: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
 .login-error {
@@ -176,65 +178,64 @@ body {
 }
 
 .btn-login {
-    margin-top: 24px;
+    margin-top: 8px;
     padding: 18px;
     font-size: 1.05rem;
     border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(185, 28, 123, 0.35);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   الرأس — تصميم جديد بسيط
+   الرأس — تصميم مميز
    ═══════════════════════════════════════════════════════════ */
 #main-screen {
     flex: 1;
     display: flex;
     flex-direction: column;
     min-height: 0;
-    padding-bottom: calc(80px + var(--safe-bottom));
+    padding-bottom: calc(88px + var(--safe-bottom));
 }
 
 .emp-header {
-    background: #fff;
+    background: linear-gradient(180deg, #fff 0%, rgba(255,251,247,0.98) 100%);
     color: var(--text);
     flex-shrink: 0;
-    border-bottom: 1px solid var(--border);
+    box-shadow: 0 4px 24px rgba(185, 28, 123, 0.06);
 }
 
 .emp-header-inner {
-    padding: 16px 20px;
+    padding: 18px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 .emp-header-title {
-    font-size: 1.2rem;
-    font-weight: 800;
+    font-family: 'Amiri', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
     color: var(--text);
 }
 
-.emp-header-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
+.emp-header-user { display: flex; align-items: center; gap: 12px; }
 
 .emp-header-avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 800;
-    font-size: 0.95rem;
+    font-size: 1.1rem;
+    box-shadow: 0 4px 16px rgba(185, 28, 123, 0.3);
 }
 
 .emp-header-name {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.95rem;
+    font-weight: 700;
     color: var(--text);
 }
 
@@ -243,48 +244,45 @@ body {
    ═══════════════════════════════════════════════════════════ */
 .emp-content {
     flex: 1;
-    padding: 20px;
+    padding: 24px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    background: var(--bg);
+    background: linear-gradient(180deg, #FFFBF7 0%, #FDF2F8 100%);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   عناوين الشاشات — تصميم جديد
+   عناوين الشاشات
    ═══════════════════════════════════════════════════════════ */
 .screen-hero {
-    padding: 0 0 24px;
+    padding: 0 0 28px;
     margin-bottom: 0;
-    border-bottom: 1px solid var(--border);
 }
 
 .screen-hero-icon {
-    font-size: 2rem;
+    font-size: 2.25rem;
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .screen-hero-title {
-    font-size: 1.4rem;
-    font-weight: 800;
+    font-family: 'Amiri', serif;
+    font-size: 1.6rem;
+    font-weight: 700;
     color: var(--text);
 }
 
 .screen-hero-sub {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     color: var(--text-muted);
-    margin-top: 4px;
+    margin-top: 6px;
 }
 
-.screen-hero-sm {
-    padding: 0 0 20px;
-}
-
-.screen-hero-sm .screen-hero-icon { font-size: 1.6rem; }
-.screen-hero-sm .screen-hero-title { font-size: 1.25rem; }
+.screen-hero-sm { padding: 0 0 24px; }
+.screen-hero-sm .screen-hero-icon { font-size: 1.75rem; }
+.screen-hero-sm .screen-hero-title { font-size: 1.35rem; }
 
 /* ═══════════════════════════════════════════════════════════
-   شريط التنقل — تصميم شرائح
+   شريط التنقل — تصميم مميز
    ═══════════════════════════════════════════════════════════ */
 .bottom-nav {
     position: fixed;
@@ -293,22 +291,21 @@ body {
     transform: translateX(-50%);
     width: 100%;
     max-width: 480px;
-    padding: 12px 16px;
-    padding-bottom: calc(12px + var(--safe-bottom));
+    padding: 16px 24px;
+    padding-bottom: calc(16px + var(--safe-bottom));
     z-index: 100;
-    background: transparent;
 }
 
 .bottom-nav-track {
     width: 100%;
-    height: 56px;
+    height: 64px;
     background: #fff;
-    border-radius: 28px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    border-radius: 32px;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.06), 0 8px 32px rgba(185, 28, 123, 0.12);
     display: flex;
     align-items: center;
-    padding: 6px;
-    gap: 4px;
+    padding: 8px;
+    gap: 6px;
 }
 
 .bottom-nav .bottom-nav-track .bottom-nav-item {
@@ -317,17 +314,17 @@ body {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 8px 4px;
+    gap: 4px;
+    padding: 10px 6px;
     border: none;
     background: transparent;
     color: var(--text-muted);
     font-family: inherit;
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
-    border-radius: 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 24px;
 }
 
 .bottom-nav .bottom-nav-track .bottom-nav-item:hover {
@@ -337,24 +334,32 @@ body {
 .bottom-nav .bottom-nav-track .bottom-nav-item.active {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: #fff;
+    box-shadow: 0 4px 16px rgba(185, 28, 123, 0.35);
 }
 
-.bottom-nav-icon { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
-.bottom-nav-icon svg { width: 20px; height: 20px; }
+.bottom-nav-icon {
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bottom-nav-icon svg { width: 22px; height: 22px; }
 .bottom-nav-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
 /* ═══════════════════════════════════════════════════════════
-   الأزرار والنماذج — تصميم جديد
+   الأزرار والنماذج
    ═══════════════════════════════════════════════════════════ */
 .btn {
-    padding: 14px 24px;
-    min-height: 48px;
+    padding: 16px 28px;
+    min-height: 52px;
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     font-family: inherit;
     font-weight: 700;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn:active { transform: scale(0.98); }
@@ -362,22 +367,27 @@ body {
 .btn-primary {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: #fff;
+    box-shadow: 0 8px 24px rgba(185, 28, 123, 0.3);
 }
+
+.btn-primary:hover { box-shadow: 0 12px 32px rgba(185, 28, 123, 0.4); }
 
 .btn-block { width: 100%; }
 
 .btn-secondary {
-    background: var(--border-input);
+    background: #F3F4F6;
     color: var(--text);
 }
 
-.form-group { margin-bottom: 18px; }
+.btn-secondary:hover { background: #E5E7EB; }
+
+.form-group { margin-bottom: 20px; }
 
 .form-group label {
     display: block;
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
     color: var(--text);
 }
 
@@ -385,12 +395,12 @@ body {
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 14px 16px;
-    border: 1px solid var(--border-input);
-    border-radius: 10px;
+    padding: 16px 18px;
+    border: 2px solid var(--border-input);
+    border-radius: 12px;
     font-family: inherit;
     font-size: 1rem;
-    transition: border-color 0.2s;
+    transition: all 0.2s ease;
 }
 
 .form-group input:focus,
@@ -398,6 +408,7 @@ body {
 .form-group textarea:focus {
     outline: none;
     border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
 .form-group select { cursor: pointer; background: #fff; }
@@ -408,8 +419,8 @@ body {
 
 .form-group input[type="checkbox"] {
     width: auto;
-    min-width: 20px;
-    height: 20px;
+    min-width: 22px;
+    height: 22px;
     margin-left: 10px;
     accent-color: var(--primary);
 }
@@ -421,66 +432,81 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   البطاقات — تصميم جديد مسطح
+   البطاقات — تصميم مميز
    ═══════════════════════════════════════════════════════════ */
 .card {
     background: #fff;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 16px;
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 20px;
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-soft);
+    transition: box-shadow 0.3s ease;
 }
 
+.card:hover { box-shadow: var(--shadow); }
+
+.card-form { border: 1px solid rgba(185, 28, 123, 0.12); }
+
 .card h3, .card-title {
-    font-size: 1.1rem;
-    font-weight: 800;
-    margin-bottom: 20px;
+    font-family: 'Amiri', serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    margin-bottom: 24px;
     color: var(--text);
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+    border-bottom: 2px solid var(--primary-soft);
 }
 
 /* ═══════════════════════════════════════════════════════════
-   المبلغ النهائي — تصميم جديد
+   المبلغ النهائي
    ═══════════════════════════════════════════════════════════ */
 .order-total-box {
-    background: var(--primary-soft);
-    border-radius: 12px;
-    padding: 18px 20px;
-    margin-bottom: 20px;
+    background: linear-gradient(135deg, var(--primary-soft) 0%, var(--accent-soft) 100%);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border: 1px solid rgba(185, 28, 123, 0.15);
 }
 
 .order-total-label { font-weight: 700; color: var(--text); }
-.order-total-value { font-weight: 900; font-size: 1.3rem; color: var(--primary-dark); }
+.order-total-value { font-family: 'Amiri', serif; font-weight: 700; font-size: 1.5rem; color: var(--primary-dark); }
 
 /* ═══════════════════════════════════════════════════════════
    التغذية الراجعة
    ═══════════════════════════════════════════════════════════ */
 .feedback {
-    padding: 14px 16px;
-    border-radius: 10px;
-    margin-bottom: 16px;
-    font-weight: 500;
+    padding: 16px 20px;
+    border-radius: 12px;
+    margin-bottom: 18px;
+    font-weight: 600;
 }
 
-.feedback.success { background: var(--success-soft); color: #047857; }
-.feedback.error { background: var(--danger-soft); color: #b91c1c; }
+.feedback.success { background: var(--success-soft); color: var(--success); }
+.feedback.error { background: var(--danger-soft); color: var(--danger); }
 
 /* ═══════════════════════════════════════════════════════════
-   بطاقات الطلبات — تصميم قائمة جديد
+   بطاقات الطلبات
    ═══════════════════════════════════════════════════════════ */
 .order-card {
     background: #fff;
-    border-radius: 14px;
-    padding: 18px 20px;
-    margin-bottom: 12px;
+    border-radius: 18px;
+    padding: 20px 24px;
+    margin-bottom: 16px;
     border: 1px solid var(--border);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
+    box-shadow: var(--shadow-soft);
+    transition: all 0.3s ease;
+}
+
+.order-card:hover {
+    box-shadow: var(--shadow);
+    transform: translateY(-2px);
 }
 
 .order-card-header {
@@ -489,166 +515,197 @@ body {
     align-items: center;
 }
 
-.order-shipment { font-weight: 800; color: var(--primary); font-size: 1rem; }
-.order-amount { font-weight: 800; color: var(--success); font-size: 1rem; }
-
-.order-card-addr { font-size: 0.9rem; color: var(--text-muted); }
-
-.order-card .order-card-meta { font-size: 0.8rem; color: var(--text-muted); }
-
-.orders-search-wrap {
-    margin-bottom: 16px;
+.order-shipment {
+    font-weight: 800;
+    color: var(--primary);
+    font-size: 1.05rem;
 }
+
+.order-amount {
+    font-family: 'Amiri', serif;
+    font-weight: 700;
+    color: var(--success);
+    font-size: 1.05rem;
+}
+
+.order-card-addr { font-size: 0.92rem; color: var(--text-muted); line-height: 1.5; }
+
+.order-card .order-card-meta { font-size: 0.82rem; color: var(--text-muted); }
+
+.orders-search-wrap { margin-bottom: 20px; }
 
 .orders-search-input {
     width: 100%;
-    padding: 14px 44px 14px 18px;
-    border: 1px solid var(--border-input);
-    border-radius: 12px;
+    padding: 16px 48px 16px 20px;
+    border: 2px solid var(--border-input);
+    border-radius: 14px;
     font-size: 1rem;
     font-family: inherit;
-    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat right 16px center;
+    background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat right 18px center;
 }
 
 .orders-search-input:focus {
     outline: none;
     border-color: var(--primary);
+    box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
 .order-card-actions {
     display: flex;
-    gap: 10px;
-    margin-top: 10px;
+    gap: 12px;
+    margin-top: 14px;
 }
 
 .btn-order-action {
-    padding: 10px 18px;
-    font-size: 0.85rem;
-    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 0.88rem;
+    border-radius: 12px;
     border: none;
     cursor: pointer;
     font-family: inherit;
     font-weight: 700;
+    transition: all 0.2s ease;
 }
 
-.btn-order-action.btn-edit { background: var(--border-input); color: var(--text); }
-.btn-order-action.btn-print { background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); color: #fff; }
+.btn-order-action.btn-edit {
+    background: #F3F4F6;
+    color: var(--text);
+}
+
+.btn-order-action.btn-edit:hover { background: #E5E7EB; }
+
+.btn-order-action.btn-print {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(185, 28, 123, 0.3);
+}
+
+.btn-order-action.btn-print:hover { box-shadow: 0 6px 20px rgba(185, 28, 123, 0.4); }
 
 /* ═══════════════════════════════════════════════════════════
    حالات فارغة وتحميل
    ═══════════════════════════════════════════════════════════ */
 .empty-state, .loading-state {
     text-align: center;
-    padding: 48px 24px;
+    padding: 56px 28px;
     color: var(--text-muted);
 }
+
+.empty-state { font-size: 1rem; }
 
 .loading-state { animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
 /* ═══════════════════════════════════════════════════════════
-   الإعدادات — تصميم جديد
+   الإعدادات
    ═══════════════════════════════════════════════════════════ */
 .settings-profile {
     background: #fff;
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 28px;
+    border-radius: var(--radius-lg);
+    padding: 36px;
     text-align: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-soft);
 }
 
-.settings-driver-name { font-size: 1.3rem; font-weight: 800; }
+.settings-driver-name {
+    font-family: 'Amiri', serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+}
 
 .btn-logout {
     width: 100%;
-    padding: 16px;
-    background: var(--danger);
+    padding: 18px;
+    background: linear-gradient(135deg, var(--danger) 0%, #B91C1C 100%);
     color: #fff;
     border: none;
-    border-radius: 12px;
+    border-radius: 14px;
     font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
 }
 
 /* ═══════════════════════════════════════════════════════════
-   النوافذ المنبثقة — تصميم جديد
+   النوافذ المنبثقة
    ═══════════════════════════════════════════════════════════ */
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(4px);
+    background: rgba(76, 29, 149, 0.2);
+    backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    padding: 20px;
+    padding: 24px;
 }
 
 .modal-card {
     background: #fff;
-    border-radius: 20px;
-    padding: 28px;
+    border-radius: var(--radius-xl);
+    padding: 32px;
     max-width: 440px;
     width: 100%;
     max-height: 90vh;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    box-shadow: 0 32px 64px rgba(0,0,0,0.2);
 }
 
-.modal-card h3 { margin-bottom: 22px; font-weight: 800; }
+.modal-card h3 {
+    font-family: 'Amiri', serif;
+    margin-bottom: 24px;
+    font-weight: 700;
+}
 
-.modal-actions { display: flex; gap: 12px; margin-top: 22px; }
+.modal-actions { display: flex; gap: 14px; margin-top: 24px; }
 .modal-actions .btn { flex: 1; }
 
 /* ═══════════════════════════════════════════════════════════
    عناصر أخرى
    ═══════════════════════════════════════════════════════════ */
-.form-actions { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.form-actions { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
 
 .driver-badge {
     background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: #fff;
-    padding: 10px 16px;
-    border-radius: 10px;
+    padding: 12px 20px;
+    border-radius: 12px;
     font-weight: 700;
 }
 
 /* ═══════════════════════════════════════════════════════════
    استلام الطلبات — مسح الباركود
    ═══════════════════════════════════════════════════════════ */
-.receive-scan-area { margin-bottom: 20px; }
+.receive-scan-area { margin-bottom: 24px; }
 
 .receive-scanner {
     width: 100%;
-    min-height: 220px;
-    border-radius: var(--radius);
+    min-height: 240px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    background: #1e1b4b;
-    margin-bottom: 14px;
-    border: 1px solid var(--border);
+    background: linear-gradient(145deg, #1e1b4b 0%, #312e81 100%);
+    margin-bottom: 16px;
+    border: 2px solid var(--border);
 }
 
 .receive-scanner video { width: 100%; display: block; }
 
-.receive-scan-btn { margin-bottom: 10px; }
+.receive-scan-btn { margin-bottom: 12px; }
 
 .receive-scan-stop {
-    background: var(--danger) !important;
+    background: linear-gradient(135deg, var(--danger) 0%, #B91C1C 100%) !important;
     color: #fff !important;
 }
 
-.receive-scan-stop:hover {
-    filter: brightness(0.9);
-}
+.receive-scan-stop:hover { filter: brightness(0.95); }
 
 .receive-divider {
     text-align: center;
     color: var(--text-muted);
-    font-size: 0.9rem;
-    margin: 18px 0 14px;
+    font-size: 0.92rem;
+    margin: 22px 0 16px;
     position: relative;
 }
 
@@ -657,19 +714,17 @@ body {
     content: '';
     position: absolute;
     top: 50%;
-    width: 40%;
+    width: 42%;
     height: 1px;
-    background: var(--border);
+    background: var(--border-input);
 }
 
 .receive-divider::before { right: 0; }
 .receive-divider::after { left: 0; }
 
 @media (max-width: 480px) {
-    .emp-content { padding: 16px; }
-    .emp-header-inner { padding: 14px 18px; }
-    #main-screen { padding-bottom: calc(76px + var(--safe-bottom)); }
-    .bottom-nav-track { height: 52px; }
-    .bottom-nav-icon svg { width: 18px; height: 18px; }
-    .bottom-nav-label { font-size: 0.65rem; }
+    .emp-content { padding: 18px; }
+    .emp-header-inner { padding: 16px 20px; }
+    #main-screen { padding-bottom: calc(92px + var(--safe-bottom)); }
+    .bottom-nav-track { height: 58px; }
 }
