@@ -83,6 +83,27 @@ sudo ufw status
 
 ---
 
+## الحل 5: حذف Caddy وإعادة بنائه (لحل المشاكل المستعصية)
+
+```bash
+cd /opt/delivery-system
+docker compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https stop caddy
+docker rm -f delivery-caddy 2>/dev/null || true
+docker volume rm delivery-system_caddy-data 2>/dev/null || true
+docker compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https up -d caddy
+docker logs delivery-caddy --tail 30
+```
+
+**إذا كنت تستخدم البورت 8443** استبدل `override-domain` بـ `override-ports`:
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https stop caddy
+docker rm -f delivery-caddy 2>/dev/null || true
+docker volume rm delivery-system_caddy-data 2>/dev/null || true
+docker compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https up -d caddy
+```
+
+---
+
 ## التحقق من DNS
 
 ```bash
