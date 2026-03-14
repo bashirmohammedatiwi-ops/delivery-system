@@ -55,17 +55,38 @@ services:
     depends_on:
       - app
 
-  # Caddy - HTTPS (شغّله فقط عند وجود دومين: docker-compose --profile https up -d)
-  caddy:
-    image: caddy:2-alpine
-    container_name: delivery-caddy
+  # Nginx - HTTPS (شغّله عند وجود دومين: docker-compose --profile https up -d)
+  # أولاً شغّل: bash scripts/init-ssl.sh للحصول على شهادة Let's Encrypt
+  # Certbot — الحصول على شهادة Let's Encrypt (مرة واحدة) — يستخدم البورت 80
+  certbot-init:
+    image: certbot/certbot
+    volumes:
+      - letsencrypt:/etc/letsencrypt:rw
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        certbot certonly --standalone -d $$DOMAIN --email "$$SSL_EMAIL" \
+          --agree-tos --no-eff-email --non-interactive \
+          && echo "تم الحصول على الشهادة بنجاح"
+    environment:
+      - DOMAIN=${DOMAIN}
+      - SSL_EMAIL=${SSL_EMAIL:-noreply@example.com}
+    profiles:
+      - init-ssl
+
+  nginx:
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    image: alhayat-delivery-nginx:latest
+    container_name: delivery-nginx
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy-data:/data
+      - ./nginx/certbot-webroot:/var/www/certbot:ro
+      - letsencrypt:/etc/letsencrypt:ro
     environment:
       - DOMAIN=${DOMAIN:-localhost}
     depends_on:
@@ -76,7 +97,7 @@ services:
 volumes:
   app-data:
     driver: local
-  caddy-data:
+  letsencrypt:
     driver: local
 
 networks:

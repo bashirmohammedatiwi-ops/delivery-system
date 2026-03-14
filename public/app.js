@@ -719,14 +719,14 @@ const screens = {
                                 <div class="new-order-card-body">
                                     <div class="new-order-field">
                                         <label>اسم المتجر <span class="required">*</span></label>
-                                        <input type="text" id="storeName" required>
-                                    </div>
+                                    <input type="text" id="storeName" required>
+                                </div>
                                     <div class="new-order-field">
                                         <label>هاتف المتجر <span class="required">*</span></label>
                                         <input type="text" id="storePhone" placeholder="11 رقم" required>
-                                    </div>
                                 </div>
-                            </div>
+                                </div>
+                                </div>
                             <div class="new-order-credentials-customer-row">
                                 <div class="new-order-card new-order-card-credentials">
                                     <div class="new-order-card-header"><i class="bi bi-key"></i><span>بيانات الدخول</span></div>
@@ -734,12 +734,12 @@ const screens = {
                                         <div class="new-order-field">
                                             <label>رمز الموظف <span class="required">*</span></label>
                                             <input type="password" id="employeeCode" placeholder="أدخل رمزك السري" required autocomplete="off">
-                                        </div>
+                                </div>
                                         <div class="new-order-field">
                                             <label>رقم الطلب في النظام الإداري <span class="required">*</span></label>
                                             <input type="text" id="adminOrderNo" placeholder="رقم الطلب عندكم" required>
-                                        </div>
-                                    </div>
+                                </div>
+                                </div>
                                 </div>
                                 <div class="new-order-card new-order-card-customer">
                                     <div class="new-order-card-header"><i class="bi bi-person"></i><span>بيانات المستلم</span></div>
@@ -796,25 +796,25 @@ const screens = {
                                         </div>
                                         <div class="new-order-total-due" id="totalDue">المبلغ المستحق: <strong>0</strong> د.ع</div>
                                         <label class="new-order-free-label">
-                                            <input type="checkbox" id="freeDelivery">
+                                        <input type="checkbox" id="freeDelivery">
                                             <span>توصيل مجاني</span>
-                                        </label>
-                                    </div>
+                                    </label>
+                                </div>
+                                </div>
                                 </div>
                             </div>
                             </div>
-                        </div>
                         <div class="new-order-card new-order-card-extra new-order-extra-above">
                             <div class="new-order-card-header"><i class="bi bi-link-45deg"></i><span>إضافي</span></div>
                             <div class="new-order-card-body">
                                 <div class="new-order-field new-order-field-full">
                                     <label>رابط موقع الزبون (اختياري)</label>
                                     <input type="url" id="customerLocationLink" placeholder="رابط خرائط جوجل أو موقع التوصيل">
-                                </div>
+                            </div>
                                 <div class="new-order-field new-order-field-full">
                                     <label>ملاحظات (اختياري)</label>
                                     <textarea id="notes" rows="2" placeholder="اكتب ملاحظة إن وجدت"></textarea>
-                                </div>
+                    </div>
                             </div>
                         </div>
                         <div class="new-order-actions">
@@ -1093,7 +1093,7 @@ const screens = {
                         </div>
                         <div class="drivers-table-wrap">
                             <table class="drivers-table">
-                                <thead>
+                            <thead>
                                     <tr>
                                         <th>الاسم</th>
                                         <th>الهاتف</th>
@@ -1101,10 +1101,10 @@ const screens = {
                                         <th>الحالة</th>
                                         <th>إجراء</th>
                                     </tr>
-                                </thead>
+                            </thead>
                                 <tbody>
-                                    ${drivers.map(d => `
-                                        <tr data-id="${d.DriverID}">
+                                ${drivers.map(d => `
+                                    <tr data-id="${d.DriverID}">
                                             <td><input type="text" class="edit-name" value="${esc(d.DriverName)}"></td>
                                             <td><input type="text" class="edit-phone" value="${esc(d.Phone)}"></td>
                                             <td class="driver-account-cell">
@@ -1116,18 +1116,18 @@ const screens = {
                                             </td>
                                             <td>
                                                 <label class="checkbox-label">
-                                                    <input type="checkbox" class="edit-active" ${d.Active ? 'checked' : ''}>
-                                                    نشط
-                                                </label>
-                                            </td>
-                                            <td>
+                                                <input type="checkbox" class="edit-active" ${d.Active ? 'checked' : ''}>
+                                                نشط
+                                            </label>
+                                        </td>
+                                        <td>
                                                 <button type="button" class="btn btn-secondary btn-sm btn-save" title="حفظ">حفظ</button>
                                                 <button type="button" class="btn btn-sm btn-delete btn-delete-driver" data-id="${d.DriverID}" data-name="${esc(d.DriverName)}" title="حذف">حذف</button>
-                                            </td>
-                                        </tr>
-                                    `).join('')}
-                                </tbody>
-                            </table>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                         </div>
                     </div>
                 </div>
@@ -1153,7 +1153,7 @@ const screens = {
             container.querySelector('.drivers-table tbody').onclick = async (e) => {
                 const btn = e.target.closest('button');
                 if (!btn) return;
-                const row = btn.closest('tr');
+                    const row = btn.closest('tr');
                 const id = parseInt(row?.dataset?.id);
                 const name = btn.dataset?.name || row?.querySelector('.edit-name')?.value || 'السائق';
 
@@ -1185,7 +1185,7 @@ const screens = {
                     e.stopPropagation();
                     if (!(await window.api.showConfirm(`هل تريد حذف السائق "${name}"؟ سيتم إلغاء تعيين الطلبات المرتبطة به.`))) return;
                     try {
-                        await window.api.drivers.delete(id);
+                    await window.api.drivers.delete(id);
                         refresh();
                     } catch (err) { await showMsg('خطأ: ' + (err?.message || err)); }
                 }
@@ -1224,10 +1224,10 @@ const screens = {
                         ${drivers.length === 0 ? '<p style="color:#b91c1c;margin-bottom:16px">أضف سائقين من قسم السائقين أولاً</p>' : ''}
                         <p style="color:#64748b;margin-bottom:16px;font-size:0.9rem">أدخل الرمز السري للسائق واضغط Enter لإظهار اسمه، ثم امسح أو اكتب أرقام الشحنات للتعيين.</p>
                         <div id="receiveStep1">
-                            <div class="form-group" style="margin-bottom:16px">
+                        <div class="form-group" style="margin-bottom:16px">
                                 <label>الرمز السري للسائق</label>
                                 <input type="password" id="driverCodeInput" placeholder="أدخل الرمز السري واضغط Enter" autocomplete="off" style="width:100%;padding:12px" ${drivers.length === 0 ? 'disabled' : ''}>
-                            </div>
+                        </div>
                         </div>
                         <div id="receiveStep2" style="display:none">
                             <div class="form-group" style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
@@ -1237,7 +1237,7 @@ const screens = {
                             <div class="form-group" style="display:flex;gap:8px;align-items:flex-end">
                                 <div style="flex:1">
                                     <label>امسح الباركود أو اكتب رقم الشحنة ثم Enter</label>
-                                    <input type="text" id="scanInput" placeholder="رقم الشحنة" autocomplete="off">
+                            <input type="text" id="scanInput" placeholder="رقم الشحنة" autocomplete="off">
                                 </div>
                                 <button type="button" class="btn btn-primary" id="btnAssign" style="height:42px;white-space:nowrap">تعيين للسائق</button>
                             </div>
@@ -1341,7 +1341,7 @@ const screens = {
                                     <div class="support-pane-icon-wrap"><i class="bi bi-arrow-left-right"></i></div>
                                     <h2 class="support-pane-title">تبديل السائق</h2>
                                     <p class="support-pane-lead">امسح الباركود أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي. يمكنك بعدها تعيينه لسائق آخر من قسم "استلام الطلبات".</p>
-                                </div>
+                        </div>
                                 <div class="support-scan-card">
                                     <div class="support-scan-header">
                                         <i class="bi bi-upc-scan"></i>
@@ -1557,28 +1557,28 @@ const screens = {
                                 <p class="report-pane-desc">سجّل استلام أجور التوصيل من السائق بعد إكمال الطلبات</p>
                                 <div class="report-form-row">
                                     <div class="report-field">
-                                        <label>السائق</label>
+                                <label>السائق</label>
                                         <select id="collectDriver">${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}</select>
-                                    </div>
+                            </div>
                                     <div class="report-field">
                                         <label>تاريخ الطلبات</label>
                                         <input type="date" id="collectOrderDate" value="${today}">
-                                    </div>
+                            </div>
                                     <button type="button" class="btn btn-outline" id="btnLoadCollectAmount">عرض المبلغ</button>
-                                </div>
+                            </div>
                                 <div id="collectAmountBox" class="report-collect-box">
                                     <div class="report-collect-label">المبلغ المستحق لهذا اليوم:</div>
                                     <div id="collectTotalDue" class="report-collect-value"></div>
                                     <div id="collectOrderCount" class="report-collect-count"></div>
                                     <div id="collectAlreadyPaidMsg" class="report-collect-error">تم دفع المبلغ - لا يمكن الدفع مرتين</div>
-                                </div>
+                            </div>
                                 <div class="report-form-row" id="collectFormRow">
                                     <div class="report-field report-field-wide">
                                         <label>المبلغ المستحصل</label>
                                         <input type="text" id="collectAmountInput" placeholder="أدخل المبلغ بالأرقام" inputmode="numeric">
-                                    </div>
+                        </div>
                                     <button type="button" class="btn btn-primary btn-lg" id="btnCollectFees">استحصال الأجور</button>
-                                </div>
+                        </div>
                                 <div id="collectFeedback" class="scan-feedback report-feedback"></div>
                             </section>
                             <section class="report-pane" id="pane-daily">
@@ -1590,12 +1590,12 @@ const screens = {
                                         <div class="driver-checkboxes">
                                             <label class="checkbox-label"><input type="checkbox" id="dailySummaryAll" checked> الكل</label>
                                             ${drivers.map(d => `<label class="checkbox-label"><input type="checkbox" class="dailySummaryDriver" value="${d.DriverID}" ${drivers.length <= 5 ? 'checked' : ''}> ${(d.DriverName||'').replace(/</g,'&lt;')}</label>`).join('')}
-                                        </div>
-                                    </div>
+                    </div>
+                            </div>
                                     <div class="report-field"><label>من تاريخ</label><input type="date" id="dailySummaryFrom" value="${today}"></div>
                                     <div class="report-field"><label>إلى تاريخ</label><input type="date" id="dailySummaryTo" value="${today}"></div>
                                     <button type="button" class="btn btn-primary" id="btnDailySummary">عرض التقرير</button>
-                                </div>
+                            </div>
                                 <div id="dailySummaryContent"></div>
                                 <div id="dailySummaryActions" class="report-actions" style="display:none"><button type="button" class="btn btn-secondary" id="btnDailySummaryPDF">تصدير PDF</button></div>
                             </section>
@@ -1606,7 +1606,7 @@ const screens = {
                                     <div class="report-field">
                                         <label>السائق</label>
                                         <select id="reportDriver">${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}</select>
-                                    </div>
+                            </div>
                                     <div class="report-field"><label>من تاريخ</label><input type="date" id="reportDateFrom" value="${today}"></div>
                                     <div class="report-field"><label>إلى تاريخ</label><input type="date" id="reportDateTo" value="${today}"></div>
                                     <button class="btn btn-primary" id="btnDriverReport">عرض التقرير</button>
@@ -1621,12 +1621,12 @@ const screens = {
                                     <div class="report-field"><label>من تاريخ</label><input type="date" id="companyDateFrom" value="${today}"></div>
                                     <div class="report-field"><label>إلى تاريخ</label><input type="date" id="companyDateTo" value="${today}"></div>
                                     <button class="btn btn-primary" id="btnCompanyReport">عرض التقرير</button>
-                                </div>
-                                <div id="companyReportContent"></div>
+                        </div>
+                        <div id="companyReportContent"></div>
                                 <div id="companyReportActions" class="report-actions" style="display:none"><button class="btn btn-secondary" id="btnExportCompanyPDF">تصدير PDF</button></div>
                             </section>
                         </main>
-                    </div>
+                        </div>
                 </div>
             `;
 
@@ -1797,9 +1797,9 @@ const screens = {
                                         }).join('')}
                                     </tbody>
                                 </table>
-                            </div>
-                        </div>
-                    `;
+                    </div>
+                </div>
+            `;
                 } catch (err) {
                     document.getElementById('dailySummaryContent').innerHTML = `<div class="scan-feedback error">${err?.message || 'فشل تحميل التقرير'}</div>`;
                     document.getElementById('dailySummaryActions').style.display = 'none';
@@ -2110,16 +2110,16 @@ const screens = {
                                     <div class="settings-form-header"><i class="bi bi-pencil-square"></i><span>تعديل القيم الافتراضية</span></div>
                                     <div class="settings-defaults-form">
                                         <div class="settings-field">
-                                            <label>اسم المتجر الافتراضي</label>
-                                            <input type="text" id="defaultStoreName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" placeholder="مثال: متجر ديما الحياة">
-                                        </div>
+                                <label>اسم المتجر الافتراضي</label>
+                                <input type="text" id="defaultStoreName" value="${(defaults.storeName || '').replace(/"/g, '&quot;')}" placeholder="مثال: متجر ديما الحياة">
+                            </div>
                                         <div class="settings-field">
-                                            <label>هاتف المتجر الافتراضي</label>
-                                            <input type="text" id="defaultStorePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="مثال: 07701234567">
-                                        </div>
+                                <label>هاتف المتجر الافتراضي</label>
+                                <input type="text" id="defaultStorePhone" value="${(defaults.storePhone || '').replace(/"/g, '&quot;')}" placeholder="مثال: 07701234567">
+                            </div>
                                         <button type="button" class="btn settings-action-btn" id="btnSaveDefaults"><i class="bi bi-check2-circle"></i><span>حفظ القيم الافتراضية</span></button>
-                                    </div>
-                                </div>
+                        </div>
+                    </div>
                             </section>
                             <section class="settings-pane settings-pane-about" id="settings-pane-about">
                                 <div class="settings-pane-hero">
@@ -2138,8 +2138,8 @@ const screens = {
                                         <span class="settings-badges-label">حالات الطلبات</span>
                                         <div class="settings-badges-list">
                                             <span class="badge badge-new">جديد</span>
-                                            <span class="badge badge-assigned">مع السائق</span>
-                                            <span class="badge badge-delivered">تم التوصيل</span>
+                            <span class="badge badge-assigned">مع السائق</span>
+                            <span class="badge badge-delivered">تم التوصيل</span>
                                             <span class="badge badge-returned">راجع</span>
                                         </div>
                                     </div>

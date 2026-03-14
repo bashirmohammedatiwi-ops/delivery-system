@@ -14,10 +14,10 @@
 # 1. هل الحاويات تعمل؟
 docker ps
 
-# 2. سجلات Caddy — هل توجد أخطاء؟
-docker logs delivery-caddy --tail 50
+# 2. سجلات Nginx — هل توجد أخطاء؟
+docker logs delivery-nginx --tail 50
 
-# 3. ما الذي يستخدم البورت 80؟ (إذا كان محجوزاً، Caddy سيفشل)
+# 3. ما الذي يستخدم البورت 80؟ (إذا كان محجوزاً، Certbot سيفشل)
 sudo ss -tlnp | grep ':80 '
 
 # 4. ما الذي يستخدم البورت 443؟
@@ -27,7 +27,7 @@ sudo ss -tlnp | grep ':443 '
 curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/health
 # النتيجة المتوقعة: 200
 
-# 6. هل Caddy يستجيب محلياً؟
+# 6. هل Nginx يستجيب محلياً؟
 curl -sk -o /dev/null -w "%{http_code}" https://127.0.0.1:443/ 2>/dev/null || echo "فشل"
 ```
 
@@ -53,12 +53,12 @@ sudo ufw reload
 
 ---
 
-## الحل 2: البورت 80 متاح — إعادة تشغيل Caddy
+## الحل 2: البورت 80 متاح — إعادة تشغيل Nginx
 
 ```bash
 cd /opt/delivery-system
-docker compose --profile https restart caddy
-docker logs delivery-caddy --tail 30
+docker compose --profile https restart nginx
+docker logs delivery-nginx --tail 30
 ```
 
 ---
@@ -83,23 +83,16 @@ sudo ufw status
 
 ---
 
-## الحل 5: حذف Caddy وإعادة بنائه (لحل المشاكل المستعصية)
+## الحل 5: حذف Nginx وإعادة بنائه (لحل المشاكل المستعصية)
 
 ```bash
 cd /opt/delivery-system
-docker compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https stop caddy
-docker rm -f delivery-caddy 2>/dev/null || true
-docker volume rm delivery-system_caddy-data 2>/dev/null || true
-docker compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https up -d caddy
-docker logs delivery-caddy --tail 30
+bash scripts/rebuild-nginx.sh
 ```
 
-**إذا كنت تستخدم البورت 8443** استبدل `override-domain` بـ `override-ports`:
+**إذا كنت تستخدم البورت 8443**:
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https stop caddy
-docker rm -f delivery-caddy 2>/dev/null || true
-docker volume rm delivery-system_caddy-data 2>/dev/null || true
-docker compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https up -d caddy
+OVERRIDE=override-ports bash scripts/rebuild-nginx.sh
 ```
 
 ---

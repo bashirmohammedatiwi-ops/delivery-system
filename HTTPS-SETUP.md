@@ -1,123 +1,71 @@
 # تفعيل HTTPS للتطبيق
 
-## الطريقة الموصى بها: Caddy (شهادة Let's Encrypt مجانية)
-
-Caddy يحصل تلقائياً على شهادات SSL ويجددها. لا حاجة لإعداد يدوي.
+## الطريقة الموصى بها: Nginx + Let's Encrypt
 
 ### على السيرفر (الإنتاج)
 
-1. **أنشئ ملف `.env`** في مجلد المشروع وأضف دومينك:
+1. **أنشئ ملف `.env`** في مجلد المشروع:
    ```
-   DOMAIN=delivery.your-company.com
+   DOMAIN=demaalhayaadelivery.online
+   SSL_EMAIL=admin@demaalhayaadelivery.online
    ```
 
 2. **تأكد أن الدومين يشير لـ IP السيرفر** في إعدادات الـ DNS.
 
 3. **افتح المنافذ 80 و 443** في الجدار الناري (firewall).
 
-4. **شغّل التطبيق**:
+4. **احصل على شهادة Let's Encrypt** (مرة واحدة):
    ```bash
-   docker-compose up -d
+   bash scripts/init-ssl.sh
+   ```
+   تأكد أن **البورت 80 حر** — أوقف أي خدمة أخرى عليه.
+
+5. **شغّل التطبيق**:
+   ```bash
+   docker compose --profile https up -d
    ```
 
-5. **الوصول**: `https://delivery.your-company.com`
+6. **الوصول**: `https://demaalhayaadelivery.online`
 
-Caddy سيحصل تلقائياً على شهادة Let's Encrypt مجانية خلال الثواني الأولى.
+### البورت 80 محجوز
 
-### محلياً (التطوير)
-
-بدون تعيين DOMAIN، التطبيق يعمل على `https://localhost` بشهادة ذاتية (المتصفح قد يعرض تحذيراً).
-
-### 2. ملف Caddyfile (مطلوب)
-
-أنشئ ملف `Caddyfile` في جذر المشروع بالمحتوى التالي (عدّل الدومين):
-
-```
-your-domain.com {
-    reverse_proxy app:3000
-}
-```
-
-للاختبار المحلي مع دومين فرضي:
-
-```
-localhost {
-    tls internal  # شهادة ذاتية للنظام
-    reverse_proxy app:3000
-}
-```
-
-### 3. تعديل المنافذ في docker-compose
-
-غيّر تعريض المنافذ للخدمة `app` حتى لا تتعرض مباشرة للإنترنت:
-
-```yaml
-  app:
-    # احذف أو علّق على ports - أو استخدم منافذ داخلية فقط
-    expose:
-      - "3000"
-```
-
-### 4. التشغيل
+إذا كان البورت 80 مستخدماً، استخدم الشهادة الذاتية على البورت 8443:
 
 ```bash
-# تشغيل مع HTTPS (يشمل Caddy)
-docker-compose --profile https up -d
+docker compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https up -d
+```
 
-# أو لتشغيل Caddy مع الخدمات الأساسية
-docker-compose up -d app employee-web driver-web caddy
+الوصول: `https://demaalhayaadelivery.online:8443` (المتصفح قد يعرض تحذيراً).
+
+### التشغيل
+
+```bash
+# تشغيل مع HTTPS (يشمل Nginx)
+docker compose --profile https up -d
 ```
 
 الوصول:
-- التطبيق الرئيسي: `https://your-domain.com` أو `https://localhost`
-- **تطبيق السائقين**: `https://your-domain.com/driver` أو `https://localhost/driver`
-- **تطبيق الموظفين**: `https://your-domain.com/employee` أو `https://localhost/employee`
+- التطبيق الرئيسي: `https://demaalhayaadelivery.online`
+- **تطبيق السائقين**: `https://demaalhayaadelivery.online/driver`
+- **تطبيق الموظفين**: `https://demaalhayaadelivery.online/employee`
 
-**ملاحظة**: الخدمة `caddy` تستخدم profile باسم `https`. للإنتاج، احذف `profiles: - https` من docker-compose حتى يبدأ Caddy دائماً مع التطبيق.
+**ملاحظة**: الخدمة `nginx` تستخدم profile باسم `https`. للإنتاج، احذف `profiles: - https` من docker-compose حتى يبدأ Nginx دائماً مع التطبيق.
 
 ---
 
-## طريقة بديلة: Nginx + Let's Encrypt
+## تجديد الشهادة
 
-### 1. استخدام certbot يدوياً
+Let's Encrypt يجدد تلقائياً كل 90 يوماً. لتجديد يدوياً (أوقف Nginx أولاً لأن Certbot يحتاج البورت 80):
 
 ```bash
-# تثبيت certbot
-sudo apt install certbot  # Linux
-# أو من https://certbot.eff.org
-
-# الحصول على الشهادة (يحتاج خادم يعمل على المنفذ 80)
-sudo certbot certonly --standalone -d your-domain.com
-```
-
-الشهادات ستكون في:
-- `/etc/letsencrypt/live/your-domain.com/fullchain.pem`
-- `/etc/letsencrypt/live/your-domain.com/privkey.pem`
-
-### 2. إعداد Nginx
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name your-domain.com;
-
-    ssl_certificate /etc/letsencrypt/live/your-domain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/your-domain.com/privkey.pem;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
+docker compose --profile https stop nginx
+docker compose --profile init-ssl run --rm -p 80:80 certbot-init
+docker compose --profile https start nginx
 ```
 
 ---
 
-## طريقة ثالثة: HTTPS مباشرة في Node.js (شهادة ذاتية للاختبار)
+## طريقة بديلة: Node.js مباشرة (شهادة ذاتية للاختبار)
 
 للتجربة المحلية فقط - المتصفح سيعرض تحذيراً لأن الشهادة غير موقّعة:
 
@@ -150,12 +98,12 @@ openssl req -x509 -newkey rsa:2048 -keyout certs/key.pem -out certs/cert.pem -da
 
 | الطريقة        | مناسب لـ        | الجهد |
 |----------------|-----------------|-------|
-| Caddy          | الإنتاج (موصى به) | منخفض |
-| Nginx + certbot| الإنتاج         | متوسط |
+| Nginx + Certbot| الإنتاج (موصى به) | متوسط |
+| البورت 8443 (شهادة ذاتية) | البورت 80 محجوز | منخفض |
 | Node.js مباشر  | اختبار محلي    | منخفض |
 
 ## ملاحظات مهمة
 
-1. **الدومين**: تحتاج دومين يشير إلى السيرفر (مثل `delivery.yourcompany.com`).
-2. **المنفذ 80**: مطلوب للتحقق من Let's Encrypt.
+1. **الدومين**: تحتاج دومين يشير إلى السيرفر (مثل `demaalhayaadelivery.online`).
+2. **المنفذ 80**: مطلوب للتحقق من Let's Encrypt في المرة الأولى.
 3. **الجدار الناري**: تأكد من فتح المنافذ 80 و 443.

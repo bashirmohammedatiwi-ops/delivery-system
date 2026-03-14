@@ -1,10 +1,9 @@
-# تشغيل على الدومين بدون بورت (https://demaalhayaadelivery.online)
-# شهادة ذاتية — المتصفح قد يعرض تحذيراً مرة واحدة
-# شغّل: docker-compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https up -d
+# تشغيل على الدومين مع Let's Encrypt (https://demaalhayaadelivery.online)
+# شغّل: bash scripts/init-ssl.sh أولاً، ثم:
+# docker-compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https up -d
 
 services:
-  caddy:
+  nginx:
     ports:
-      - "443:443"   # HTTPS على البورت الافتراضي
-    volumes:
-      - ./Caddyfile.alt-ports:/etc/caddy/Caddyfile
+      - "80:80"
+      - "443:443"

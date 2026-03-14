@@ -1,10 +1,16 @@
 # استخدم عندما البورت 80 محجوز لتطبيق آخر
+# انسخ إلى: docker-compose.override-ports.yml
 # شغّل: docker-compose -f docker-compose.yml -f docker-compose.override-ports.yml --profile https up -d
-# الوصول: https://IP-السيرفر:8443 و https://IP-السيرفر:8443/driver و /employee
+# الوصول: https://demaalhayaadelivery.online:8443 و /employee و /driver
 
 services:
-  caddy:
+  nginx:
     ports:
-      - "8443:443"   # HTTPS فقط (بورت بديل عن 443 إن لزم)
+      - "8443:443"
     volumes:
-      - ./Caddyfile.alt-ports:/etc/caddy/Caddyfile
+      - nginx-certs:/etc/nginx/certs
+    environment:
+      - SELF_SIGNED=true
+
+volumes:
+  nginx-certs:
