@@ -4,9 +4,6 @@
  */
 
 function formatIQD(n) {
-    return new Intl.NumberFormat('ar-IQ').format(Math.round(n || 0)) + ' د.ع';
-}
-function formatIQDEn(n) {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(n || 0)) + ' د.ع';
 }
 
@@ -85,9 +82,7 @@ async function renderNewOrder(container) {
     try { defaults = await window.api.settings.getDefaults(); } catch (_) {}
     container.innerHTML = `
         <div class="screen-hero screen-hero-sm">
-            <span class="screen-hero-icon">✨</span>
             <h2 class="screen-hero-title">طلب جديد</h2>
-            <p class="screen-hero-sub">أدخل بيانات الطلب للحفظ</p>
         </div>
         <div class="card card-form">
             <h3 class="card-title">بيانات الطلب</h3>
@@ -126,6 +121,10 @@ async function renderNewOrder(container) {
                 <div class="form-group">
                     <label>العنوان <span class="required">*</span></label>
                     <input type="text" id="address" required>
+                </div>
+                <div class="form-group">
+                    <label>عدد القطع</label>
+                    <input type="number" id="pieces" min="1" value="1">
                 </div>
                 <div class="form-group">
                     <label>مبلغ الفاتورة (د.ع) <span class="required">*</span></label>
@@ -169,7 +168,7 @@ async function renderNewOrder(container) {
         const free = freeEl?.checked || false;
         const total = calcTotal(amt, fee, free);
         const el = document.getElementById('orderTotalDisplay');
-        if (el) el.textContent = formatIQDEn(total);
+        if (el) el.textContent = formatIQD(total);
     };
     document.getElementById('regionId')?.addEventListener('change', function() {
         const opt = this.options[this.selectedIndex];
@@ -196,7 +195,7 @@ async function renderNewOrder(container) {
             CustomerPhone: document.getElementById('customerPhone').value.trim(),
             RegionID: document.getElementById('regionId').value ? parseInt(document.getElementById('regionId').value) : null,
             Address: document.getElementById('address').value.trim(),
-            Pieces: 1,
+            Pieces: parseInt(document.getElementById('pieces')?.value) || 1,
             AmountIQD: parseFloat(document.getElementById('amount').value) || 0,
             DeliveryFeeIQD: parseFloat(document.getElementById('deliveryFee').value) || 0,
             FreeDelivery: document.getElementById('freeDelivery').checked,
@@ -242,7 +241,6 @@ async function renderReceive(container) {
     let currentDriver = null;
     container.innerHTML = `
         <div class="screen-hero screen-hero-sm">
-            <span class="screen-hero-icon">📋</span>
             <h2 class="screen-hero-title">استلام للسائق</h2>
         </div>
         <div class="card">
@@ -380,7 +378,6 @@ async function renderOrders(container) {
         if (!list.length) {
             container.innerHTML = `
                 <div class="screen-hero screen-hero-sm">
-                    <span class="screen-hero-icon">📄</span>
                     <h2 class="screen-hero-title">الطلبات</h2>
                 </div>
                 <div class="empty-state"><p>لا توجد طلبات</p></div>
@@ -442,7 +439,6 @@ async function renderOrders(container) {
         };
         container.innerHTML = `
             <div class="screen-hero screen-hero-sm">
-                <span class="screen-hero-icon">📄</span>
                 <h2 class="screen-hero-title">الطلبات</h2>
             </div>
             <div class="orders-search-wrap">
