@@ -279,6 +279,7 @@ function getAmountDue(order) {
     return total - deliveryAmt;
 }
 
+/* العرض حسب تاريخ الطلب (CreatedDate) */
 function getDriverStats(driverId, date) {
     const database = db.getDatabase();
     const d = date || new Date().toISOString().slice(0, 10);
@@ -334,6 +335,7 @@ function getDriverStats(driverId, date) {
     };
 }
 
+/* طلبات موصّلة — حسب تاريخ الطلب */
 function getDriverDeliveredOrders(driverId, date) {
     const database = db.getDatabase();
     const d = date || new Date().toISOString().slice(0, 10);
@@ -346,6 +348,7 @@ function getDriverDeliveredOrders(driverId, date) {
     ).all(driverId, d);
 }
 
+/* طلبات مرتجعة — حسب تاريخ الطلب */
 function getDriverReturnedOrders(driverId, date) {
     const database = db.getDatabase();
     const d = date || new Date().toISOString().slice(0, 10);
