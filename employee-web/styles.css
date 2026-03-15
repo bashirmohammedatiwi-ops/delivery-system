@@ -237,6 +237,56 @@ body {
 .form-group .required { color: var(--danger); }
 .form-hint { font-size: 0.8rem; color: var(--text-muted); }
 
+/* بحث المنطقة */
+.region-search-wrap {
+    position: relative;
+    width: 100%;
+}
+.region-search-input {
+    width: 100%;
+    padding: 12px 36px 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 1rem;
+    background: #fff;
+}
+.region-search-input:focus { outline: none; border-color: var(--primary); }
+.region-search-chevron {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.region-search-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    margin-top: 4px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 100;
+}
+.region-search-item {
+    padding: 12px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+}
+.region-search-item:last-child { border-bottom: none; }
+.region-search-item:hover,
+.region-search-item.focused { background: var(--primary); color: #fff; }
+.region-search-empty { color: var(--text-muted); cursor: default; }
+.region-search-empty:hover { background: #fff; color: var(--text-muted); }
+
 .form-group input[type="checkbox"] {
     width: auto;
     min-width: 18px;
@@ -288,6 +338,9 @@ body {
 .feedback.success { background: var(--success-soft); color: var(--success); }
 .feedback.error { background: var(--danger-soft); color: var(--danger); }
 
+.input-error { border-color: var(--danger) !important; box-shadow: 0 0 0 2px var(--danger-soft); }
+.field-error { font-size: 0.82rem; color: var(--danger); margin-top: 6px; }
+
 /* بطاقات الطلبات */
 .order-card {
     background: #fff;
@@ -332,6 +385,15 @@ body {
 
 .btn-order-action.btn-edit { background: #E2E8F0; color: var(--text); }
 .btn-order-action.btn-print { background: var(--primary); color: #fff; }
+
+.label-printed-badge {
+    font-size: 0.75rem;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+}
+.label-printed-badge.printed { background: var(--success-soft); color: var(--success); }
+.label-printed-badge.not-printed { background: #FEF3C7; color: #B45309; }
 
 /* حالات فارغة وتحميل */
 .empty-state, .loading-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }

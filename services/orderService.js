@@ -271,9 +271,12 @@ function markReturnedByDriver(orderId, driverId, returnReason = '') {
     return { success: true, order: getOrderById(orderId) };
 }
 
+/* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
 function getAmountDue(order) {
-    if (order.FreeDelivery) return Math.max(0, (order.AmountIQD || 0) - (order.WaivedDeliveryIQD || 0));
-    return order.AmountIQD || 0;
+    const total = Number(order.TotalIQD ?? 0) || 0;
+    const free = !!(order.FreeDelivery);
+    const deliveryAmt = free ? (Number(order.WaivedDeliveryIQD ?? 0) || 0) : (Number(order.DeliveryFeeIQD ?? 0) || 0);
+    return total - deliveryAmt;
 }
 
 function getDriverStats(driverId, date) {
@@ -313,7 +316,7 @@ function getDriverStats(driverId, date) {
         }
     }
 
-    totalAmountDue = Math.max(0, Math.round(totalAmountDue * 100) / 100);
+    totalAmountDue = Math.round(totalAmountDue * 100) / 100;
 
     const deliveredCount = (delivered && delivered.c) || 0;
     const returnedCount = (returned && returned.c) || 0;

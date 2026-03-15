@@ -75,9 +75,12 @@ function formatIQD(val) {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(val || 0));
 }
 
+/* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
 function getAmountDue(o) {
-    if (o.FreeDelivery) return Math.max(0, (o.AmountIQD || 0) - (o.WaivedDeliveryIQD || 0));
-    return o.AmountIQD || 0;
+    const total = Number(o.TotalIQD ?? 0) || 0;
+    const free = !!(o.FreeDelivery);
+    const deliveryAmt = free ? (Number(o.WaivedDeliveryIQD ?? 0) || 0) : (Number(o.DeliveryFeeIQD ?? 0) || 0);
+    return total - deliveryAmt;
 }
 
 function getFullAddress(o) {
@@ -155,14 +158,18 @@ async function showEditOrderModal(container, order, onSuccess) {
                         <input type="number" id="editAmount" value="${order.AmountIQD || 0}" min="0" step="1">
                     </div>
                     <div class="form-group">
-                        <label>أجرة التوصيل (د.ع)</label>
-                        <input type="number" id="editDeliveryFee" value="${driverDelivery || 0}" min="0" step="1">
+                        <label>أجرة التوصيل (د.ع)${currentUser?.Role === 'employee' ? ' <span class="form-hint">(ثابتة حسب المنطقة)</span>' : ''}</label>
+                        <input type="number" id="editDeliveryFee" value="${driverDelivery || 0}" min="0" step="1" ${currentUser?.Role === 'employee' ? 'readonly' : ''}>
                     </div>
                     <div class="form-group">
                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
                             <input type="checkbox" id="editFreeDelivery" ${order.FreeDelivery ? 'checked' : ''}>
                             توصيل مجاني
                         </label>
+                    </div>
+                    <div class="form-group full edit-order-totals" style="background:var(--bg-main);padding:12px;border-radius:8px;">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>المبلغ النهائي:</span><strong id="editTotalDisplay">0</strong></div>
+                        <div style="display:flex;justify-content:space-between"><span>المبلغ المستحق:</span><strong id="editDueDisplay">0</strong></div>
                     </div>
                     <div class="form-group full">
                         <label>رابط موقع الزبون (اختياري)</label>
@@ -209,11 +216,29 @@ async function showEditOrderModal(container, order, onSuccess) {
 
     document.getElementById('editModalClose').addEventListener('click', closeModal);
 
+    const updateEditTotals = () => {
+        const amt = parseFloat(document.getElementById('editAmount')?.value || 0) || 0;
+        const fee = parseFloat(document.getElementById('editDeliveryFee')?.value || 0) || 0;
+        const free = document.getElementById('editFreeDelivery')?.checked || false;
+        const total = free ? amt : (amt + fee);
+        const due = free ? (amt - fee) : amt;
+        const totalEl = document.getElementById('editTotalDisplay');
+        const dueEl = document.getElementById('editDueDisplay');
+        if (totalEl) totalEl.textContent = formatIQD(total) + ' د.ع';
+        if (dueEl) dueEl.textContent = formatIQD(due) + ' د.ع';
+    };
+    updateEditTotals();
+    document.getElementById('editAmount')?.addEventListener('input', updateEditTotals);
+    document.getElementById('editAmount')?.addEventListener('change', updateEditTotals);
+    document.getElementById('editDeliveryFee')?.addEventListener('input', updateEditTotals);
+    document.getElementById('editDeliveryFee')?.addEventListener('change', updateEditTotals);
+    document.getElementById('editFreeDelivery')?.addEventListener('change', updateEditTotals);
     document.getElementById('editRegionId')?.addEventListener('change', () => {
         const sel = document.getElementById('editRegionId');
         const opt = sel?.options[sel.selectedIndex];
         if (opt && opt.value) {
             document.getElementById('editDeliveryFee').value = parseFloat(opt.dataset.fee || 0);
+            updateEditTotals();
         }
     });
 
@@ -318,7 +343,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                 </thead>
                                 <tbody id="ordersTableBody">
                                     ${list.map(o => `
-                                        <tr data-order-id="${o.OrderID}">
+                                        <tr data-order-id="${o.OrderID}" class="${isOrderReturned(o) ? 'order-returned' : ''}">
                                             <td class="orders-id">${o.OrderID}</td>
                                             <td>${o.AdminOrderNo || '-'}</td>
                                             <td><strong>${o.ShipmentNumber}</strong></td>
@@ -580,7 +605,7 @@ function setNavActive(screenId, subTab) {
         const child = document.querySelector(`.nav-child[data-screen="${screenId}"][data-tab="${subTab}"]`);
         if (parent) {
             parent.closest('.nav-group')?.classList.add('expanded');
-            parent.classList.add('active');
+            /* لا نضيف active للقسم الرئيسي - يبقى التمييز للفرعي فقط */
         }
         if (child) child.classList.add('active');
     } else {
@@ -641,6 +666,28 @@ const screens = {
             const todayKarkh = todayOrders.filter(o => (o.RegionArea || '').trim() === 'الكرخ').length;
             const todayRusafa = todayOrders.filter(o => (o.RegionArea || 'الرصافة').trim() === 'الرصافة').length;
 
+            let overrideNotifications = { list: [], count: 0 };
+            if (currentUser?.Role === 'admin') {
+                try {
+                    overrideNotifications = await window.api.notifications.getFreeDeliveryOverrides();
+                } catch (_) {}
+            }
+
+            const notifList = overrideNotifications.list || [];
+            const notifHtml = notifList.length > 0
+                ? notifList.map(n => `
+                    <div class="override-notif-item" data-id="${n.NotificationID}">
+                        <div class="override-notif-info">
+                            <strong>طلب #${n.ShipmentNumber}</strong>
+                            ${n.AdminOrderNo ? ` (${n.AdminOrderNo})` : ''}
+                            <br><span class="override-notif-detail">${n.CustomerName || '-'} · مبلغ الفاتورة: ${formatIQD(n.AmountIQD)} · أجرة معفاة: ${formatIQD(n.WaivedDeliveryIQD)}</span>
+                            <br><span class="override-notif-by">نفّذ الموظف: ${(n.PerformedByName || 'موظف').replace(/</g, '&lt;')} · ${n.CreatedAt || ''}</span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-override-seen" data-id="${n.NotificationID}" title="تمت المراجعة">✓</button>
+                    </div>
+                `).join('')
+                : '<p class="override-notif-empty">لا توجد إشعارات جديدة</p>';
+
             container.innerHTML = `
                 <div class="screen active">
                     <h1 class="page-title">لوحة التحكم</h1>
@@ -670,12 +717,37 @@ const screens = {
                             <div class="label">الرصافة اليوم</div>
                         </div>
                     </div>
+                    ${currentUser?.Role === 'admin' ? `
+                    <div class="card override-notif-card">
+                        <h3 class="card-title">
+                            <span>إشعارات التوصيل المجاني اليدوي</span>
+                            ${overrideNotifications.count > 0 ? `<span class="override-notif-badge">${overrideNotifications.count}</span>` : ''}
+                        </h3>
+                        <p class="override-notif-desc">طلبات أقل من 50,000 د.ع وضع عليها موظف توصيل مجاني يدوياً:</p>
+                        <div id="overrideNotifList" class="override-notif-list">${notifHtml}</div>
+                    </div>
+                    ` : ''}
                     <div class="card">
                         <p>مرحباً بك في نظام إدارة التوصيل - شركة ديما الحياة</p>
                         <p class="status-map" style="margin-top:12px">استخدم القائمة الجانبية للتنقل بين الأقسام</p>
                     </div>
                 </div>
             `;
+
+            if (currentUser?.Role === 'admin') {
+                container.querySelectorAll('.btn-override-seen').forEach(btn => {
+                    btn.onclick = async () => {
+                        const id = parseInt(btn.dataset.id);
+                        if (!id) return;
+                        try {
+                            await window.api.notifications.markAsReviewed(id);
+                            btn.closest('.override-notif-item').remove();
+                        } catch (e) {
+                            await showMsg('خطأ: ' + (e?.message || e));
+                        }
+                    };
+                });
+            }
         }
     },
 
@@ -699,9 +771,9 @@ const screens = {
                 if (amt < FREE_DELIVERY_THRESHOLD) lastAmountForFreeDelivery = amt;
                 else lastAmountForFreeDelivery = amt;
                 const free = freeEl?.checked || false;
-                // التوصيل مجاني: النهائي = الفاتورة، المستحق = الفاتورة - أجرة التوصيل (لا يقل عن صفر)
+                // التوصيل مجاني: النهائي = الفاتورة، المستحق = max(0, الفاتورة - أجرة التوصيل)
                 const total = free ? amt : (amt + fee);
-                const due = Math.max(0, free ? (amt - fee) : amt);
+                const due = free ? (Number(amt) - Number(fee)) : Number(amt);
                 document.getElementById('totalDisplay').textContent = formatIQD(total);
                 const dueEl = document.getElementById('totalDue');
                 if (dueEl) {
@@ -786,8 +858,8 @@ const screens = {
                                         <input type="number" id="amount" min="0" step="1" placeholder="0" required>
                                     </div>
                                     <div class="new-order-field">
-                                        <label>أجرة التوصيل (د.ع) <span class="required">*</span></label>
-                                        <input type="number" id="deliveryFee" min="0" step="1" placeholder="0" required>
+                                        <label>أجرة التوصيل (د.ع) <span class="required">*</span>${currentUser?.Role === 'employee' ? ' <span class="form-hint">(ثابتة حسب المنطقة)</span>' : ''}</label>
+                                        <input type="number" id="deliveryFee" min="0" step="1" placeholder="0" required ${currentUser?.Role === 'employee' ? 'readonly' : ''}>
                                     </div>
                                     <div class="new-order-totals">
                                         <div class="new-order-total-row">
@@ -1575,7 +1647,7 @@ const screens = {
                                 <div class="report-form-row" id="collectFormRow">
                                     <div class="report-field report-field-wide">
                                         <label>المبلغ المستحصل</label>
-                                        <input type="text" id="collectAmountInput" placeholder="أدخل المبلغ بالأرقام" inputmode="numeric">
+                                        <input type="text" id="collectAmountInput" placeholder="أدخل المبلغ بالأرقام (سالب إذا كان المستحق سالباً)" inputmode="numeric">
                         </div>
                                     <button type="button" class="btn btn-primary btn-lg" id="btnCollectFees">استحصال الأجور</button>
                         </div>
@@ -1724,7 +1796,10 @@ const screens = {
                     feedback.textContent = 'تم دفع المبلغ مسبقاً - لا يمكن الدفع مرتين';
                     return;
                 }
-                const enteredNum = parseInt(String(amountInput).replace(/\D/g, ''), 10) || 0;
+                const raw = String(amountInput).trim();
+                const isNegative = raw.startsWith('-');
+                const digits = raw.replace(/\D/g, '');
+                const enteredNum = (isNegative ? -1 : 1) * (parseInt(digits, 10) || 0);
                 if (enteredNum !== collectExpectedAmount) {
                     feedback.style.display = 'block';
                     feedback.className = 'scan-feedback error';

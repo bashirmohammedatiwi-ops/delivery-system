@@ -37,7 +37,10 @@
                 <span class="sidebar-toggle-icon">◀</span>
             </button>
             <aside class="sidebar" id="sidebar">
-                <div class="logo">شركة ديما الحياة</div>
+                <div class="logo">
+                    <i class="bi bi-truck logo-icon"></i>
+                    <span class="logo-text">شركة ديما الحياة</span>
+                </div>
                 <div class="user-info" id="sidebarUserInfo"></div>
                 <nav class="nav" id="mainNav">
                     <a href="#" data-screen="dashboard" class="nav-item nav-admin"><i class="bi bi-grid-1x2"></i><span>لوحة التحكم</span></a>
@@ -72,8 +75,10 @@
                         </div>
                     </div>
                 </nav>
-                <button type="button" class="btn btn-secondary btn-logout" id="btnLogout">تسجيل الخروج</button>
-                <button type="button" class="btn btn-secondary" id="btnAdminLogin" style="margin-top:8px;display:none">دخول المدير</button>
+                <div class="sidebar-footer">
+                    <button type="button" class="btn btn-secondary btn-logout" id="btnLogout">تسجيل الخروج</button>
+                    <button type="button" class="btn btn-secondary" id="btnAdminLogin" style="margin-top:8px;display:none">دخول المدير</button>
+                </div>
             </aside>
             <main class="content">
                 <div id="screen-container"></div>

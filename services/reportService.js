@@ -145,10 +145,13 @@ function getDriverDeliveryAmount(order) {
     return order.DeliveryFeeIQD || 0;
 }
 
-// التوصيل مجاني: المستحق = الفاتورة - أجرة التوصيل | غير مجاني: المستحق = الفاتورة
+// المبلغ المستحق الكلي = إجمالي المبلغ النهائي - إجمالي أجور التوصيل
+// لكل طلب: المستحق = النهائي (TotalIQD) - أجرة التوصيل (مجاني: WaivedDeliveryIQD، غير مجاني: DeliveryFeeIQD)
 function getAmountDue(order) {
-    if (order.FreeDelivery) return Math.max(0, (order.AmountIQD || 0) - (order.WaivedDeliveryIQD || 0));
-    return order.AmountIQD || 0;
+    const total = Number(order.TotalIQD ?? 0) || 0;
+    const free = !!(order.FreeDelivery);
+    const deliveryAmt = free ? (Number(order.WaivedDeliveryIQD ?? 0) || 0) : (Number(order.DeliveryFeeIQD ?? 0) || 0);
+    return total - deliveryAmt;
 }
 
 // ─── رسم الهيدر ───
@@ -751,6 +754,7 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
     const totalAmount = validOrders.reduce((s, o) => s + (o.AmountIQD || 0), 0);
     const totalDelivery = validOrders.reduce((s, o) => s + getDriverDeliveryAmount(o), 0);
     const net = validOrders.reduce((s, o) => s + (o.TotalIQD || 0), 0);
+    /* المبلغ المستحق الكلي = إجمالي المبلغ النهائي - إجمالي أجور التوصيل (مطابق للتقرير العام والملخص) */
     const totalDue = validOrders.reduce((s, o) => s + getAmountDue(o), 0);
     const countFreeDelivery = validOrders.filter(o => o.FreeDelivery).length;
     const countPaidDelivery = validOrders.filter(o => !o.FreeDelivery).length;

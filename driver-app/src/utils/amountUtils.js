@@ -1,14 +1,14 @@
 /**
- * معادلة المبلغ المستحق من تطبيق الويب (app.js)
- * التوصيل مجاني: المستحق = الفاتورة - أجرة التوصيل المعفاة
- * غير مجاني: المستحق = مبلغ الفاتورة (AmountIQD)
+ * المبلغ المستحق = المبلغ النهائي - أجرة التوصيل
+ * المبلغ المستحق الكلي = إجمالي المبلغ النهائي - إجمالي أجور التوصيل
  */
 function getAmountDue(order) {
-  const amountIQD = Number(order.AmountIQD ?? order.amountiqd) || 0;
-  const waivedIQD = Number(order.WaivedDeliveryIQD ?? order.waiveddeliveryiqd) || 0;
+  const total = Number(order.TotalIQD ?? order.totaliqd) || 0;
   const freeDelivery = !!(order.FreeDelivery === 1 || order.FreeDelivery === '1' || order.FreeDelivery === true);
-  if (freeDelivery) return Math.max(0, amountIQD - waivedIQD);
-  return amountIQD;
+  const deliveryAmt = freeDelivery
+    ? (Number(order.WaivedDeliveryIQD ?? order.waiveddeliveryiqd) || 0)
+    : (Number(order.DeliveryFeeIQD ?? order.deliveryfeeiqd) || 0);
+  return total - deliveryAmt;
 }
 
 /**
@@ -21,5 +21,5 @@ export function calcTotalAmountDue(deliveredOrders) {
   for (const o of delivered) {
     total += getAmountDue(o);
   }
-  return Math.max(0, Math.round(total * 100) / 100);
+  return Math.round(total * 100) / 100;
 }

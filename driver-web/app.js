@@ -33,11 +33,12 @@ function formatDateShort(d) {
     if (!d) return '';
     return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 }
+/* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
 function getAmountDue(o) {
-    const amount = Number(o.AmountIQD) || 0;
-    const waived = Number(o.WaivedDeliveryIQD) || 0;
+    const total = Number(o.TotalIQD ?? o.totaliqd) || 0;
     const free = !!(o.FreeDelivery === 1 || o.FreeDelivery === '1' || o.FreeDelivery === true);
-    return free ? Math.max(0, amount - waived) : amount;
+    const deliveryAmt = free ? (Number(o.WaivedDeliveryIQD ?? o.waiveddeliveryiqd) || 0) : (Number(o.DeliveryFeeIQD ?? o.deliveryfeeiqd) || 0);
+    return total - deliveryAmt;
 }
 function calcTotalAmountDue(orders) {
     let t = 0;

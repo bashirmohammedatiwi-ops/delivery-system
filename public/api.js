@@ -132,6 +132,10 @@ window.api = {
         getFeesCollectedStatus: (driverId, orderDate) => apiGet(`/api/drivers/fees-collected-status?driverId=${driverId}&orderDate=${encodeURIComponent(orderDate)}`)
     },
 
+    notifications: {
+        getFreeDeliveryOverrides: () => apiGet('/api/notifications/free-delivery-overrides'),
+        markAsReviewed: (id) => apiPost('/api/notifications/' + id + '/review', {})
+    },
     settings: {
         getDefaults: () => apiGet('/api/settings/defaults'),
         updateDefaults: (data) => apiPut('/api/settings/defaults', data)

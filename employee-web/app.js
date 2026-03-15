@@ -63,13 +63,22 @@ function calcTotal(amt, fee, free) {
     if (free) return amt;
     return (amt || 0) + (fee || 0);
 }
+/* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
+function getAmountDue(o) {
+    const total = Number(o.TotalIQD ?? 0) || 0;
+    const free = !!(o.FreeDelivery);
+    const deliveryAmt = free ? (Number(o.WaivedDeliveryIQD ?? 0) || 0) : (Number(o.DeliveryFeeIQD ?? 0) || 0);
+    return total - deliveryAmt;
+}
 
-async function printOrder(order) {
+async function printOrder(order, onPrinted) {
     if (!order) return;
     try {
         const url = await window.api.orders.print(order);
         const w = window.open(url, '_blank', 'noopener');
         if (w) setTimeout(() => w.print(), 500);
+        await window.api.orders.markLabelPrinted(order.OrderID).catch(() => {});
+        if (onPrinted) onPrinted();
     } catch (err) {
         alert(err?.message || 'فشلت الطباعة');
     }
@@ -113,10 +122,12 @@ async function renderNewOrder(container) {
                 </div>
                 <div class="form-group">
                     <label>المنطقة <span class="required">*</span></label>
-                    <select id="regionId" required>
-                        <option value="">-- اختر --</option>
-                        ${(regions || []).map(r => `<option value="${r.RegionID}" data-fee="${r.DeliveryFeeIQD || 0}">${(r.RegionName || '').replace(/</g, '&lt;')} (${formatIQD(r.DeliveryFeeIQD)})</option>`).join('')}
-                    </select>
+                    <div class="region-search-wrap">
+                        <input type="text" id="regionSearchInput" class="region-search-input" placeholder="ابحث بكتابة اسم المنطقة أو أول أحرفها..." autocomplete="off">
+                        <span class="region-search-chevron">▼</span>
+                        <input type="hidden" id="regionId" required>
+                        <div id="regionSearchDropdown" class="region-search-dropdown" style="display:none"></div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>العنوان <span class="required">*</span></label>
@@ -127,12 +138,12 @@ async function renderNewOrder(container) {
                     <input type="number" id="pieces" min="1" value="1">
                 </div>
                 <div class="form-group">
-                    <label>مبلغ الفاتورة (د.ع) <span class="required">*</span></label>
-                    <input type="number" id="amount" min="0" required>
+                    <label>مبلغ الفاتورة (د.ع) <span class="form-hint">(يمكن أن يكون 0)</span></label>
+                    <input type="number" id="amount" min="0" value="0" step="1">
                 </div>
                 <div class="form-group">
-                    <label>أجرة التوصيل (د.ع)</label>
-                    <input type="number" id="deliveryFee" min="0" value="0">
+                    <label>أجرة التوصيل (د.ع) <span class="form-hint">(ثابتة حسب المنطقة)</span></label>
+                    <input type="number" id="deliveryFee" min="0" value="0" readonly>
                 </div>
                 <div class="form-group">
                     <label><input type="checkbox" id="freeDelivery"> توصيل مجاني <span class="form-hint">(تلقائي عند 50,000 د.ع أو أكثر)</span></label>
@@ -140,6 +151,10 @@ async function renderNewOrder(container) {
                 <div class="order-total-box">
                     <span class="order-total-label">المبلغ النهائي:</span>
                     <span id="orderTotalDisplay" class="order-total-value">0 د.ع</span>
+                </div>
+                <div class="order-total-box">
+                    <span class="order-total-label">المبلغ المستحق:</span>
+                    <span id="orderDueDisplay" class="order-total-value">0 د.ع</span>
                 </div>
                 <div class="form-group">
                     <label>ملاحظات</label>
@@ -167,56 +182,177 @@ async function renderNewOrder(container) {
         lastAmountForFreeDelivery = amt;
         const free = freeEl?.checked || false;
         const total = calcTotal(amt, fee, free);
+        const due = free ? (amt - fee) : amt;
         const el = document.getElementById('orderTotalDisplay');
+        const dueEl = document.getElementById('orderDueDisplay');
         if (el) el.textContent = formatIQD(total);
+        if (dueEl) dueEl.textContent = formatIQD(due);
     };
-    document.getElementById('regionId')?.addEventListener('change', function() {
-        const opt = this.options[this.selectedIndex];
-        if (opt?.value) document.getElementById('deliveryFee').value = opt.dataset.fee || 0;
-        updateOrderTotal(false);
-    });
+    (() => {
+        const regionSearchInput = document.getElementById('regionSearchInput');
+        const regionIdInput = document.getElementById('regionId');
+        const dropdown = document.getElementById('regionSearchDropdown');
+        const deliveryFeeInput = document.getElementById('deliveryFee');
+
+        const applyRegionSelection = (r) => {
+            regionIdInput.value = r.RegionID;
+            regionSearchInput.value = (r.RegionName || '') + ' (' + formatIQD(r.DeliveryFeeIQD) + ')';
+            regionSearchInput.dataset.fee = r.DeliveryFeeIQD || 0;
+            deliveryFeeInput.value = r.DeliveryFeeIQD || 0;
+            dropdown.style.display = 'none';
+            updateOrderTotal(false);
+        };
+
+        const filterRegions = (q) => {
+            const qn = (q || '').trim().toLowerCase();
+            if (!qn) return regions;
+            return regions.filter(r => {
+                const name = (r.RegionName || '').toLowerCase();
+                const area = (r.RegionArea || '').toLowerCase();
+                return name.includes(qn) || name.startsWith(qn) || area.includes(qn) || area.startsWith(qn);
+            });
+        };
+
+        const renderDropdown = (list) => {
+            dropdown.innerHTML = list.length
+                ? list.map(r => `<div class="region-search-item" data-id="${r.RegionID}" data-fee="${r.DeliveryFeeIQD || 0}">${(r.RegionName || '').replace(/</g, '&lt;')} (${formatIQD(r.DeliveryFeeIQD)})</div>`).join('')
+                : '<div class="region-search-item region-search-empty">لا توجد نتائج</div>';
+            dropdown.style.display = 'block';
+        };
+
+        regionSearchInput?.addEventListener('input', () => {
+            regionIdInput.value = '';
+            regionSearchInput.dataset.fee = '';
+            deliveryFeeInput.value = '0';
+            const list = filterRegions(regionSearchInput.value);
+            renderDropdown(list);
+            updateOrderTotal(false);
+        });
+
+        regionSearchInput?.addEventListener('focus', () => {
+            const list = regionIdInput.value ? regions : filterRegions(regionSearchInput.value);
+            renderDropdown(list);
+        });
+
+        regionSearchInput?.closest('.region-search-wrap')?.addEventListener('click', () => regionSearchInput?.focus());
+
+        regionSearchInput?.addEventListener('keydown', (e) => {
+            const items = dropdown.querySelectorAll('.region-search-item:not(.region-search-empty)');
+            const focused = dropdown.querySelector('.region-search-item.focused');
+            if (e.key === 'Escape') { dropdown.style.display = 'none'; return; }
+            if (e.key === 'Enter' && focused?.dataset.id) {
+                e.preventDefault();
+                const r = regions.find(x => x.RegionID == focused.dataset.id);
+                if (r) applyRegionSelection(r);
+                return;
+            }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                let idx = Array.from(items).indexOf(focused);
+                if (e.key === 'ArrowDown') idx = Math.min(idx + 1, items.length - 1);
+                else idx = Math.max(idx - 1, 0);
+                items.forEach(el => el.classList.remove('focused'));
+                if (items[idx]) items[idx].classList.add('focused');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!regionSearchInput?.contains(e.target) && !dropdown?.contains(e.target)) dropdown.style.display = 'none';
+        });
+
+        dropdown?.addEventListener('click', (e) => {
+            const item = e.target.closest('.region-search-item');
+            if (item?.dataset.id) {
+                const r = regions.find(x => x.RegionID == item.dataset.id);
+                if (r) applyRegionSelection(r);
+            }
+        });
+    })();
     document.getElementById('amount')?.addEventListener('input', () => updateOrderTotal(true));
     document.getElementById('amount')?.addEventListener('change', () => updateOrderTotal(true));
     document.getElementById('deliveryFee')?.addEventListener('input', () => updateOrderTotal(false));
     document.getElementById('deliveryFee')?.addEventListener('change', () => updateOrderTotal(false));
     document.getElementById('freeDelivery')?.addEventListener('change', () => updateOrderTotal(false));
     updateOrderTotal(false);
+    const clearFieldErrors = () => {
+        document.querySelectorAll('.field-error').forEach(el => el.remove());
+        document.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+    };
+    const showFieldError = (fieldId, msg, feedbackEl) => {
+        clearFieldErrors();
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.classList.add('input-error');
+            field.focus();
+            const wrap = field.closest('.form-group') || field.closest('.region-search-wrap');
+            if (wrap && !wrap.querySelector('.field-error')) {
+                const err = document.createElement('div');
+                err.className = 'field-error';
+                err.textContent = msg;
+                wrap.appendChild(err);
+            }
+        }
+        if (feedbackEl) {
+            feedbackEl.style.display = 'block';
+            feedbackEl.className = 'feedback error';
+            feedbackEl.textContent = '❌ ' + msg;
+        }
+        return false;
+    };
+
+    const feedback = document.getElementById('orderFeedback');
     document.getElementById('orderForm').onsubmit = async (e) => {
         e.preventDefault();
+        clearFieldErrors();
         document.getElementById('btnPrintAfterSave')?.style.setProperty('display', 'none');
+        const feedback = document.getElementById('orderFeedback');
+
         const empCode = (document.getElementById('empCode')?.value || '').trim();
-        if (!empCode) { alert('أدخل رمز الموظف'); return; }
+        if (!empCode) return showFieldError('empCode', 'أدخل رمز الموظف', feedback);
+
+        const regionId = document.getElementById('regionId')?.value;
+        if (!regionId) return showFieldError('regionSearchInput', 'اختر المنطقة', feedback);
+
+        const customerPhone = (document.getElementById('customerPhone')?.value || '').trim();
+        if (!customerPhone) return showFieldError('customerPhone', 'أدخل هاتف المستلم', feedback);
+
+        const phoneDigits = customerPhone.replace(/\D/g, '');
+        if (phoneDigits.length !== 11) return showFieldError('customerPhone', 'هاتف المستلم يجب أن يكون 11 رقماً', feedback);
+
+        const address = (document.getElementById('address')?.value || '').trim();
+        if (!address) return showFieldError('address', 'أدخل العنوان', feedback);
+
+        const amountVal = parseFloat(document.getElementById('amount')?.value);
+        if (isNaN(amountVal) || amountVal < 0) return showFieldError('amount', 'مبلغ الفاتورة لا يمكن أن يكون سالباً', feedback);
+
         const data = {
             EmployeeCode: empCode,
             AdminOrderNo: document.getElementById('adminOrderNo').value,
             StoreName: document.getElementById('storeName').value.trim(),
             StorePhone: document.getElementById('storePhone').value.trim(),
             CustomerName: document.getElementById('customerName').value.trim(),
-            CustomerPhone: document.getElementById('customerPhone').value.trim(),
-            RegionID: document.getElementById('regionId').value ? parseInt(document.getElementById('regionId').value) : null,
-            Address: document.getElementById('address').value.trim(),
+            CustomerPhone: customerPhone,
+            RegionID: parseInt(regionId),
+            Address: address,
             Pieces: parseInt(document.getElementById('pieces')?.value) || 1,
-            AmountIQD: parseFloat(document.getElementById('amount').value) || 0,
+            AmountIQD: amountVal,
             DeliveryFeeIQD: parseFloat(document.getElementById('deliveryFee').value) || 0,
             FreeDelivery: document.getElementById('freeDelivery').checked,
             Notes: document.getElementById('notes').value
         };
         if (!data.StoreName || !data.StorePhone) { data.StoreName = defaults.storeName || ''; data.StorePhone = defaults.storePhone || ''; }
-        if (!data.CustomerPhone || !data.Address || data.AmountIQD <= 0) {
-            alert('أكمل الحقول المطلوبة');
-            return;
-        }
-        const phone = (data.CustomerPhone || '').replace(/\D/g, '');
-        if (phone.length !== 11) { alert('هاتف المستلم يجب 11 رقماً'); return; }
-        const feedback = document.getElementById('orderFeedback');
         try {
             const order = await window.api.orders.create(data);
+            clearFieldErrors();
             feedback.style.display = 'block';
             feedback.className = 'feedback success';
             feedback.textContent = 'تم الحفظ! رقم الشحنة: ' + order.ShipmentNumber;
             document.getElementById('orderForm').reset();
             document.getElementById('storeName').value = defaults.storeName || '';
             document.getElementById('storePhone').value = defaults.storePhone || '';
+            document.getElementById('regionSearchInput').value = '';
+            document.getElementById('regionId').value = '';
+            document.getElementById('deliveryFee').value = '0';
             updateOrderTotal(false);
             const btnPrint = document.getElementById('btnPrintAfterSave');
             if (btnPrint) {
@@ -396,6 +532,8 @@ async function renderOrders(container) {
                 <div>${o.CustomerName || '—'}</div>
                 <div class="order-card-addr">${o.Address || ''}</div>
                 <div class="order-card-meta">${STATUS_MAP[o.Status] || o.Status} · ${o.CreatedDate || ''}</div>
+                <div class="order-card-meta">المستحق: ${formatIQD(getAmountDue(o))}</div>
+                <div class="order-card-meta"><span class="label-printed-badge ${o.LabelPrinted ? 'printed' : 'not-printed'}">${o.LabelPrinted ? 'تم الطباعة' : 'لم يُطبع'}</span></div>
                 <div class="order-card-actions">
                     <button type="button" class="btn-order-action btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
                     <button type="button" class="btn-order-action btn-print" data-order-id="${o.OrderID}" title="طباعة">طباعة</button>
@@ -415,7 +553,7 @@ async function renderOrders(container) {
                     const order = list.find(o => o.OrderID === id);
                     if (!order) return;
                     const fullOrder = order.RegionName ? order : await window.api.orders.getById(id).catch(() => order);
-                    printOrder(fullOrder || order);
+                    printOrder(fullOrder || order, () => { order.LabelPrinted = 1; renderOrdersList(filterOrders(document.getElementById('ordersSearchInput')?.value || '')); });
                 };
             });
         };
@@ -453,6 +591,8 @@ async function renderOrders(container) {
                 <div>${o.CustomerName || '—'}</div>
                 <div class="order-card-addr">${o.Address || ''}</div>
                 <div class="order-card-meta">${STATUS_MAP[o.Status] || o.Status} · ${o.CreatedDate || ''}</div>
+                <div class="order-card-meta">المستحق: ${formatIQD(getAmountDue(o))}</div>
+                <div class="order-card-meta"><span class="label-printed-badge ${o.LabelPrinted ? 'printed' : 'not-printed'}">${o.LabelPrinted ? 'تم الطباعة' : 'لم يُطبع'}</span></div>
                 <div class="order-card-actions">
                     <button type="button" class="btn-order-action btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
                     <button type="button" class="btn-order-action btn-print" data-order-id="${o.OrderID}" title="طباعة">طباعة</button>
@@ -472,7 +612,7 @@ async function renderOrders(container) {
                 const order = list.find(o => o.OrderID === id);
                 if (!order) return;
                 const fullOrder = order.RegionName ? order : await window.api.orders.getById(id).catch(() => order);
-                printOrder(fullOrder || order);
+                printOrder(fullOrder || order, () => { order.LabelPrinted = 1; renderOrdersList(filterOrders(document.getElementById('ordersSearchInput')?.value || '')); });
             };
         });
         document.getElementById('ordersSearchInput').addEventListener('input', function() {
@@ -538,11 +678,15 @@ async function showEditOrderModalEmp(order, onSuccess) {
                     <input type="number" id="editAmount" value="${o.AmountIQD || 0}" min="0">
                 </div>
                 <div class="form-group">
-                    <label>أجرة التوصيل (د.ع)</label>
-                    <input type="number" id="editDeliveryFee" value="${driverDelivery || 0}" min="0">
+                    <label>أجرة التوصيل (د.ع) <span class="form-hint">(ثابتة حسب المنطقة)</span></label>
+                    <input type="number" id="editDeliveryFee" value="${driverDelivery || 0}" min="0" readonly>
                 </div>
                 <div class="form-group">
                     <label><input type="checkbox" id="editFreeDelivery" ${o.FreeDelivery ? 'checked' : ''}> توصيل مجاني</label>
+                </div>
+                <div class="form-group" style="background:var(--bg);padding:12px;border-radius:8px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:6px"><span>المبلغ النهائي:</span><strong id="editTotalDisplayEmp">0</strong></div>
+                    <div style="display:flex;justify-content:space-between"><span>المبلغ المستحق:</span><strong id="editDueDisplayEmp">0</strong></div>
                 </div>
                 <div class="form-group">
                     <label>ملاحظات</label>
@@ -560,13 +704,61 @@ async function showEditOrderModalEmp(order, onSuccess) {
     const closeModal = () => modal.remove();
     modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
     document.getElementById('editModalCloseEmp').onclick = closeModal;
+    const updateEditTotalsEmp = () => {
+        const amt = parseFloat(document.getElementById('editAmount')?.value || 0) || 0;
+        const fee = parseFloat(document.getElementById('editDeliveryFee')?.value || 0) || 0;
+        const free = document.getElementById('editFreeDelivery')?.checked || false;
+        const total = free ? amt : (amt + fee);
+        const due = free ? (amt - fee) : amt;
+        const totalEl = document.getElementById('editTotalDisplayEmp');
+        const dueEl = document.getElementById('editDueDisplayEmp');
+        if (totalEl) totalEl.textContent = formatIQD(total);
+        if (dueEl) dueEl.textContent = formatIQD(due);
+    };
+    updateEditTotalsEmp();
+    document.getElementById('editAmount')?.addEventListener('input', updateEditTotalsEmp);
+    document.getElementById('editAmount')?.addEventListener('change', updateEditTotalsEmp);
+    document.getElementById('editFreeDelivery')?.addEventListener('change', updateEditTotalsEmp);
     document.getElementById('editRegionId')?.addEventListener('change', function() {
         const opt = this.options[this.selectedIndex];
-        if (opt?.value) document.getElementById('editDeliveryFee').value = opt.dataset.fee || 0;
+        if (opt?.value) {
+            document.getElementById('editDeliveryFee').value = opt.dataset.fee || 0;
+            updateEditTotalsEmp();
+        }
     });
+    const clearEditErrors = () => {
+        modal.querySelectorAll('.field-error').forEach(el => el.remove());
+        modal.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+    };
+    const showEditFieldError = (fieldId, msg) => {
+        clearEditErrors();
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.classList.add('input-error');
+            field.focus();
+            const wrap = field.closest('.form-group');
+            if (wrap && !wrap.querySelector('.field-error')) {
+                const err = document.createElement('div');
+                err.className = 'field-error';
+                err.textContent = msg;
+                wrap.appendChild(err);
+            }
+        }
+        const fb = document.getElementById('editFeedbackEmp');
+        fb.style.display = 'block'; fb.className = 'feedback error'; fb.textContent = '❌ ' + msg;
+    };
     document.getElementById('editOrderFormEmp').onsubmit = async (e) => {
         e.preventDefault();
+        clearEditErrors();
         const fb = document.getElementById('editFeedbackEmp');
+        const editPhone = (document.getElementById('editCustomerPhone')?.value || '').trim();
+        if (editPhone && editPhone.replace(/\D/g, '').length !== 11) {
+            return showEditFieldError('editCustomerPhone', 'هاتف المستلم يجب أن يكون 11 رقماً');
+        }
+        const editAmount = parseFloat(document.getElementById('editAmount')?.value);
+        if (isNaN(editAmount) || editAmount < 0) {
+            return showEditFieldError('editAmount', 'مبلغ الفاتورة لا يمكن أن يكون سالباً');
+        }
         const data = {
             AdminOrderNo: document.getElementById('editAdminOrderNo').value,
             StoreName: document.getElementById('editStoreName').value.trim(),
@@ -575,17 +767,18 @@ async function showEditOrderModalEmp(order, onSuccess) {
             CustomerPhone: document.getElementById('editCustomerPhone').value,
             RegionID: document.getElementById('editRegionId').value ? parseInt(document.getElementById('editRegionId').value) : null,
             Address: document.getElementById('editAddress').value.trim(),
-            AmountIQD: parseFloat(document.getElementById('editAmount').value) || 0,
+            AmountIQD: isNaN(editAmount) ? 0 : editAmount,
             DeliveryFeeIQD: parseFloat(document.getElementById('editDeliveryFee').value) || 0,
             FreeDelivery: document.getElementById('editFreeDelivery').checked,
             Notes: document.getElementById('editNotes').value
         };
         try {
             await window.api.orders.update(o.OrderID, data);
+            clearEditErrors();
             fb.style.display = 'block'; fb.className = 'feedback success'; fb.textContent = 'تم الحفظ';
             setTimeout(() => { closeModal(); if (onSuccess) onSuccess(); }, 600);
         } catch (err) {
-            fb.style.display = 'block'; fb.className = 'feedback error'; fb.textContent = err?.message || 'فشل الحفظ';
+            fb.style.display = 'block'; fb.className = 'feedback error'; fb.textContent = '❌ ' + (err?.message || 'فشل الحفظ');
         }
     };
 }

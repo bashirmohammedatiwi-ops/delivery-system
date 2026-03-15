@@ -135,6 +135,20 @@ async function initSchema() {
     try { nativeDb.run('ALTER TABLE AppUsers ADD COLUMN StorePhone TEXT'); saveDb(); } catch (e) {}
 
     try {
+        nativeDb.run(`CREATE TABLE IF NOT EXISTS FreeDeliveryOverrideNotifications (
+            NotificationID INTEGER PRIMARY KEY AUTOINCREMENT,
+            OrderID INTEGER NOT NULL,
+            PerformedByUserID INTEGER,
+            PerformedByName TEXT,
+            CreatedAt TEXT DEFAULT (datetime('now', 'localtime')),
+            Reviewed INTEGER DEFAULT 0,
+            ReviewedAt TEXT,
+            FOREIGN KEY (OrderID) REFERENCES Orders(OrderID)
+        )`);
+        saveDb();
+    } catch (e) {}
+
+    try {
         nativeDb.run(`CREATE TABLE IF NOT EXISTS AppSettings (
             SettingKey TEXT PRIMARY KEY,
             SettingValue TEXT

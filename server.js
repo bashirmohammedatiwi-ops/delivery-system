@@ -11,6 +11,7 @@ const labelService = require('./services/labelService');
 const authService = require('./services/authService');
 const userAuthService = require('./services/userAuthService');
 const regionService = require('./services/regionService');
+const notificationService = require('./services/notificationService');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -544,6 +545,9 @@ app.post('/api/orders', requireAppAuth, async (req, res) => {
         const body = { ...req.body, CreatedByUserID: emp.UserID };
         delete body.EmployeeCode;
         const order = orderService.createOrder(body);
+        const empUser = userAuthService.getUserById(emp.UserID);
+        const isEmployee = empUser && empUser.Role === 'employee';
+        notificationService.maybeCreateNotification(order, emp.UserID, empUser?.DisplayName || empUser?.Username, isEmployee);
         res.json(order);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -611,6 +615,9 @@ app.post('/api/orders/update-status', requireAppAuth, requireAdmin, async (req, 
 app.put('/api/orders/:id', requireAppAuth, async (req, res) => {
     try {
         const order = orderService.updateOrder(parseInt(req.params.id), req.body);
+        const appUser = req.appUser;
+        const isEmployee = appUser && appUser.Role === 'employee';
+        notificationService.maybeCreateNotification(order, appUser?.UserID, appUser?.DisplayName || appUser?.Username, isEmployee);
         res.json(order);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -678,6 +685,28 @@ app.post('/api/orders/:id/receive-returned', requireAppAuth, async (req, res) =>
         const result = orderService.markReturnedOrderReceived(id);
         if (!result.success) return res.status(400).json({ error: result.error });
         res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ─── API: إشعارات التوصيل المجاني (المدير فقط) ───
+app.get('/api/notifications/free-delivery-overrides', requireAppAuth, requireAdmin, async (req, res) => {
+    try {
+        const list = notificationService.getUnreviewedNotifications();
+        const count = notificationService.getUnreviewedCount();
+        res.json({ list, count });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/notifications/:id/review', requireAppAuth, requireAdmin, async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (!id || isNaN(id)) return res.status(400).json({ error: 'رقم الإشعار غير صالح' });
+        notificationService.markAsReviewed(id);
+        res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
