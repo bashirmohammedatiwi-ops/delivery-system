@@ -91,6 +91,8 @@ services:
       - DOMAIN=${DOMAIN:-localhost}
     depends_on:
       - app
+      - employee-web
+      - driver-web
     profiles:
       - https
 

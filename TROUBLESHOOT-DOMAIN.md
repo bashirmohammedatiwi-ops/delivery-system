@@ -1,5 +1,61 @@
 # استكشاف مشاكل الدومين — demaalhayaadelivery.online
 
+## 502 Bad Gateway على /employee/ أو /driver/
+
+إذا ظهر 502 عند فتح `https://demaalhayaadelivery.online/employee/` أو `/driver/`:
+
+### 1. التأكد من تشغيل جميع الحاويات
+
+```bash
+cd /opt/delivery-system
+docker ps
+```
+
+يجب أن ترى: `delivery-system` و `delivery-employee-web` و `delivery-driver-web` و `delivery-nginx` (جميعها في حالة Up).
+
+### 2. إذا كان employee-web أو driver-web متوقفاً
+
+```bash
+# إعادة تشغيل كل الخدمات (مع Nginx و HTTPS)
+docker compose --profile https up -d
+
+# أو إن كنت بدون profile https:
+docker compose up -d
+```
+
+### 3. عرض سجلات الموظفين والسائقين
+
+```bash
+docker compose logs employee-web --tail 30
+docker compose logs driver-web --tail 30
+```
+
+إذا ظهر "لا يمكن الاتصال بالسيرفر الرئيسي" — السيرفر الرئيسي (app) غير جاهز. انتظر حتى يكتمل تشغيله ثم أعد تشغيل employee-web:
+
+```bash
+docker compose restart employee-web driver-web
+```
+
+### 4. إعادة بناء Nginx بعد التحديثات
+
+```bash
+cd /opt/delivery-system
+docker compose --profile https build --no-cache nginx
+docker compose --profile https up -d
+```
+
+### 5. التحقق من الشبكة بين الحاويات
+
+```bash
+# من داخل nginx — هل يصل لـ employee-web؟
+docker exec delivery-nginx wget -q -O - http://employee-web:3002/ | head -5
+
+# إذا فشل — تأكد أن nginx و employee-web على نفس الشبكة
+docker network inspect alhayat-network
+```
+
+---
+
 ## مشكلة: Let's Encrypt يستشير 2.57.91.91 بدلاً من 187.124.23.65
 
 إذا ظهر في السجلات أن Let's Encrypt يصل إلى `2.57.91.91` (Hostinger) وليس سيرفرك:
