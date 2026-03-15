@@ -618,31 +618,38 @@ function setNavActive(screenId, subTab) {
 }
 
 function initSidebarNav() {
-    document.querySelectorAll('.nav-parent').forEach(parent => {
-        parent.addEventListener('click', (e) => {
-            e.preventDefault();
-            const group = parent.closest('.nav-group');
-            const screen = parent.dataset.screen;
+    const nav = document.getElementById('mainNav');
+    if (!nav) return;
+    /* إزالة المستمع السابق إن وُجد لتجنّب تكرار المعالجة عند إعادة الاستدعاء */
+    const oldHandler = nav._navClickHandler;
+    if (oldHandler) nav.removeEventListener('click', oldHandler);
+
+    const handleNavClick = (e) => {
+        const item = e.target.closest('.nav-item');
+        if (!item) return;
+        e.preventDefault();
+        const screen = item.dataset.screen;
+        if (!screen || !screens[screen]) return;
+
+        if (item.classList.contains('nav-parent')) {
+            const group = item.closest('.nav-group');
+            const wasExpanded = group?.classList.contains('expanded');
             group?.classList.toggle('expanded');
-            if (group?.classList.contains('expanded') && screen && screens[screen]) {
+            /* عند التوسيع أو عند الضغط على قسم موسّع: عرض الفرعي الأول */
+            if (group?.classList.contains('expanded')) {
                 const firstChild = group.querySelector('.nav-child');
                 const tab = firstChild?.dataset.tab;
                 setNavActive(screen, tab);
                 showScreen(screen, tab || undefined);
             }
-        });
-    });
-    document.querySelectorAll('.nav-item:not(.nav-parent)').forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            const screen = item.dataset.screen;
-            const tab = item.dataset.tab;
-            if (screen && screens[screen]) {
-                setNavActive(screen, tab);
-                showScreen(screen, tab);
-            }
-        });
-    });
+        } else {
+            setNavActive(screen, item.dataset.tab);
+            showScreen(screen, item.dataset.tab);
+        }
+    };
+
+    nav._navClickHandler = handleNavClick;
+    nav.addEventListener('click', handleNavClick);
 }
 
 function showScreen(screenId, subTab) {
@@ -1848,7 +1855,7 @@ const screens = {
                     content.innerHTML = `
                         <div class="report-view">
                             <div class="report-view-title">التقرير الملخص - ${dateFrom} إلى ${dateTo}</div>
-                            <div class="report-table-wrap">
+                            <div class="report-table-wrap report-table-wrap--scrollable">
                                 <table class="report-table">
                                     <thead><tr>
                                         <th>التاريخ</th><th>السائق</th><th>عدد الطلبات</th><th>مرتجعات</th>
@@ -1930,7 +1937,7 @@ const screens = {
                             ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                         </div>
                         <div class="report-section-title">تفاصيل الطلبات</div>
-                        <div class="report-table-wrap">
+                        <div class="report-table-wrap report-table-wrap--scrollable">
                             <table class="report-table">
                                 <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>اسم المستلم</th><th>هاتف المستلم</th><th class="col-address">العنوان</th><th>رابط الموقع</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th><th class="col-notes">ملاحظات</th></tr></thead>
                                 <tbody>
@@ -2002,7 +2009,7 @@ const screens = {
                             ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                         </div>
                         <div class="report-section-title">ملخص حسب السائق</div>
-                        <div class="report-table-wrap">
+                        <div class="report-table-wrap report-table-wrap--scrollable">
                             <table class="report-table">
                                 <thead><tr><th>اسم السائق</th><th>عدد الطلبات</th><th>عدد المرتجعات</th><th>إجمالي الفواتير</th><th>أجور التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th></tr></thead>
                                 <tbody>
@@ -2021,7 +2028,7 @@ const screens = {
                             </table>
                         </div>
                         <div class="report-section-title">تفاصيل الطلبات</div>
-                        <div class="report-table-wrap">
+                        <div class="report-table-wrap report-table-wrap--scrollable">
                             <table class="report-table">
                                 <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>الهاتف</th><th class="col-address">العنوان</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th></tr></thead>
                                 <tbody>

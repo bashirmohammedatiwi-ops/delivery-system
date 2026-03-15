@@ -2359,6 +2359,11 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .report-summary-card:nth-child(3) .value { color: var(--accent-blue); }
 .report-summary-card:nth-child(4) .value { color: var(--accent-pink); }
 
+/* الحاويات التي تحتوي تفاصيل الطلبات: رؤوس ثابتة مع تمرير الجدول */
+.report-table-wrap.report-table-wrap--scrollable {
+    max-height: 65vh;
+    overflow: auto;
+}
 .report-table-wrap { overflow-x: auto; }
 .report-table { width: 100%; border-collapse: collapse; }
 .report-table thead th {
