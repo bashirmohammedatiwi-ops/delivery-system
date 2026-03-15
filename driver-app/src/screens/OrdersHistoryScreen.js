@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { THEME } from '../theme';
 import { getDriverDeliveredOrders, getDriverReturnedOrders, getDriverStats } from '../api';
+import { getLocalDateStr, addDays } from '../utils/dateUtils';
 
 function formatIQD(n) {
   return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
@@ -36,19 +37,17 @@ export default function OrdersHistoryScreen() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(getLocalDateStr());
 
   const goPrevDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(d.toISOString().slice(0, 10));
+    setSelectedDate(addDays(selectedDate, -1));
   };
 
   const goNextDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    const today = new Date().toISOString().slice(0, 10);
-    if (d.toISOString().slice(0, 10) <= today) setSelectedDate(d.toISOString().slice(0, 10));
+    const today = getLocalDateStr();
+    if (addDays(selectedDate, 1) <= today) {
+      setSelectedDate(addDays(selectedDate, 1));
+    }
   };
 
   const fetchOrders = useCallback(async () => {
@@ -110,7 +109,7 @@ export default function OrdersHistoryScreen() {
     );
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = getLocalDateStr();
   const canGoNext = selectedDate < todayStr;
 
   return (

@@ -33,6 +33,19 @@ function formatDateShort(d) {
     if (!d) return '';
     return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 }
+/* تاريخ محلي YYYY-MM-DD (تجنب مشكلة UTC في العراق) */
+function getLocalDateStr(d) {
+    d = d || new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+function addDays(dateStr, delta) {
+    const d = new Date(dateStr + 'T12:00:00');
+    d.setDate(d.getDate() + delta);
+    return getLocalDateStr(d);
+}
 /* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
 function getAmountDue(o) {
     const total = Number(o.TotalIQD ?? o.totaliqd) || 0;
@@ -218,10 +231,10 @@ function renderReceive(container) {
 async function renderPending(container) {
     container.innerHTML = '<div class="loading-state">جاري التحميل...</div>';
     try {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = getLocalDateStr();
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 6);
-        const dateFrom = weekAgo.toISOString().slice(0, 10);
+        const dateFrom = getLocalDateStr(weekAgo);
         const data = await api('/api/driver/pending-orders?dateFrom=' + dateFrom + '&dateTo=' + today);
         const days = Array.isArray(data) ? data : [];
         const filtered = days.filter(d => ((d.countKarkh || 0) + (d.countRusafa || 0)) > 0);
@@ -295,7 +308,7 @@ function showPendingOrdersList(date, area) {
 }
 
 async function renderStats(container) {
-    let selectedDate = new Date().toISOString().slice(0, 10);
+    let selectedDate = getLocalDateStr();
     const render = async () => {
         container.innerHTML = '<div class="loading-state">جاري تحميل الإحصائيات...</div>';
         try {
@@ -305,18 +318,14 @@ async function renderStats(container) {
             ]);
             const totalAmountDue = calcTotalAmountDue(deliveredOrders);
             const stats = { ...statsData, totalAmountDue };
-            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayStr = getLocalDateStr();
             const goPrev = () => {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() - 1);
-                selectedDate = d.toISOString().slice(0, 10);
+                selectedDate = addDays(selectedDate, -1);
                 render();
             };
             const goNext = () => {
                 if (selectedDate >= todayStr) return;
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() + 1);
-                selectedDate = d.toISOString().slice(0, 10);
+                selectedDate = addDays(selectedDate, 1);
                 render();
             };
             container.innerHTML = `
@@ -362,7 +371,7 @@ async function renderStats(container) {
 
 async function renderHistory(container) {
     let tab = 'delivered';
-    let selectedDate = new Date().toISOString().slice(0, 10);
+    let selectedDate = getLocalDateStr();
     const doRender = async () => {
         container.innerHTML = '<div class="loading-state">جاري التحميل...</div>';
         try {
@@ -371,7 +380,7 @@ async function renderHistory(container) {
                 api('/api/driver/stats?date=' + selectedDate)
             ]);
             const list = Array.isArray(orders) ? orders : [];
-            const todayStr = new Date().toISOString().slice(0, 10);
+            const todayStr = getLocalDateStr();
             const fmtDt = (d) => d ? new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
             container.innerHTML = `
                 <div class="history-date-nav">
@@ -404,16 +413,12 @@ async function renderHistory(container) {
                 b.onclick = () => { tab = b.dataset.t; doRender(); };
             });
             document.driverHistPrev = () => {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() - 1);
-                selectedDate = d.toISOString().slice(0, 10);
+                selectedDate = addDays(selectedDate, -1);
                 doRender();
             };
             document.driverHistNext = () => {
                 if (selectedDate >= todayStr) return;
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() + 1);
-                selectedDate = d.toISOString().slice(0, 10);
+                selectedDate = addDays(selectedDate, 1);
                 doRender();
             };
         } catch (e) {

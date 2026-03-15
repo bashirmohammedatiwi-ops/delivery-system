@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { getPendingOrdersByArea, getPendingOrdersList } from '../api';
 import { THEME } from '../theme';
+import { getLocalDateStr } from '../utils/dateUtils';
 
 function formatDateAr(d) {
   if (!d) return '';
@@ -64,10 +65,10 @@ export default function PendingOrdersScreen() {
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = getLocalDateStr();
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 6);
-      const dateFrom = weekAgo.toISOString().slice(0, 10);
+      const dateFrom = getLocalDateStr(weekAgo);
       const data = await getPendingOrdersByArea(token, dateFrom, today);
       setDays(Array.isArray(data) ? data : []);
     } catch (e) {

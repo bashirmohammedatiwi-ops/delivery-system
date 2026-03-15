@@ -156,12 +156,19 @@ function getOrders(filters = {}) {
 
 function updateOrderStatus(orderId, status, deliveredDate = null) {
     const database = db.getDatabase();
+    const order = database.prepare('SELECT DriverID FROM Orders WHERE OrderID = ?').get(orderId);
     let dateVal = deliveredDate;
     if (status === 'Delivered' && !deliveredDate) {
         dateVal = new Date().toISOString().slice(0, 19).replace('T', ' ');
     }
-    database.prepare('UPDATE Orders SET Status = ?, DeliveredDate = ? WHERE OrderID = ?')
-        .run(status, dateVal, orderId);
+    if ((status === 'Returned' || status === 'راجع') && order && order.DriverID) {
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        database.prepare('UPDATE Orders SET Status = ?, ReturnedDate = ?, ReturnedByDriverID = ?, DriverID = NULL WHERE OrderID = ?')
+            .run('Returned', now, order.DriverID, orderId);
+    } else {
+        database.prepare('UPDATE Orders SET Status = ?, DeliveredDate = ? WHERE OrderID = ?')
+            .run(status, dateVal, orderId);
+    }
 }
 
 function getOrderById(orderId) {
@@ -286,9 +293,13 @@ function getDriverStats(driverId, date) {
     const delivered = database.prepare(
         `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'Delivered' AND date(CreatedDate) = date(?)`
     ).get(driverId, d);
+    /* المراجع: إمّا أرجعها السائق (ReturnedByDriverID) أو غيّرها المدير (DriverID مع Status=Returned) */
     const returned = database.prepare(
-        `SELECT COUNT(*) as c FROM Orders WHERE ReturnedByDriverID = ? AND Status = 'Returned' AND date(CreatedDate) = date(?)`
-    ).get(driverId, d);
+        `SELECT COUNT(*) as c FROM Orders WHERE date(CreatedDate) = date(?) AND (
+            (ReturnedByDriverID = ? AND (Status = 'Returned' OR LOWER(TRIM(COALESCE(Status,''))) IN ('returned','راجع','canceled','ملغي')))
+            OR (DriverID = ? AND Status = 'Returned')
+        )`
+    ).get(d, driverId, driverId);
     const assigned = database.prepare(
         `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'AssignedToDriver'`
     ).get(driverId);
@@ -297,10 +308,12 @@ function getDriverStats(driverId, date) {
     ).get(driverId, d);
     const ordersForDay = database.prepare(
         `SELECT TotalIQD, AmountIQD, DeliveryFeeIQD, WaivedDeliveryIQD, FreeDelivery, Status 
-         FROM Orders WHERE (DriverID = ? OR ReturnedByDriverID = ?) 
-         AND (Status = 'Delivered' OR Status = 'Returned') 
-         AND date(CreatedDate) = date(?)`
-    ).all(driverId, driverId, d);
+         FROM Orders WHERE date(CreatedDate) = date(?) AND (
+             (Status = 'Delivered' AND DriverID = ?)
+             OR ((Status = 'Returned' OR LOWER(TRIM(COALESCE(Status,''))) IN ('returned','راجع','canceled','ملغي')) 
+                 AND (ReturnedByDriverID = ? OR DriverID = ?))
+         )`
+    ).all(d, driverId, driverId, driverId);
 
     let totalDeliveredIQD = 0;
     let totalReturnedIQD = 0;
@@ -312,7 +325,7 @@ function getDriverStats(driverId, date) {
         if (status === 'Delivered') {
             totalDeliveredIQD += totalIQD;
             totalAmountDue += getAmountDue(o);
-        } else if (status === 'Returned') {
+        } else if (status === 'Returned' || /راجع|returned|canceled|ملغي/i.test(status)) {
             totalReturnedIQD += totalIQD;
         }
     }
@@ -348,17 +361,22 @@ function getDriverDeliveredOrders(driverId, date) {
     ).all(driverId, d);
 }
 
-/* طلبات مرتجعة — حسب تاريخ الطلب */
+/* طلبات مرتجعة — حسب تاريخ الطلب (السائق أرجعها أو المدير غيّر الحالة) */
 function getDriverReturnedOrders(driverId, date) {
     const database = db.getDatabase();
     const d = date || new Date().toISOString().slice(0, 10);
     return database.prepare(
-        `SELECT o.*, d.DriverName, r.RegionName 
-         FROM Orders o LEFT JOIN Drivers d ON o.ReturnedByDriverID = d.DriverID 
+        `SELECT o.*, COALESCE(rd.DriverName, d.DriverName) AS DriverName, r.RegionName 
+         FROM Orders o 
+         LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID 
+         LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
          LEFT JOIN Regions r ON o.RegionID = r.RegionID 
-         WHERE o.ReturnedByDriverID = ? AND o.Status = 'Returned' AND date(o.CreatedDate) = date(?)
+         WHERE date(o.CreatedDate) = date(?) AND (
+             (o.ReturnedByDriverID = ? AND (o.Status = 'Returned' OR LOWER(TRIM(COALESCE(o.Status,''))) IN ('returned','راجع','canceled','ملغي')))
+             OR (o.DriverID = ? AND o.Status = 'Returned')
+         )
          ORDER BY o.CreatedDate DESC, o.ReturnedDate DESC`
-    ).all(driverId, d);
+    ).all(d, driverId, driverId);
 }
 
 function getPendingOrdersByArea(dateFrom, dateTo) {
