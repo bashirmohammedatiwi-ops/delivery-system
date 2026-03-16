@@ -9,12 +9,16 @@ import {
   Alert,
   Modal,
   Pressable,
-  ScrollView,
+  TouchableWithoutFeedback,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getPendingOrdersByArea, getPendingOrdersList } from '../api';
 import { THEME } from '../theme';
 import { getLocalDateStr } from '../utils/dateUtils';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const MODAL_CONTENT_HEIGHT = Math.floor(SCREEN_HEIGHT * 0.82);
 
 function formatDateAr(d) {
   if (!d) return '';
@@ -118,6 +122,19 @@ export default function PendingOrdersScreen() {
     );
   };
 
+  const renderOrderItem = ({ item: o }) => (
+    <View style={styles.orderCard}>
+      <View style={styles.orderCardHeader}>
+        <Text style={styles.orderShipment}>#{o.ShipmentNumber}</Text>
+        <Text style={styles.orderAmount}>{formatIQD(o.TotalIQD)}</Text>
+      </View>
+      <Text style={styles.orderCustomer}>{o.CustomerName || '—'}</Text>
+      <Text style={styles.orderAddress}>{o.Address || '—'}</Text>
+      {o.RegionName ? <Text style={styles.orderRegion}>{o.RegionName}</Text> : null}
+      {o.StoreName ? <Text style={styles.orderStore}>{o.StoreName}</Text> : null}
+    </View>
+  );
+
   if (loading && days.length === 0) {
     return (
       <View style={styles.center}>
@@ -155,11 +172,14 @@ export default function PendingOrdersScreen() {
         animationType="slide"
         onRequestClose={() => setShowOrdersModal(false)}
       >
-        <Pressable style={styles.modalOverlay} onPress={() => setShowOrdersModal(false)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+        <View style={styles.modalRoot}>
+          <TouchableWithoutFeedback onPress={() => setShowOrdersModal(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={[styles.modalContent, { height: MODAL_CONTENT_HEIGHT }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{selectedArea} - {formatDateAr(selectedDate)}</Text>
-              <Pressable onPress={() => setShowOrdersModal(false)}>
+              <Pressable onPress={() => setShowOrdersModal(false)} hitSlop={12}>
                 <Text style={styles.modalClose}>✕ إغلاق</Text>
               </Pressable>
             </View>
@@ -168,33 +188,22 @@ export default function PendingOrdersScreen() {
                 <ActivityIndicator size="large" color={THEME.primary} />
               </View>
             ) : ordersList.length === 0 ? (
-              <Text style={styles.emptyText}>لا توجد طلبات</Text>
-            ) : (
-              <View style={styles.ordersListWrap}>
-                <ScrollView
-                  style={styles.ordersScroll}
-                  contentContainerStyle={styles.ordersScrollContent}
-                  showsVerticalScrollIndicator={true}
-                  nestedScrollEnabled={true}
-                  bounces={true}
-                >
-                  {ordersList.map((o) => (
-                    <View key={o.OrderID} style={styles.orderCard}>
-                      <View style={styles.orderCardHeader}>
-                        <Text style={styles.orderShipment}>#{o.ShipmentNumber}</Text>
-                        <Text style={styles.orderAmount}>{formatIQD(o.TotalIQD)}</Text>
-                      </View>
-                      <Text style={styles.orderCustomer}>{o.CustomerName || '—'}</Text>
-                      <Text style={styles.orderAddress}>{o.Address || '—'}</Text>
-                      {o.RegionName ? <Text style={styles.orderRegion}>{o.RegionName}</Text> : null}
-                      {o.StoreName ? <Text style={styles.orderStore}>{o.StoreName}</Text> : null}
-                    </View>
-                  ))}
-                </ScrollView>
+              <View style={styles.modalEmpty}>
+                <Text style={styles.emptyText}>لا توجد طلبات</Text>
               </View>
+            ) : (
+              <FlatList
+                data={ordersList}
+                keyExtractor={(o) => String(o.OrderID)}
+                renderItem={renderOrderItem}
+                style={styles.ordersFlatList}
+                contentContainerStyle={styles.ordersListContent}
+                showsVerticalScrollIndicator={true}
+                bounces={true}
+              />
             )}
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -256,18 +265,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: { fontSize: 16, color: '#94a3b8' },
-  modalOverlay: {
+  modalRoot: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: THEME.bgCard,
     borderTopLeftRadius: THEME.radiusXl,
     borderTopRightRadius: THEME.radiusXl,
-    height: '85%',
     padding: 20,
     paddingBottom: 24,
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -278,12 +291,13 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
   modalClose: { fontSize: 16, color: THEME.primary, fontWeight: '600' },
   modalLoading: { padding: 40, alignItems: 'center' },
-  ordersListWrap: {
+  modalEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  ordersFlatList: {
     flex: 1,
-    minHeight: 100,
   },
-  ordersScroll: { flex: 1 },
-  ordersScrollContent: { paddingBottom: 24 },
+  ordersListContent: {
+    paddingBottom: 24,
+  },
   orderCard: {
     backgroundColor: THEME.bgMuted,
     borderRadius: THEME.radiusMd,
