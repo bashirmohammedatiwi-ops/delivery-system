@@ -277,7 +277,9 @@ function drawDeliveryFeeStats(doc, report, y, font) {
     const countFree = report.countFreeDelivery ?? 0;
     const countPaid = report.countPaidDelivery ?? 0;
     const breakdown = report.deliveryFeeBreakdown ?? {};
+    const freeBreakdown = report.freeDeliveryBreakdown ?? {};
     const feeEntries = Object.entries(breakdown).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]));
+    const freeEntries = Object.entries(freeBreakdown).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]));
     const gap = 12;
     const cardH = 38;
     const totalW = TBL_W;
@@ -302,20 +304,26 @@ function drawDeliveryFeeStats(doc, report, y, font) {
         xRight -= w + gap;
     });
 
-    if (feeEntries.length > 0) {
+    const allEntries = [
+        ...freeEntries.map(([amt, c]) => ({ amt: parseFloat(amt), count: c, isFree: true })),
+        ...feeEntries.map(([amt, c]) => ({ amt: parseFloat(amt), count: c, isFree: false }))
+    ].sort((a, b) => a.amt - b.amt);
+
+    if (allEntries.length > 0) {
         y += cardH + 10;
         doc.font(font).fillColor(COLORS.textMuted).fontSize(7);
         textRTL(doc, 'حسب المبلغ', PAGE_WIDTH - MARGIN - 10, y, { width: 80, align: 'right' });
         y += 14;
-        const n = feeEntries.length;
+        const n = allEntries.length;
         const feeCardW = Math.min(95, (totalW - (n - 1) * 8) / n);
         xRight = PAGE_WIDTH - MARGIN;
-        feeEntries.forEach(([fee, c]) => {
+        allEntries.forEach(({ amt, count, isFree }) => {
+            const label = isFree ? 'مجاني ' + formatIQD(amt) + ' د.ع' : formatIQD(amt) + ' د.ع';
             doc.rect(xRight - feeCardW, y, feeCardW, 32).fillAndStroke(COLORS.rowAlt, COLORS.gridLine);
             doc.font(font).fillColor(COLORS.textMuted).fontSize(6);
-            textRTL(doc, formatIQD(fee) + ' د.ع', xRight - feeCardW + 4, y + 4, { width: feeCardW - 8, align: 'right' });
+            textRTL(doc, label, xRight - feeCardW + 4, y + 4, { width: feeCardW - 8, align: 'right' });
             doc.fillColor(COLORS.text).fontSize(FONT_SM);
-            textRTL(doc, c.toString(), xRight - feeCardW + 4, y + 16, { width: feeCardW - 8, align: 'right' });
+            textRTL(doc, count.toString(), xRight - feeCardW + 4, y + 16, { width: feeCardW - 8, align: 'right' });
             doc.font(font);
             xRight -= feeCardW + 8;
         });
@@ -529,9 +537,13 @@ async function generateDailySummaryReportPDF(report) {
     y += drawTableHead(doc, cols, y, font, true);
 
     (report.rows || []).forEach((r, i) => {
-        const feeDetail = Object.entries(r.deliveryFeeBreakdown || {})
+        const freeDetail = Object.entries(r.freeDeliveryBreakdown || {})
+            .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
+            .map(([amt, c]) => 'مجاني ' + formatIQD(amt) + ':' + c).join(' ');
+        const paidDetail = Object.entries(r.deliveryFeeBreakdown || {})
             .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
             .map(([fee, c]) => formatIQD(fee) + ':' + c).join(' ');
+        const feeDetail = [freeDetail, paidDetail].filter(Boolean).join(' | ') || '-';
         const cells = [
             r.orderDate,
             wrap(r.driverName, 28),
@@ -764,9 +776,16 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         const fee = Math.round(o.DeliveryFeeIQD || 0);
         deliveryFeeBreakdown[fee] = (deliveryFeeBreakdown[fee] || 0) + 1;
     });
+    const freeDeliveryBreakdown = {};
+    validOrders.filter(o => o.FreeDelivery).forEach(o => {
+        const waived = Math.round(o.WaivedDeliveryIQD || 0);
+        freeDeliveryBreakdown[waived] = (freeDeliveryBreakdown[waived] || 0) + 1;
+    });
     const dateStr = dateFrom === dTo ? dateFrom : dateFrom + ' إلى ' + dTo;
     const countKarkh = validOrders.filter(o => (o.RegionArea || '') === 'الكرخ').length;
     const countRusafa = validOrders.filter(o => (o.RegionArea || '') === 'الرصافة').length;
+    const returnedOrders = orders.filter(o => isOrderReturned(o));
+    const hasUnreceivedReturned = returnedOrders.some(o => !(o.ReturnedOrderReceived));
     return {
         driver,
         date: dateStr,
@@ -775,6 +794,7 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         orders,
         count: validOrders.length,
         countReturned,
+        hasUnreceivedReturned,
         countKarkh,
         countRusafa,
         totalAmount,
@@ -783,7 +803,8 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         totalDue,
         countFreeDelivery,
         countPaidDelivery,
-        deliveryFeeBreakdown
+        deliveryFeeBreakdown,
+        freeDeliveryBreakdown
     };
 }
 
@@ -846,6 +867,11 @@ function getCompanyReportByRange(dateFrom, dateTo) {
         const fee = Math.round(o.DeliveryFeeIQD || 0);
         deliveryFeeBreakdown[fee] = (deliveryFeeBreakdown[fee] || 0) + 1;
     });
+    const freeDeliveryBreakdown = {};
+    validAll.filter(o => o.FreeDelivery).forEach(o => {
+        const waived = Math.round(o.WaivedDeliveryIQD || 0);
+        freeDeliveryBreakdown[waived] = (freeDeliveryBreakdown[waived] || 0) + 1;
+    });
     const dateStr = dateFrom === dTo ? dateFrom : dateFrom + ' إلى ' + dTo;
     return {
         date: dateStr,
@@ -856,7 +882,8 @@ function getCompanyReportByRange(dateFrom, dateTo) {
         totalReturned,
         countFreeDelivery,
         countPaidDelivery,
-        deliveryFeeBreakdown
+        deliveryFeeBreakdown,
+        freeDeliveryBreakdown
     };
 }
 
@@ -901,7 +928,8 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
                 totalDue: 0,
                 countFreeDelivery: 0,
                 countPaidDelivery: 0,
-                deliveryFeeBreakdown: {}
+                deliveryFeeBreakdown: {},
+                freeDeliveryBreakdown: {}
             };
         }
         const rec = byKey[key];
@@ -914,8 +942,11 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
             rec.totalDelivery += getDriverDeliveryAmount(o);
             rec.net += o.TotalIQD || 0;
             rec.totalDue += getAmountDue(o);
-            if (o.FreeDelivery) rec.countFreeDelivery++;
-            else {
+            if (o.FreeDelivery) {
+                rec.countFreeDelivery++;
+                const waived = Math.round(o.WaivedDeliveryIQD || 0);
+                rec.freeDeliveryBreakdown[waived] = (rec.freeDeliveryBreakdown[waived] || 0) + 1;
+            } else {
                 rec.countPaidDelivery++;
                 const fee = Math.round(o.DeliveryFeeIQD || 0);
                 rec.deliveryFeeBreakdown[fee] = (rec.deliveryFeeBreakdown[fee] || 0) + 1;
@@ -942,7 +973,8 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
             feesCollected: r.feesCollected,
             countFreeDelivery: r.countFreeDelivery,
             countPaidDelivery: r.countPaidDelivery,
-            deliveryFeeBreakdown: r.deliveryFeeBreakdown
+            deliveryFeeBreakdown: r.deliveryFeeBreakdown,
+            freeDeliveryBreakdown: r.freeDeliveryBreakdown
         }))
     };
 }

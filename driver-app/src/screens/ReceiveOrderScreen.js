@@ -151,7 +151,7 @@ export default function ReceiveOrderScreen({ navigation }) {
           ) : null}
           <View style={styles.overlay} pointerEvents="none">
             <View style={styles.scanFrame}>
-              <View style={styles.scanCorner} style={[styles.scanCorner, styles.scanCornerTL]} />
+              <View style={[styles.scanCorner, styles.scanCornerTL]} />
               <View style={[styles.scanCorner, styles.scanCornerTR]} />
               <View style={[styles.scanCorner, styles.scanCornerBL]} />
               <View style={[styles.scanCorner, styles.scanCornerBR]} />
@@ -195,21 +195,30 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.bg },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 12, color: '#64748b' },
+  permissionIcon: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: THEME.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
   permissionText: { fontSize: 16, color: '#475569', textAlign: 'center', marginBottom: 20 },
   permissionBtn: {
     backgroundColor: THEME.primary,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: THEME.radiusMd,
   },
   permissionBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   toggleRow: { flexDirection: 'row', padding: 16, gap: 12 },
   toggleBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
-    borderRadius: 12,
-    backgroundColor: '#e2e8f0',
+    borderRadius: THEME.radiusMd,
+    backgroundColor: THEME.border,
   },
   toggleActive: { backgroundColor: THEME.primary },
   toggleText: { fontSize: 15, color: '#64748b' },
@@ -225,10 +234,22 @@ const styles = StyleSheet.create({
     width: 260,
     height: 120,
     borderWidth: 2,
-    borderColor: `rgba(13, 148, 136, 0.9)`,
-    borderRadius: 12,
+    borderColor: 'rgba(15, 118, 110, 0.9)',
+    borderRadius: THEME.radiusMd,
     backgroundColor: 'transparent',
+    position: 'relative',
   },
+  scanCorner: {
+    position: 'absolute',
+    width: 24,
+    height: 24,
+    borderColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 3,
+  },
+  scanCornerTL: { top: -2, right: -2, borderTopWidth: 0, borderLeftWidth: 0 },
+  scanCornerTR: { top: -2, left: -2, borderTopWidth: 0, borderRightWidth: 0 },
+  scanCornerBL: { bottom: -2, right: -2, borderBottomWidth: 0, borderLeftWidth: 0 },
+  scanCornerBR: { bottom: -2, left: -2, borderBottomWidth: 0, borderRightWidth: 0 },
   overlayText: {
     marginTop: 24,
     fontSize: 16,
@@ -252,7 +273,7 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 2,
     borderColor: THEME.border,
-    borderRadius: 12,
+    borderRadius: THEME.radiusMd,
     padding: 18,
     fontSize: 18,
     marginBottom: 16,
@@ -260,7 +281,7 @@ const styles = StyleSheet.create({
   },
   submitBtn: {
     backgroundColor: THEME.primary,
-    borderRadius: 12,
+    borderRadius: THEME.radiusMd,
     padding: 18,
     alignItems: 'center',
   },

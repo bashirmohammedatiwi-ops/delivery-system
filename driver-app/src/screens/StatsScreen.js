@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     backgroundColor: THEME.primary,
-    borderRadius: 12,
+    borderRadius: THEME.radiusMd,
   },
   dateBtnDisabled: { backgroundColor: '#cbd5e1' },
   dateBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: THEME.radiusLg,
     padding: 20,
     alignItems: 'center',
     shadowColor: '#000',
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   feeBadge: {
     marginTop: 20,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: THEME.radiusMd,
     alignItems: 'center',
   },
   feePaid: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#22c55e' },
@@ -231,8 +231,8 @@ const styles = StyleSheet.create({
   totalFooter: {
     marginTop: 24,
     padding: 20,
-    backgroundColor: THEME.text,
-    borderRadius: 18,
+    backgroundColor: THEME.primary,
+    borderRadius: THEME.radiusXl,
     alignItems: 'center',
     shadowColor: THEME.shadow,
     shadowOffset: { width: 0, height: 4 },

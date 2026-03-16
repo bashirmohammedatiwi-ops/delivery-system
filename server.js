@@ -331,6 +331,10 @@ app.post('/api/drivers/collect-fees', requireAppAuth, requireAdmin, async (req, 
         if (feeCollectionService.isFeesCollected(parseInt(driverId), orderDate)) {
             return res.status(400).json({ error: 'تم دفع المبلغ مسبقاً - لا يمكن الدفع مرتين' });
         }
+        const report = reportService.getDriverReportByRange(parseInt(driverId), orderDate, orderDate);
+        if (report && report.hasUnreceivedReturned) {
+            return res.status(400).json({ error: 'لا يمكن استحصال الأجور: يوجد طلب راجع في ذلك اليوم لم يُسلّم من السائق بعد. سجّل استلام الطلب الراجع أولاً.' });
+        }
         const result = feeCollectionService.recordCollection(
             parseInt(driverId), orderDate, req.appUser?.UserID
         );

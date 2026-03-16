@@ -23,9 +23,10 @@ function AppNavigator() {
       screenOptions={{
         headerStyle: { backgroundColor: THEME.primary },
         headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+        headerTitleStyle: { fontWeight: '700', fontSize: 18 },
         headerShadowVisible: false,
         contentStyle: { backgroundColor: THEME.bg },
+        headerBackTitleVisible: false,
       }}
     >
       {!token ? (

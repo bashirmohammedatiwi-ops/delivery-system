@@ -28,7 +28,7 @@ export default function SettingsScreen() {
     <View style={styles.container}>
       <View style={styles.profileCard}>
         <View style={styles.avatarWrap}>
-          <Ionicons name="person" size={40} color={THEME.primary} />
+          <Ionicons name="person-circle" size={48} color={THEME.primary} />
         </View>
         <Text style={styles.label}>اسم السائق</Text>
         <Text style={styles.driverName}>{driver?.DriverName || '—'}</Text>
@@ -52,21 +52,17 @@ const styles = StyleSheet.create({
   },
   profileCard: {
     backgroundColor: THEME.bgCard,
-    borderRadius: 20,
+    borderRadius: THEME.radiusXl,
     padding: 28,
     marginBottom: 24,
     alignItems: 'center',
-    shadowColor: THEME.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 4,
+    ...THEME.shadowMd,
   },
   avatarWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(13, 148, 136, 0.12)',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: THEME.primarySoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -84,7 +80,7 @@ const styles = StyleSheet.create({
   logoutBtn: {
     flexDirection: 'row',
     backgroundColor: THEME.danger,
-    borderRadius: 16,
+    borderRadius: THEME.radiusLg,
     padding: 18,
     alignItems: 'center',
     justifyContent: 'center',

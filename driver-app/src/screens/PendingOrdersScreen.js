@@ -10,6 +10,7 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getPendingOrdersByArea, getPendingOrdersList } from '../api';
@@ -156,7 +157,7 @@ export default function PendingOrdersScreen() {
         onRequestClose={() => setShowOrdersModal(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowOrdersModal(false)}>
-          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{selectedArea} - {formatDateAr(selectedDate)}</Text>
               <Pressable onPress={() => setShowOrdersModal(false)}>
@@ -170,9 +171,15 @@ export default function PendingOrdersScreen() {
             ) : ordersList.length === 0 ? (
               <Text style={styles.emptyText}>لا توجد طلبات</Text>
             ) : (
-              <ScrollView style={styles.ordersScroll} contentContainerStyle={styles.ordersScrollContent}>
-                {ordersList.map((o) => (
-                  <View key={o.OrderID} style={styles.orderCard}>
+              <FlatList
+                data={ordersList}
+                keyExtractor={(o) => String(o.OrderID)}
+                style={styles.ordersScroll}
+                contentContainerStyle={styles.ordersScrollContent}
+                showsVerticalScrollIndicator={true}
+                nestedScrollEnabled={true}
+                renderItem={({ item: o }) => (
+                  <View style={styles.orderCard}>
                     <View style={styles.orderCardHeader}>
                       <Text style={styles.orderShipment}>#{o.ShipmentNumber}</Text>
                       <Text style={styles.orderAmount}>{formatIQD(o.TotalIQD)}</Text>
@@ -182,10 +189,10 @@ export default function PendingOrdersScreen() {
                     {o.RegionName ? <Text style={styles.orderRegion}>{o.RegionName}</Text> : null}
                     {o.StoreName ? <Text style={styles.orderStore}>{o.StoreName}</Text> : null}
                   </View>
-                ))}
-              </ScrollView>
+                )}
+              />
             )}
-          </Pressable>
+          </View>
         </Pressable>
       </Modal>
     </View>
@@ -213,15 +220,11 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 32 },
   dayCard: {
     backgroundColor: THEME.bgCard,
-    borderRadius: 18,
+    borderRadius: THEME.radiusXl,
     padding: 20,
     marginBottom: 14,
-    shadowColor: THEME.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    borderRightWidth: 4,
+    ...THEME.shadowMd,
+    borderRightWidth: 5,
     borderRightColor: THEME.primary,
   },
   dayDate: {
@@ -237,11 +240,11 @@ const styles = StyleSheet.create({
   },
   areaBadge: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: THEME.radiusMd,
     padding: 16,
     alignItems: 'center',
   },
-  karkhBadge: { backgroundColor: 'rgba(13, 148, 136, 0.15)' },
+  karkhBadge: { backgroundColor: THEME.primarySoft },
   rusafaBadge: { backgroundColor: 'rgba(139, 92, 246, 0.15)' },
   areaValue: { fontSize: 24, fontWeight: '800', color: '#0f172a' },
   areaLabel: { fontSize: 14, color: '#64748b', marginTop: 4 },
@@ -259,8 +262,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: THEME.bgCard,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: THEME.radiusXl,
+    borderTopRightRadius: THEME.radiusXl,
     maxHeight: '80%',
     padding: 20,
   },
@@ -273,11 +276,11 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
   modalClose: { fontSize: 16, color: THEME.primary, fontWeight: '600' },
   modalLoading: { padding: 40, alignItems: 'center' },
-  ordersScroll: { maxHeight: 400 },
+  ordersScroll: { maxHeight: Dimensions.get('window').height * 0.6 },
   ordersScrollContent: { paddingBottom: 24 },
   orderCard: {
-    backgroundColor: THEME.bg,
-    borderRadius: 14,
+    backgroundColor: THEME.bgMuted,
+    borderRadius: THEME.radiusMd,
     padding: 16,
     marginBottom: 12,
     borderRightWidth: 4,

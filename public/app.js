@@ -131,8 +131,8 @@ async function showEditOrderModal(container, order, onSuccess) {
                         <input type="text" id="editStorePhone" value="${(order.StorePhone || '').replace(/"/g, '&quot;')}">
                     </div>
                     <div class="form-group">
-                        <label>اسم المستلم</label>
-                        <input type="text" id="editCustomerName" value="${(order.CustomerName || '').replace(/"/g, '&quot;')}" required>
+                        <label>اسم المستلم (اختياري)</label>
+                        <input type="text" id="editCustomerName" value="${(order.CustomerName || '').replace(/"/g, '&quot;')}">
                     </div>
                     <div class="form-group">
                         <label>هاتف المستلم</label>
@@ -681,6 +681,7 @@ const screens = {
             }
 
             const notifList = overrideNotifications.list || [];
+            const notifCount = notifList.length; // العداد من القائمة الفعلية لضمان التطابق
             const notifHtml = notifList.length > 0
                 ? notifList.map(n => `
                     <div class="override-notif-item" data-id="${n.NotificationID}">
@@ -728,7 +729,7 @@ const screens = {
                     <div class="card override-notif-card">
                         <h3 class="card-title">
                             <span>إشعارات التوصيل المجاني اليدوي</span>
-                            ${overrideNotifications.count > 0 ? `<span class="override-notif-badge">${overrideNotifications.count}</span>` : ''}
+                            ${notifCount > 0 ? `<span class="override-notif-badge">${notifCount}</span>` : ''}
                         </h3>
                         <p class="override-notif-desc">طلبات أقل من 50,000 د.ع وضع عليها موظف توصيل مجاني يدوياً:</p>
                         <div id="overrideNotifList" class="override-notif-list">${notifHtml}</div>
@@ -1650,6 +1651,7 @@ const screens = {
                                     <div id="collectTotalDue" class="report-collect-value"></div>
                                     <div id="collectOrderCount" class="report-collect-count"></div>
                                     <div id="collectAlreadyPaidMsg" class="report-collect-error">تم دفع المبلغ - لا يمكن الدفع مرتين</div>
+                                    <div id="collectUnreceivedReturnedMsg" class="report-collect-error" style="display:none">لا يمكن استحصال الأجور: يوجد طلب راجع في ذلك اليوم لم يُسلّم من السائق بعد. سجّل استلام الطلب الراجع أولاً.</div>
                             </div>
                                 <div class="report-form-row" id="collectFormRow">
                                     <div class="report-field report-field-wide">
@@ -1715,13 +1717,16 @@ const screens = {
 
             let collectExpectedAmount = null;
             let collectAlreadyPaid = false;
+            let collectBlockedUnreceived = false;
             const hideCollectAmount = () => {
                 document.getElementById('collectAmountBox').style.display = 'none';
                 document.getElementById('collectAlreadyPaidMsg').style.display = 'none';
+                document.getElementById('collectUnreceivedReturnedMsg').style.display = 'none';
                 document.getElementById('collectAmountInput').disabled = false;
                 document.getElementById('btnCollectFees').disabled = false;
                 collectExpectedAmount = null;
                 collectAlreadyPaid = false;
+                collectBlockedUnreceived = false;
             };
             document.getElementById('collectDriver').addEventListener('change', hideCollectAmount);
             document.getElementById('collectOrderDate').addEventListener('change', hideCollectAmount);
@@ -1746,16 +1751,26 @@ const screens = {
                         window.api.drivers.getFeesCollectedStatus(driverId, orderDate)
                     ]);
                     collectAlreadyPaid = status.collected || false;
+                    collectBlockedUnreceived = !!(report && report.hasUnreceivedReturned);
                     const alreadyPaidMsg = document.getElementById('collectAlreadyPaidMsg');
+                    const unreceivedMsg = document.getElementById('collectUnreceivedReturnedMsg');
                     const amountInput = document.getElementById('collectAmountInput');
                     const btnCollect = document.getElementById('btnCollectFees');
                     if (collectAlreadyPaid) {
                         alreadyPaidMsg.style.display = 'block';
+                        unreceivedMsg.style.display = 'none';
+                        amountInput.disabled = true;
+                        btnCollect.disabled = true;
+                        amountInput.value = '';
+                    } else if (collectBlockedUnreceived) {
+                        alreadyPaidMsg.style.display = 'none';
+                        unreceivedMsg.style.display = 'block';
                         amountInput.disabled = true;
                         btnCollect.disabled = true;
                         amountInput.value = '';
                     } else {
                         alreadyPaidMsg.style.display = 'none';
+                        unreceivedMsg.style.display = 'none';
                         amountInput.disabled = false;
                         btnCollect.disabled = false;
                     }
@@ -1801,6 +1816,12 @@ const screens = {
                     feedback.style.display = 'block';
                     feedback.className = 'scan-feedback error';
                     feedback.textContent = 'تم دفع المبلغ مسبقاً - لا يمكن الدفع مرتين';
+                    return;
+                }
+                if (collectBlockedUnreceived) {
+                    feedback.style.display = 'block';
+                    feedback.className = 'scan-feedback error';
+                    feedback.textContent = 'لا يمكن استحصال الأجور: يوجد طلب راجع في ذلك اليوم لم يُسلّم من السائق بعد. سجّل استلام الطلب الراجع أولاً.';
                     return;
                 }
                 const raw = String(amountInput).trim();
@@ -1864,9 +1885,13 @@ const screens = {
                                     </tr></thead>
                                     <tbody>
                                         ${report.rows.map(r => {
-                                            const feeDetail = Object.entries(r.deliveryFeeBreakdown || {})
+                                            const freeDetail = Object.entries(r.freeDeliveryBreakdown || {})
                                                 .sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]))
-                                                .map(([fee,c]) => formatIQD(fee)+': '+c).join(' | ') || '-';
+                                                .map(([amt,c]) => 'مجاني '+formatIQD(amt)+': '+c).join(' | ');
+                                            const paidDetail = Object.entries(r.deliveryFeeBreakdown || {})
+                                                .sort((a,b)=>parseFloat(a[0])-parseFloat(b[0]))
+                                                .map(([fee,c]) => formatIQD(fee)+': '+c).join(' | ');
+                                            const feeDetail = [freeDetail, paidDetail].filter(Boolean).join(' | ') || '-';
                                             return `<tr>
                                                 <td>${r.orderDate}</td><td>${(r.driverName||'').replace(/</g,'&lt;')}</td>
                                                 <td>${r.count}</td><td>${r.countReturned}</td>
@@ -1934,6 +1959,7 @@ const screens = {
                         <div class="report-summary-cards report-fee-cards">
                             <div class="report-summary-card"><div class="label">مجاني</div><div class="value">${report.countFreeDelivery || 0}</div></div>
                             <div class="report-summary-card"><div class="label">غير مجاني</div><div class="value">${report.countPaidDelivery || 0}</div></div>
+                            ${Object.entries(report.freeDeliveryBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([amt,c]) => `<div class="report-summary-card"><div class="label">مجاني أجر ${formatIQD(amt)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                             ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                         </div>
                         <div class="report-section-title">تفاصيل الطلبات <span class="report-count-badge">${report.orders.length} طلب</span></div>
@@ -2006,6 +2032,7 @@ const screens = {
                         <div class="report-summary-cards report-fee-cards">
                             <div class="report-summary-card"><div class="label">مجاني</div><div class="value">${report.countFreeDelivery || 0}</div></div>
                             <div class="report-summary-card"><div class="label">غير مجاني</div><div class="value">${report.countPaidDelivery || 0}</div></div>
+                            ${Object.entries(report.freeDeliveryBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([amt,c]) => `<div class="report-summary-card"><div class="label">مجاني أجر ${formatIQD(amt)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                             ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                         </div>
                         <div class="report-section-title">ملخص حسب السائق</div>
