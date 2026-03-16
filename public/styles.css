@@ -2298,8 +2298,9 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .support-scan-field { flex: 1; min-width: 200px; }
 .support-scan-field label { display: block; margin-bottom: 8px; font-weight: 600; }
 
-.support-section-pane, .report-pane, .settings-pane { display: none; }
-.support-section-pane.active, .report-pane.active, .settings-pane.active { display: block; }
+.support-section-pane, .report-pane, .settings-pane { display: none !important; }
+.support-section-pane.active, .report-pane.active, .settings-pane.active { display: block !important; }
+.report-pane { position: relative; isolation: isolate; }
 
 .support-pane-head, .settings-pane-head { font-size: 1.2rem; font-weight: 700; margin: 0 0 8px; }
 .support-pane-desc, .settings-pane-desc { color: var(--text-muted); margin: 0 0 20px; }
@@ -2364,6 +2365,21 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     max-height: 65vh;
     overflow: auto;
 }
+/* جدول تفاصيل الطلبات: استغلال المساحة السفلية لعرض المزيد */
+.report-table-wrap--orders {
+    max-height: calc(100vh - 185px);
+}
+.report-view { display: flex; flex-direction: column; }
+.report-details-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+/* جدول ملخص السائق: مدمج */
+.report-table-wrap--compact {
+    max-height: 50vh;
+}
 .report-table-wrap { overflow-x: auto; }
 .report-table { width: 100%; border-collapse: collapse; }
 .report-table thead th {
@@ -2378,6 +2394,27 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .report-table tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border-light); }
 .report-table tbody tr.order-returned { background: #FEE2E2; }
 .report-table tbody tr.order-returned:hover { background: #FECACA; }
+
+/* جدول تفاصيل الطلبات: صفوف مدمجة لعرض المزيد */
+.report-table--orders { font-size: 0.875rem; }
+.report-table--orders thead th { padding: 8px 10px; font-size: 0.8rem; white-space: nowrap; }
+.report-table--orders tbody td { padding: 6px 10px; font-size: 0.85rem; }
+.report-table--orders .col-address { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-table--orders .col-notes { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-table--orders .iqd { white-space: nowrap; }
+.report-table--orders .badge { padding: 2px 6px; font-size: 0.75rem; }
+
+/* جدول ملخص السائق: مدمج */
+.report-table--compact thead th { padding: 8px 12px; font-size: 0.9rem; }
+.report-table--compact tbody td { padding: 8px 12px; font-size: 0.9rem; }
+
+/* شارة عدد الطلبات في العنوان */
+.report-count-badge {
+    font-weight: 500;
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-right: 8px;
+}
 
 .report-view-title {
     font-size: 1.1rem;
@@ -2403,6 +2440,34 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     margin-top: 24px;
     padding-top: 20px;
     border-top: 1px solid var(--border-light);
+}
+/* التقرير العام: يظهر فقط عند تفعيله — زر التصدير في الأسفل */
+#pane-company.active {
+    display: flex !important;
+    flex-direction: column;
+    min-height: calc(100vh - 140px);
+}
+#pane-company.active #companyReportContent {
+    flex: 1;
+    min-height: 0;
+}
+#pane-company.active #companyReportActions {
+    flex-shrink: 0;
+    margin-top: auto;
+    padding: 12px 0 8px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+    position: sticky;
+    bottom: 0;
+    background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%);
+    z-index: 10;
+}
+/* إطار تفاصيل الطلبات في التقرير العام: ارتفاع أكبر */
+#pane-company .report-table-wrap--orders {
+    max-height: calc(100vh - 95px);
+}
+#pane-company .report-table-wrap--compact {
+    max-height: 60vh;
 }
 
 .report-empty {

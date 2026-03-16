@@ -186,11 +186,15 @@ window.api = {
             return null;
         },
         companyReportPDF: async (report) => {
-            const blob = await apiPostBlob('/api/reports/company-pdf', report);
+            /* إرسال التاريخ فقط لتجنّب حد حجم الطلب عند التقارير الكبيرة */
+            const body = report?.dateFrom && report?.dateTo
+                ? { dateFrom: report.dateFrom, dateTo: report.dateTo }
+                : report;
+            const blob = await apiPostBlob('/api/reports/company-pdf', body);
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `تقرير-يومي-${report.date || 'report'}.pdf`;
+            a.download = `تقرير-يومي-${report?.date || 'report'}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
             return null;

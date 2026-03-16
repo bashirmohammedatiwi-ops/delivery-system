@@ -17,7 +17,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors({ origin: '*' }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // نقطة فحص الصحة لـ Docker (قبل أي مسار آخر)
 app.get('/health', (_req, res) => res.status(200).send('OK'));
@@ -768,7 +768,12 @@ app.post('/api/reports/daily-summary-pdf', requireAppAuth, requireAdmin, async (
 
 app.post('/api/reports/company-pdf', requireAppAuth, requireAdmin, async (req, res) => {
     try {
-        const buf = await reportService.generateCompanyReportPDF(req.body);
+        const { dateFrom, dateTo } = req.body;
+        /* عند التقرير الكبير: إرسال التاريخ فقط وتوليد التقرير من DB يتجنّب حد حجم الطلب (413) */
+        const report = (dateFrom && dateTo)
+            ? reportService.getCompanyReportByRange(dateFrom, dateTo)
+            : req.body;
+        const buf = await reportService.generateCompanyReportPDF(report);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename=company-report.pdf');
         res.send(buf);

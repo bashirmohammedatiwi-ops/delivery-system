@@ -1855,8 +1855,8 @@ const screens = {
                     content.innerHTML = `
                         <div class="report-view">
                             <div class="report-view-title">التقرير الملخص - ${dateFrom} إلى ${dateTo}</div>
-                            <div class="report-table-wrap report-table-wrap--scrollable">
-                                <table class="report-table">
+                            <div class="report-table-wrap report-table-wrap--scrollable report-table-wrap--compact">
+                                <table class="report-table report-table--compact">
                                     <thead><tr>
                                         <th>التاريخ</th><th>السائق</th><th>عدد الطلبات</th><th>مرتجعات</th>
                                         <th>إجمالي الفواتير</th><th>أجور التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th>
@@ -1879,9 +1879,9 @@ const screens = {
                                         }).join('')}
                                     </tbody>
                                 </table>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
                 } catch (err) {
                     document.getElementById('dailySummaryContent').innerHTML = `<div class="scan-feedback error">${err?.message || 'فشل تحميل التقرير'}</div>`;
                     document.getElementById('dailySummaryActions').style.display = 'none';
@@ -1936,10 +1936,10 @@ const screens = {
                             <div class="report-summary-card"><div class="label">غير مجاني</div><div class="value">${report.countPaidDelivery || 0}</div></div>
                             ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                         </div>
-                        <div class="report-section-title">تفاصيل الطلبات</div>
-                        <div class="report-table-wrap report-table-wrap--scrollable">
-                            <table class="report-table">
-                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>اسم المستلم</th><th>هاتف المستلم</th><th class="col-address">العنوان</th><th>رابط الموقع</th><th>القطع</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th><th class="col-notes">ملاحظات</th></tr></thead>
+                        <div class="report-section-title">تفاصيل الطلبات <span class="report-count-badge">${report.orders.length} طلب</span></div>
+                        <div class="report-table-wrap report-table-wrap--scrollable report-table-wrap--orders">
+                            <table class="report-table report-table--orders">
+                                <thead><tr><th>الحالة</th><th>رقم</th><th>الشحنة</th><th>المتجر</th><th>المستلم</th><th>هاتف</th><th class="col-address">العنوان</th><th>رابط</th><th>قطع</th><th>فاتورة</th><th>توصيل</th><th>نهائي</th><th>مستحق</th><th>سداد</th><th>طبع</th><th>استلام</th><th>أنشأه</th><th class="col-notes">ملاحظات</th></tr></thead>
                                 <tbody>
                                     ${report.orders.map(o => {
                                         const returned = isOrderReturned(o);
@@ -2009,8 +2009,8 @@ const screens = {
                             ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
                         </div>
                         <div class="report-section-title">ملخص حسب السائق</div>
-                        <div class="report-table-wrap report-table-wrap--scrollable">
-                            <table class="report-table">
+                        <div class="report-table-wrap report-table-wrap--scrollable report-table-wrap--compact">
+                            <table class="report-table report-table--compact">
                                 <thead><tr><th>اسم السائق</th><th>عدد الطلبات</th><th>عدد المرتجعات</th><th>إجمالي الفواتير</th><th>أجور التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th></tr></thead>
                                 <tbody>
                                     ${report.summary.map(s => `
@@ -2027,10 +2027,11 @@ const screens = {
                                 </tbody>
                             </table>
                         </div>
-                        <div class="report-section-title">تفاصيل الطلبات</div>
-                        <div class="report-table-wrap report-table-wrap--scrollable">
-                            <table class="report-table">
-                                <thead><tr><th>الحالة</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>الهاتف</th><th class="col-address">العنوان</th><th>مبلغ الفاتورة</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>سداد الأجور</th><th>الطباعة</th><th>استلام</th><th>أنشأه</th></tr></thead>
+                        <div class="report-details-section">
+                            <div class="report-section-title">تفاصيل الطلبات <span class="report-count-badge">${allOrders.length} طلب</span></div>
+                            <div class="report-table-wrap report-table-wrap--scrollable report-table-wrap--orders">
+                                <table class="report-table report-table--orders">
+                                <thead><tr><th>الحالة</th><th>رقم</th><th>الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>هاتف</th><th class="col-address">العنوان</th><th>فاتورة</th><th>توصيل</th><th>نهائي</th><th>مستحق</th><th>سداد</th><th>طبع</th><th>استلام</th><th>أنشأه</th></tr></thead>
                                 <tbody>
                                     ${allOrders.map(o => {
                                         const returned = isOrderReturned(o);
@@ -2058,6 +2059,7 @@ const screens = {
                                     }).join('')}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2099,10 +2101,19 @@ const screens = {
 
             document.getElementById('btnExportCompanyPDF').addEventListener('click', async () => {
                 if (!currentCompanyReport) return;
-                const pdf = await window.api.reports.companyReportPDF(currentCompanyReport);
-                const name = `تقرير-يومي-${currentCompanyReport.date}.pdf`;
-                const res = await window.api.reports.savePDF({ base64: pdf, defaultName: name });
-                if (res.saved) await showMsg('تم حفظ الملف: ' + res.path);
+                const btn = document.getElementById('btnExportCompanyPDF');
+                const origText = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = '<span class="btn-loading">جاري التصدير...</span>';
+                try {
+                    await window.api.reports.companyReportPDF(currentCompanyReport);
+                    await showMsg('تم تصدير التقرير بنجاح');
+                } catch (err) {
+                    await showMsg('فشل التصدير: ' + (err?.message || err), 'خطأ');
+                } finally {
+                    btn.disabled = false;
+                    btn.innerHTML = origText;
+                }
             });
         }
     },

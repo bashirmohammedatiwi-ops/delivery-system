@@ -580,7 +580,8 @@ async function generateCompanyReportPDF(report) {
     const font = getArabicFont(doc);
     doc.font(font);
 
-    const allOrders = report.summary.flatMap(s => s.orders);
+    const summary = report?.summary || [];
+    const allOrders = summary.flatMap(s => (s?.orders || []));
     const validOrders = allOrders.filter(o => !isOrderReturned(o));
     const grandInvoice = validOrders.reduce((s, o) => s + (o.AmountIQD || 0), 0);
     const grandDelivery = validOrders.reduce((s, o) => s + getDriverDeliveryAmount(o), 0);
@@ -591,10 +592,10 @@ async function generateCompanyReportPDF(report) {
     drawHeader(doc, 'التقرير العام', 'شركة ديما الحياة', font);
 
     drawCards(doc, [
-        { label: 'التاريخ', value: report.date },
-        { label: 'إجمالي الطلبات', value: report.totalOrders.toString(), numeric: true },
-        { label: 'عدد المرتجعات', value: (report.totalReturned || 0).toString(), numeric: true },
-        { label: 'عدد السائقين', value: report.summary.length.toString(), numeric: true },
+        { label: 'التاريخ', value: report?.date || '' },
+        { label: 'إجمالي الطلبات', value: (report?.totalOrders ?? 0).toString(), numeric: true },
+        { label: 'عدد المرتجعات', value: (report?.totalReturned || 0).toString(), numeric: true },
+        { label: 'عدد السائقين', value: summary.length.toString(), numeric: true },
         { label: 'المبلغ المستحق', value: formatIQD(grandDue) + ' د.ع', numeric: true }
     ], y, font);
     y += 46;
@@ -615,8 +616,8 @@ async function generateCompanyReportPDF(report) {
 
     y += drawTableHead(doc, sumCols, y, font);
 
-    report.summary.forEach(s => {
-        const driverOrders = s.orders.filter(o => !isOrderReturned(o));
+    summary.forEach(s => {
+        const driverOrders = (s?.orders || []).filter(o => !isOrderReturned(o));
         const sInvoice = driverOrders.reduce((a, o) => a + (o.AmountIQD || 0), 0);
         const sDelivery = driverOrders.reduce((a, o) => a + getDriverDeliveryAmount(o), 0);
         const sNet = driverOrders.reduce((a, o) => a + (o.TotalIQD || 0), 0);
