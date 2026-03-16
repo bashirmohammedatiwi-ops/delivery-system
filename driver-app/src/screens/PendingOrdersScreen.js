@@ -10,7 +10,6 @@ import {
   Modal,
   Pressable,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getPendingOrdersByArea, getPendingOrdersList } from '../api';
@@ -157,7 +156,7 @@ export default function PendingOrdersScreen() {
         onRequestClose={() => setShowOrdersModal(false)}
       >
         <Pressable style={styles.modalOverlay} onPress={() => setShowOrdersModal(false)}>
-          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{selectedArea} - {formatDateAr(selectedDate)}</Text>
               <Pressable onPress={() => setShowOrdersModal(false)}>
@@ -171,28 +170,30 @@ export default function PendingOrdersScreen() {
             ) : ordersList.length === 0 ? (
               <Text style={styles.emptyText}>لا توجد طلبات</Text>
             ) : (
-              <FlatList
-                data={ordersList}
-                keyExtractor={(o) => String(o.OrderID)}
-                style={styles.ordersScroll}
-                contentContainerStyle={styles.ordersScrollContent}
-                showsVerticalScrollIndicator={true}
-                nestedScrollEnabled={true}
-                renderItem={({ item: o }) => (
-                  <View style={styles.orderCard}>
-                    <View style={styles.orderCardHeader}>
-                      <Text style={styles.orderShipment}>#{o.ShipmentNumber}</Text>
-                      <Text style={styles.orderAmount}>{formatIQD(o.TotalIQD)}</Text>
+              <View style={styles.ordersListWrap}>
+                <ScrollView
+                  style={styles.ordersScroll}
+                  contentContainerStyle={styles.ordersScrollContent}
+                  showsVerticalScrollIndicator={true}
+                  nestedScrollEnabled={true}
+                  bounces={true}
+                >
+                  {ordersList.map((o) => (
+                    <View key={o.OrderID} style={styles.orderCard}>
+                      <View style={styles.orderCardHeader}>
+                        <Text style={styles.orderShipment}>#{o.ShipmentNumber}</Text>
+                        <Text style={styles.orderAmount}>{formatIQD(o.TotalIQD)}</Text>
+                      </View>
+                      <Text style={styles.orderCustomer}>{o.CustomerName || '—'}</Text>
+                      <Text style={styles.orderAddress}>{o.Address || '—'}</Text>
+                      {o.RegionName ? <Text style={styles.orderRegion}>{o.RegionName}</Text> : null}
+                      {o.StoreName ? <Text style={styles.orderStore}>{o.StoreName}</Text> : null}
                     </View>
-                    <Text style={styles.orderCustomer}>{o.CustomerName || '—'}</Text>
-                    <Text style={styles.orderAddress}>{o.Address || '—'}</Text>
-                    {o.RegionName ? <Text style={styles.orderRegion}>{o.RegionName}</Text> : null}
-                    {o.StoreName ? <Text style={styles.orderStore}>{o.StoreName}</Text> : null}
-                  </View>
-                )}
-              />
+                  ))}
+                </ScrollView>
+              </View>
             )}
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </View>
@@ -264,8 +265,9 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.bgCard,
     borderTopLeftRadius: THEME.radiusXl,
     borderTopRightRadius: THEME.radiusXl,
-    maxHeight: '80%',
+    height: '85%',
     padding: 20,
+    paddingBottom: 24,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -276,7 +278,11 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a' },
   modalClose: { fontSize: 16, color: THEME.primary, fontWeight: '600' },
   modalLoading: { padding: 40, alignItems: 'center' },
-  ordersScroll: { maxHeight: Dimensions.get('window').height * 0.6 },
+  ordersListWrap: {
+    flex: 1,
+    minHeight: 100,
+  },
+  ordersScroll: { flex: 1 },
   ordersScrollContent: { paddingBottom: 24 },
   orderCard: {
     backgroundColor: THEME.bgMuted,
