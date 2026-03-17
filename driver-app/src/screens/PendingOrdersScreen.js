@@ -13,7 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { getPendingOrdersByArea, getPendingOrdersList } from '../api';
+import { getPendingOrdersByArea, getPendingOrdersList, getDriverToday } from '../api';
 import { THEME } from '../theme';
 import { getLocalDateStr } from '../utils/dateUtils';
 
@@ -45,6 +45,11 @@ export default function PendingOrdersScreen() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [selectedArea, setSelectedArea] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
+  const [todayStr, setTodayStr] = useState(getLocalDateStr());
+
+  React.useEffect(() => {
+    if (token) getDriverToday(token).then(t => setTodayStr(t || getLocalDateStr()));
+  }, [token]);
 
   const openAreaOrders = useCallback(
     async (date, area) => {
@@ -69,7 +74,7 @@ export default function PendingOrdersScreen() {
   const fetchData = useCallback(async () => {
     if (!token) return;
     try {
-      const today = getLocalDateStr();
+      const today = todayStr || getLocalDateStr();
       const weekAgo = new Date();
       weekAgo.setDate(weekAgo.getDate() - 6);
       const dateFrom = getLocalDateStr(weekAgo);
@@ -81,7 +86,7 @@ export default function PendingOrdersScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, todayStr]);
 
   React.useEffect(() => {
     setLoading(true);

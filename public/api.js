@@ -138,6 +138,7 @@ window.api = {
     },
     settings: {
         getDefaults: () => apiGet('/api/settings/defaults'),
+        getToday: () => apiGet('/api/settings/today'),
         updateDefaults: (data) => apiPut('/api/settings/defaults', data)
     },
     regions: {

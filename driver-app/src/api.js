@@ -45,6 +45,15 @@ export async function getDriverProfile(token) {
   return data;
 }
 
+export async function getDriverToday(token) {
+  const res = await fetch(`${API_BASE_URL}/api/driver/today`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error('غير مصرح');
+  return data.today || new Date().toISOString().slice(0, 10);
+}
+
 export async function getDriverOrders(token) {
   const res = await fetch(`${API_BASE_URL}/api/driver/orders`, {
     headers: { Authorization: `Bearer ${token}` },

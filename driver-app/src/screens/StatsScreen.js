@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { THEME } from '../theme';
-import { getDriverStats, getDriverDeliveredOrders } from '../api';
+import { getDriverStats, getDriverDeliveredOrders, getDriverToday } from '../api';
 import { calcTotalAmountDue } from '../utils/amountUtils';
 import { getLocalDateStr, addDays } from '../utils/dateUtils';
 
@@ -37,6 +37,11 @@ export default function StatsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getLocalDateStr());
+  const [todayStr, setTodayStr] = useState(getLocalDateStr());
+
+  React.useEffect(() => {
+    if (token) getDriverToday(token).then(t => setTodayStr(t || getLocalDateStr()));
+  }, [token]);
 
   const fetchStats = useCallback(async () => {
     if (!token) return;
@@ -70,13 +75,10 @@ export default function StatsScreen() {
   };
 
   const goNextDay = () => {
-    const today = getLocalDateStr();
-    if (addDays(selectedDate, 1) <= today) {
+    if (addDays(selectedDate, 1) <= todayStr) {
       setSelectedDate(addDays(selectedDate, 1));
     }
   };
-
-  const todayStr = getLocalDateStr();
   const canGoNext = selectedDate < todayStr;
 
   if (loading && !stats) {

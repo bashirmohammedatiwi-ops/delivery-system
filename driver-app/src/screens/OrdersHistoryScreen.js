@@ -12,7 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { THEME } from '../theme';
-import { getDriverDeliveredOrders, getDriverReturnedOrders, getDriverStats } from '../api';
+import { getDriverDeliveredOrders, getDriverReturnedOrders, getDriverStats, getDriverToday } from '../api';
 import { getLocalDateStr, addDays } from '../utils/dateUtils';
 
 function formatIQD(n) {
@@ -38,14 +38,18 @@ export default function OrdersHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getLocalDateStr());
+  const [todayStr, setTodayStr] = useState(getLocalDateStr());
+
+  React.useEffect(() => {
+    if (token) getDriverToday(token).then(t => setTodayStr(t || getLocalDateStr()));
+  }, [token]);
 
   const goPrevDay = () => {
     setSelectedDate(addDays(selectedDate, -1));
   };
 
   const goNextDay = () => {
-    const today = getLocalDateStr();
-    if (addDays(selectedDate, 1) <= today) {
+    if (addDays(selectedDate, 1) <= todayStr) {
       setSelectedDate(addDays(selectedDate, 1));
     }
   };
@@ -109,7 +113,6 @@ export default function OrdersHistoryScreen() {
     );
   }
 
-  const todayStr = getLocalDateStr();
   const canGoNext = selectedDate < todayStr;
 
   return (

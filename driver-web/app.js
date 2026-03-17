@@ -65,7 +65,8 @@ const app = {
     driver: null,
     currentTab: 'orders',
     currentOrder: null,
-    scanInstance: null  // مثيل مسح الباركود
+    scanInstance: null,
+    todayStr: null  // تاريخ اليوم من السيرفر (حسب إعداد وقت بداية اليوم)
 };
 
 function normalizeBarcodeInput(str) {
@@ -84,11 +85,12 @@ function showScreen(name) {
     if (el) el.classList.add('active');
 }
 
-function showMain() {
+async function showMain() {
     document.getElementById('login-screen').classList.remove('active');
     document.getElementById('main-screen').classList.add('active');
     document.getElementById('driverName').textContent = app.driver?.DriverName || '—';
     app.currentTab = 'orders';
+    try { const t = await api('/api/driver/today'); app.todayStr = t.today || getLocalDateStr(); } catch (_) { app.todayStr = getLocalDateStr(); }
     renderTab();
 }
 
@@ -231,7 +233,7 @@ function renderReceive(container) {
 async function renderPending(container) {
     container.innerHTML = '<div class="loading-state">جاري التحميل...</div>';
     try {
-        const today = getLocalDateStr();
+        const today = app.todayStr || getLocalDateStr();
         const weekAgo = new Date();
         weekAgo.setDate(weekAgo.getDate() - 6);
         const dateFrom = getLocalDateStr(weekAgo);
@@ -308,7 +310,7 @@ function showPendingOrdersList(date, area) {
 }
 
 async function renderStats(container) {
-    let selectedDate = getLocalDateStr();
+    let selectedDate = app.todayStr || getLocalDateStr();
     const render = async () => {
         container.innerHTML = '<div class="loading-state">جاري تحميل الإحصائيات...</div>';
         try {
@@ -318,7 +320,7 @@ async function renderStats(container) {
             ]);
             const totalAmountDue = calcTotalAmountDue(deliveredOrders);
             const stats = { ...statsData, totalAmountDue };
-            const todayStr = getLocalDateStr();
+            const todayStr = app.todayStr || getLocalDateStr();
             const goPrev = () => {
                 selectedDate = addDays(selectedDate, -1);
                 render();
@@ -371,7 +373,7 @@ async function renderStats(container) {
 
 async function renderHistory(container) {
     let tab = 'delivered';
-    let selectedDate = getLocalDateStr();
+    let selectedDate = app.todayStr || getLocalDateStr();
     const doRender = async () => {
         container.innerHTML = '<div class="loading-state">جاري التحميل...</div>';
         try {
@@ -380,7 +382,7 @@ async function renderHistory(container) {
                 api('/api/driver/stats?date=' + selectedDate)
             ]);
             const list = Array.isArray(orders) ? orders : [];
-            const todayStr = getLocalDateStr();
+            const todayStr = app.todayStr || getLocalDateStr();
             const fmtDt = (d) => d ? new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
             container.innerHTML = `
                 <div class="history-date-nav">

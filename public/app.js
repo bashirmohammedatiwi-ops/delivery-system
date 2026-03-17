@@ -666,7 +666,8 @@ const screens = {
     dashboard: {
         async render(container) {
             const orders = await window.api.orders.getAll({ limit: 5000 });
-            const today = new Date().toISOString().split('T')[0];
+            let today = new Date().toISOString().split('T')[0];
+            try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
             const todayOrders = orders.filter(o => (o.CreatedDate || '').startsWith(today));
             const newCount = orders.filter(o => o.Status === 'New').length;
             const assignedCount = orders.filter(o => o.Status === 'AssignedToDriver').length;
@@ -1626,7 +1627,8 @@ const screens = {
     reports: {
         async render(container) {
             const drivers = await window.api.drivers.getActive();
-            const today = new Date().toISOString().split('T')[0];
+            let today = new Date().toISOString().split('T')[0];
+            try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
 
             container.innerHTML = `
                 <div class="screen active reports-screen">
@@ -2147,10 +2149,10 @@ const screens = {
 
     settings: {
         async render(container) {
-            let defaults = { storeName: localStorage.getItem('defaultStoreName') || '', storePhone: localStorage.getItem('defaultStorePhone') || '' };
+            let defaults = { storeName: localStorage.getItem('defaultStoreName') || '', storePhone: localStorage.getItem('defaultStorePhone') || '', dayStartHour: 0 };
             try {
                 const s = await window.api.settings.getDefaults();
-                if (s.storeName || s.storePhone) defaults = s;
+                if (s.storeName || s.storePhone || s.dayStartHour !== undefined) defaults = { ...defaults, ...s };
                 else if (defaults.storeName || defaults.storePhone) {
                     window.api.settings.updateDefaults(defaults).catch(() => {});
                 }
@@ -2241,6 +2243,28 @@ const screens = {
                         </div>
                     </div>
                             </section>
+                            <section class="settings-pane settings-pane-time" id="settings-pane-time">
+                                <div class="settings-pane-hero">
+                                    <div class="settings-pane-icon-wrap"><i class="bi bi-clock-fill"></i></div>
+                                    <h2 class="settings-pane-title">التوقيت</h2>
+                                    <p class="settings-pane-lead">وقت بداية اليوم بتوقيت العراق — يُحدد متى يبدأ اليوم الجديد (للإحصائيات والتقارير)</p>
+                                </div>
+                                <div class="settings-form-card">
+                                    <div class="settings-form-header"><i class="bi bi-sunrise"></i><span>وقت بداية اليوم</span></div>
+                                    <div class="settings-defaults-form">
+                                        <div class="settings-field">
+                                            <label>بداية اليوم (بتوقيت بغداد)</label>
+                                            <select id="dayStartHour">
+                                                <option value="0" ${(defaults.dayStartHour || 0) == 0 ? 'selected' : ''}>00:00 (منتصف الليل)</option>
+                                                <option value="6" ${(defaults.dayStartHour || 0) == 6 ? 'selected' : ''}>06:00 (صبحاً)</option>
+                                                <option value="12" ${(defaults.dayStartHour || 0) == 12 ? 'selected' : ''}>12:00 (ظهراً)</option>
+                                                <option value="18" ${(defaults.dayStartHour || 0) == 18 ? 'selected' : ''}>18:00 (مساءً)</option>
+                                            </select>
+                                        </div>
+                                        <button type="button" class="btn settings-action-btn" id="btnSaveTime"><i class="bi bi-check2-circle"></i><span>حفظ إعدادات التوقيت</span></button>
+                                    </div>
+                                </div>
+                            </section>
                             <section class="settings-pane settings-pane-about" id="settings-pane-about">
                                 <div class="settings-pane-hero">
                                     <div class="settings-pane-icon-wrap"><i class="bi bi-info-circle-fill"></i></div>
@@ -2281,6 +2305,13 @@ const screens = {
                 localStorage.setItem('defaultStorePhone', storePhone);
                 try { await window.api.settings.updateDefaults({ storeName, storePhone }); } catch (_) {}
                 await showMsg('تم حفظ القيم الافتراضية');
+            });
+            container.querySelector('#btnSaveTime')?.addEventListener('click', async () => {
+                const dayStartHour = parseInt(container.querySelector('#dayStartHour')?.value || '0', 10);
+                try {
+                    await window.api.settings.updateDefaults({ dayStartHour });
+                    await showMsg('تم حفظ إعدادات التوقيت');
+                } catch (_) { await showMsg('خطأ في الحفظ'); }
             });
 
             const refreshRegions = () => screens.settings.render(container);
