@@ -8,6 +8,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: alhayat-delivery:latest
+    pull_policy: never
     container_name: delivery-system
     restart: unless-stopped
     ports:
@@ -31,6 +32,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: alhayat-delivery:latest
+    pull_policy: never
     container_name: delivery-employee-web
     restart: unless-stopped
     command: ["node", "server-employee.js"]
@@ -50,6 +52,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: alhayat-delivery:latest
+    pull_policy: never
     container_name: delivery-driver-web
     restart: unless-stopped
     command: ["node", "server-driver.js"]
@@ -88,6 +91,7 @@ services:
       context: .
       dockerfile: nginx/Dockerfile
     image: alhayat-delivery-nginx:latest
+    pull_policy: never
     container_name: delivery-nginx
     restart: unless-stopped
     ports:
