@@ -1,85 +1,38 @@
-# نشر التطبيق على السيرفر باستخدام Docker
+# إعداد النشر (Deployment)
 
-## المتطلبات
-- Docker و Docker Compose على السيرفر
+## المشكلة
+منصة النشر تحاول **سحب** الصورة `alhayat-delivery:latest` من Docker Hub، لكنها **صورة محلية** يجب بناؤها من الكود.
 
-## البورتات
-| الخدمة        | البورت | الوصف                    |
-|--------------|--------|--------------------------|
-| التطبيق الرئيسي | 3000   | واجهة الإدارة والـ API    |
-| تطبيق السائقين  | 3001   | واجهة ويب السائقين       |
-| **تطبيق الموظفين** | **3002** | **واجهة ويب الموظفين** |
+## الحل
 
-## خطوات الرفع
-
-### 1. رفع الملفات للسيرفر
+### 1. استخدام سكربت النشر
 ```bash
-# نسخ المشروع إلى السيرفر
-scp -r . user@your-server:/opt/alhayat-delivery
-cd /opt/alhayat-delivery
+chmod +x scripts/deploy.sh
+./scripts/deploy.sh
 ```
 
-### 2. البناء والتشغيل
-```bash
-# إيقاف الحاويات القديمة إن وُجدت
-docker compose down
+### 2. إعداد منصة النشر (Coolify / CapRover / إلخ)
 
-# بناء الصور وتشغيل الحاويات (بدون كاش للبناء النظيف إن لزم)
-docker compose up -d --build
+**مهم:** عطّل أو تجاوز خطوة "Pull" واجعل المنصة تنفّذ **Build** من الكود.
+
+#### Build Command (أمر البناء):
+```bash
+docker build -t alhayat-delivery:latest -f Dockerfile .
 ```
 
-### عند عدم عمل البورت 3000
+#### Start Command (أمر التشغيل):
 ```bash
-# عرض سجلات التطبيق الرئيسي
-docker compose logs app
-
-# التحقق من حالة الحاويات
-docker compose ps
+docker compose up -d
 ```
 
-### 3. التحقق
+أو أمر واحد:
 ```bash
-# عرض الحاويات
-docker-compose ps
-
-# عرض السجلات
-docker-compose logs -f employee-web
+docker build -t alhayat-delivery:latest -f Dockerfile . && docker compose up -d
 ```
 
-### 4. الوصول للتطبيق
-- **تطبيق الموظفين (ويب):** `http://YOUR_SERVER_IP:3002`
-- التطبيق الإداري: `http://YOUR_SERVER_IP:3000`
-- تطبيق السائقين: `http://YOUR_SERVER_IP:3001`
-
-## استخدام Nginx كـ Reverse Proxy (اختياري)
-
-للاستخدام مع نطاق (domain) وـ HTTPS:
-
-```nginx
-server {
-    listen 80;
-    server_name employees.yourdomain.com;
-
-    location / {
-        proxy_pass http://127.0.0.1:3002;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-## أوامر مفيدة
-
+### 3. النشر اليدوي على السيرفر
 ```bash
-# إيقاف الخدمات
-docker-compose down   # أو: docker compose down
-
-# إعادة بناء وتشغيل
-docker-compose up -d --build
-
-# عرض السجلات
-docker-compose logs -f employee-web
+cd /opt/delivery-system
+docker build -t alhayat-delivery:latest -f Dockerfile .
+docker compose up -d
 ```
