@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")/.."
 
 echo "=== بناء الصورة alhayat-delivery ==="
-docker build -t alhayat-delivery:latest -f Dockerfile .
+docker build -t localhost/alhayat-delivery:latest -f Dockerfile .
 
 echo "=== تشغيل الحاويات ==="
 docker compose up -d 2>/dev/null || docker-compose up -d

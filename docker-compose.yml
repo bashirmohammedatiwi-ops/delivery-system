@@ -7,7 +7,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: alhayat-delivery:latest
+    image: localhost/alhayat-delivery:latest
     pull_policy: never
     container_name: delivery-system
     restart: unless-stopped
@@ -31,7 +31,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: alhayat-delivery:latest
+    image: localhost/alhayat-delivery:latest
     pull_policy: never
     container_name: delivery-employee-web
     restart: unless-stopped
@@ -51,7 +51,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: alhayat-delivery:latest
+    image: localhost/alhayat-delivery:latest
     pull_policy: never
     container_name: delivery-driver-web
     restart: unless-stopped
@@ -90,7 +90,7 @@ services:
     build:
       context: .
       dockerfile: nginx/Dockerfile
-    image: alhayat-delivery-nginx:latest
+    image: localhost/alhayat-delivery-nginx:latest
     pull_policy: never
     container_name: delivery-nginx
     restart: unless-stopped
