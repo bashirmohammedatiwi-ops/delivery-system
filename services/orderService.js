@@ -1,9 +1,15 @@
 const db = require('../database/init');
-const { getIraqDateStr, getIraqDateTimeStr } = require('../utils/dateUtils');
 
-/** تاريخ ووقت محلي بتوقيت العراق */
+/** تاريخ ووقت محلي لضمان تطابق مع توقيت السائق (بدلاً من UTC) */
 function getLocalDateTimeStr() {
-    return getIraqDateTimeStr();
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const s = String(d.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${day} ${h}:${min}:${s}`;
 }
 
 // رقم الشحنة: أرقام فقط (سنة+شهر+ترتيب) مثل 2603000014
@@ -39,8 +45,8 @@ function createOrder(orderData) {
 
     const stmt = database.prepare(`
         INSERT INTO Orders (AdminOrderNo, ShipmentNumber, StoreName, StorePhone, CustomerName, CustomerPhone, 
-            Address, RegionID, Pieces, AmountIQD, DeliveryFeeIQD, FreeDelivery, WaivedDeliveryIQD, TotalIQD, Notes, CustomerLocationLink, Status, CreatedByUserID, CreatedDate)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?, ?)
+            Address, RegionID, Pieces, AmountIQD, DeliveryFeeIQD, FreeDelivery, WaivedDeliveryIQD, TotalIQD, Notes, CustomerLocationLink, Status, CreatedByUserID)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'New', ?)
     `);
 
     stmt.run(
@@ -60,8 +66,7 @@ function createOrder(orderData) {
         totalIQD,
         orderData.Notes || '',
         (orderData.CustomerLocationLink || '').trim() || null,
-        createdByUserID,
-        getLocalDateTimeStr()
+        createdByUserID
     );
 
     return getOrderByShipmentNumber(shipmentNumber);
@@ -304,7 +309,7 @@ function getAmountDue(order) {
 /* العرض حسب تاريخ الطلب (CreatedDate) */
 function getDriverStats(driverId, date) {
     const database = db.getDatabase();
-    const d = date || getIraqDateStr();
+    const d = date || new Date().toISOString().slice(0, 10);
     const delivered = database.prepare(
         `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'Delivered' AND date(CreatedDate) = date(?)`
     ).get(driverId, d);
@@ -370,7 +375,7 @@ function getDriverStats(driverId, date) {
 /* طلبات موصّلة — حسب تاريخ الطلب */
 function getDriverDeliveredOrders(driverId, date) {
     const database = db.getDatabase();
-    const d = date || getIraqDateStr();
+    const d = date || new Date().toISOString().slice(0, 10);
     return database.prepare(
         `SELECT o.*, d.DriverName, r.RegionName 
          FROM Orders o LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
@@ -383,7 +388,7 @@ function getDriverDeliveredOrders(driverId, date) {
 /* طلبات مرتجعة — حسب تاريخ الإنشاء أو تاريخ الإرجاع (السائق أرجعها أو المدير غيّر الحالة) */
 function getDriverReturnedOrders(driverId, date) {
     const database = db.getDatabase();
-    const d = date || getIraqDateStr();
+    const d = date || new Date().toISOString().slice(0, 10);
     return database.prepare(
         `SELECT o.*, COALESCE(rd.DriverName, d.DriverName) AS DriverName, r.RegionName 
          FROM Orders o 
@@ -416,7 +421,7 @@ function getPendingOrdersByArea(dateFrom, dateTo) {
 
 function getPendingOrdersList(date, regionArea) {
     const database = db.getDatabase();
-    const d = date || getIraqDateStr();
+    const d = date || new Date().toISOString().slice(0, 10);
     const area = String(regionArea || '').trim();
     if (!area || !['الكرخ', 'الرصافة'].includes(area)) return [];
     return database.prepare(

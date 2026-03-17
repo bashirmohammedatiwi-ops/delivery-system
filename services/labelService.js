@@ -3,7 +3,6 @@ const QRCode = require('qrcode');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
-const { getIraqDateTimeStr } = require('../utils/dateUtils');
 
 const BLACK = '#000000';
 const WHITE = '#ffffff';
@@ -297,7 +296,7 @@ async function createLabelPDF(order) {
         row1('الملاحظات', order.Notes.trim().slice(0, 80), false, false, false);
     }
 
-    const dateStr = order.CreatedDate || getIraqDateTimeStr();
+    const dateStr = (order.CreatedDate || new Date().toISOString()).replace('T', ' ').slice(0, 19);
     row2('عدد القطع', String(order.Pieces || 1), 'تاريخ الشحنة', dateStr, true, true, alt, false, true, true);
     alt = !alt;
     row2('رقم الطلب', order.AdminOrderNo ?? '-', 'رقم الشحنة', order.ShipmentNumber, true, true, alt, false, true, true);

@@ -3,7 +3,6 @@
  * عندما يضع موظف توصيل مجاني على طلب أقل من 50000
  */
 const db = require('../database/init');
-const { getIraqDateTimeStr } = require('../utils/dateUtils');
 
 const FREE_DELIVERY_THRESHOLD = 50000;
 
@@ -39,7 +38,7 @@ function getAllNotifications(limit = 50) {
 
 function markAsReviewed(notificationId) {
     const database = db.getDatabase();
-    const now = getIraqDateTimeStr();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     database.prepare(
         'UPDATE FreeDeliveryOverrideNotifications SET Reviewed = 1, ReviewedAt = ? WHERE NotificationID = ?'
     ).run(now, notificationId);
