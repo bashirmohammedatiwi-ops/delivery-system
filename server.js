@@ -1,6 +1,8 @@
+process.env.TZ = 'Asia/Baghdad';
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { getIraqDateStr } = require('./utils/dateUtils');
 const fs = require('fs');
 const db = require('./database/init');
 const orderService = require('./services/orderService');
@@ -449,7 +451,7 @@ app.get('/api/driver/stats', async (req, res) => {
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
         const driver = authService.getDriverByToken(token);
         if (!driver) return res.status(401).json({ error: 'غير مصرح' });
-        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const date = req.query.date || getIraqDateStr();
         const stats = orderService.getDriverStats(driver.DriverID, date);
         stats.feesCollected = feeCollectionService.isFeesCollected(driver.DriverID, date);
         res.json(stats);
@@ -464,7 +466,7 @@ app.get('/api/driver/delivered-orders', async (req, res) => {
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
         const driver = authService.getDriverByToken(token);
         if (!driver) return res.status(401).json({ error: 'غير مصرح' });
-        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const date = req.query.date || getIraqDateStr();
         const orders = orderService.getDriverDeliveredOrders(driver.DriverID, date);
         res.json(orders);
     } catch (err) {
@@ -478,7 +480,7 @@ app.get('/api/driver/returned-orders', async (req, res) => {
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
         const driver = authService.getDriverByToken(token);
         if (!driver) return res.status(401).json({ error: 'غير مصرح' });
-        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const date = req.query.date || getIraqDateStr();
         const orders = orderService.getDriverReturnedOrders(driver.DriverID, date);
         res.json(orders);
     } catch (err) {
@@ -492,7 +494,7 @@ app.get('/api/driver/pending-orders', async (req, res) => {
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
         const driver = authService.getDriverByToken(token);
         if (!driver) return res.status(401).json({ error: 'غير مصرح' });
-        const dateFrom = req.query.dateFrom || new Date().toISOString().slice(0, 10);
+        const dateFrom = req.query.dateFrom || getIraqDateStr();
         const dateTo = req.query.dateTo || dateFrom;
         const data = orderService.getPendingOrdersByArea(dateFrom, dateTo);
         res.json(data);
@@ -507,7 +509,7 @@ app.get('/api/driver/pending-orders-list', async (req, res) => {
         const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
         const driver = authService.getDriverByToken(token);
         if (!driver) return res.status(401).json({ error: 'غير مصرح' });
-        const date = req.query.date || new Date().toISOString().slice(0, 10);
+        const date = req.query.date || getIraqDateStr();
         const area = (req.query.area || '').trim();
         if (!area || !['الكرخ', 'الرصافة'].includes(area)) {
             return res.status(400).json({ error: 'حدد المنطقة: الكرخ أو الرصافة' });

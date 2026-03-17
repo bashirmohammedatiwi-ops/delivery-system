@@ -33,16 +33,13 @@ function formatDateShort(d) {
     if (!d) return '';
     return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 }
-/* تاريخ محلي YYYY-MM-DD (تجنب مشكلة UTC في العراق) */
+/* تاريخ بتوقيت العراق (Asia/Baghdad) */
 function getLocalDateStr(d) {
     d = d || new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
 }
 function addDays(dateStr, delta) {
-    const d = new Date(dateStr + 'T12:00:00');
+    const d = new Date(dateStr + 'T12:00:00+03:00');
     d.setDate(d.getDate() + delta);
     return getLocalDateStr(d);
 }

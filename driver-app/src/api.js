@@ -2,6 +2,7 @@
  * API service لتطبيق السائق
  */
 import { API_BASE_URL } from './config';
+import { getLocalDateStr } from './utils/dateUtils';
 
 async function parseResponse(res) {
   const text = await res.text();
@@ -83,7 +84,7 @@ export async function markOrderReturned(token, orderId, returnReason = '') {
 }
 
 export async function getDriverStats(token, date) {
-  const d = date || new Date().toISOString().slice(0, 10);
+  const d = date || getLocalDateStr();
   const res = await fetch(`${API_BASE_URL}/api/driver/stats?date=${encodeURIComponent(d)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -93,7 +94,7 @@ export async function getDriverStats(token, date) {
 }
 
 export async function getDriverDeliveredOrders(token, date) {
-  const d = date || new Date().toISOString().slice(0, 10);
+  const d = date || getLocalDateStr();
   const res = await fetch(`${API_BASE_URL}/api/driver/delivered-orders?date=${encodeURIComponent(d)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -103,7 +104,7 @@ export async function getDriverDeliveredOrders(token, date) {
 }
 
 export async function getDriverReturnedOrders(token, date) {
-  const d = date || new Date().toISOString().slice(0, 10);
+  const d = date || getLocalDateStr();
   const res = await fetch(`${API_BASE_URL}/api/driver/returned-orders?date=${encodeURIComponent(d)}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -113,7 +114,7 @@ export async function getDriverReturnedOrders(token, date) {
 }
 
 export async function getPendingOrdersByArea(token, dateFrom, dateTo) {
-  const from = dateFrom || new Date().toISOString().slice(0, 10);
+  const from = dateFrom || getLocalDateStr();
   const to = dateTo || from;
   const res = await fetch(
     `${API_BASE_URL}/api/driver/pending-orders?dateFrom=${encodeURIComponent(from)}&dateTo=${encodeURIComponent(to)}`,
@@ -125,7 +126,7 @@ export async function getPendingOrdersByArea(token, dateFrom, dateTo) {
 }
 
 export async function getPendingOrdersList(token, date, area) {
-  const d = date || new Date().toISOString().slice(0, 10);
+  const d = date || getLocalDateStr();
   const a = area || '';
   const res = await fetch(
     `${API_BASE_URL}/api/driver/pending-orders-list?date=${encodeURIComponent(d)}&area=${encodeURIComponent(a)}`,

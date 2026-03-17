@@ -1,3 +1,8 @@
+// ─── تاريخ اليوم بتوقيت العراق ───
+function getTodayIraq() {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+}
+
 // ─── المصادقة والصلاحيات ───
 let currentUser = null;
 
@@ -666,7 +671,7 @@ const screens = {
     dashboard: {
         async render(container) {
             const orders = await window.api.orders.getAll({ limit: 5000 });
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayIraq();
             const todayOrders = orders.filter(o => (o.CreatedDate || '').startsWith(today));
             const newCount = orders.filter(o => o.Status === 'New').length;
             const assignedCount = orders.filter(o => o.Status === 'AssignedToDriver').length;
@@ -1626,7 +1631,7 @@ const screens = {
     reports: {
         async render(container) {
             const drivers = await window.api.drivers.getActive();
-            const today = new Date().toISOString().split('T')[0];
+            const today = getTodayIraq();
 
             container.innerHTML = `
                 <div class="screen active reports-screen">
