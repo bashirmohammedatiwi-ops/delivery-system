@@ -507,7 +507,7 @@ function showOrderDetail(order) {
 }
 
 // ─── البدء ───
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
     app.token = getToken();
     app.driver = getDriver();
     if (app.token && app.driver?.DriverID) {
@@ -553,4 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
             renderTab();
         });
     });
-});
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}

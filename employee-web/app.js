@@ -800,7 +800,7 @@ function renderSettings(container) {
     };
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function init() {
     if (await checkAuth()) {
         showMain();
     } else {
@@ -838,4 +838,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderTab();
         };
     });
-});
+}
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
