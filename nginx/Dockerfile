@@ -3,8 +3,6 @@ FROM nginx:alpine
 RUN apk add --no-cache bash openssl
 
 # يُبنى من جذر المشروع: build context = .
-COPY driver-web /var/www/driver
-COPY employee-web /var/www/employee
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf.template
 COPY nginx/conf.d/default-selfsigned.conf /etc/nginx/templates/default-selfsigned.conf

@@ -4,16 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>تطبيق السائق - شركة ديما الحياة</title>
-    <script>
-      (function(){
-        var p=location.pathname;
-        var h=(p.indexOf('/driver')===0)?'/driver/styles.css':(p.indexOf('/employee')===0)?'/employee/styles.css':'styles.css';
-        var l=document.createElement('link');
-        l.rel='stylesheet';
-        l.href=h;
-        document.head.appendChild(l);
-      })();
-    </script>
+    <script>var p=location.pathname;var b=(p.indexOf('/driver')===0)?'/driver/':(p.indexOf('/employee')===0)?'/employee/':'/';document.write('<base href="'+b+'">');</script>
+    <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Tajawal:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -68,17 +60,7 @@
             </nav>
         </div>
     </div>
-    <script>
-      (function(){
-        var p=location.pathname;
-        var b=(p.indexOf('/driver')===0)?'/driver/':(p.indexOf('/employee')===0)?'/employee/':'';
-        function loadApp(){ var s=document.createElement('script'); s.src=b+'app.js'; document.body.appendChild(s); }
-        var s1=document.createElement('script');
-        s1.src=b+'html5-qrcode.min.js';
-        s1.onload=loadApp;
-        s1.onerror=loadApp;
-        document.body.appendChild(s1);
-      })();
-    </script>
+    <script src="html5-qrcode.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

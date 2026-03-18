@@ -5,16 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#7C3AED">
     <title>تطبيق الموظفين - ديما الحياة</title>
-    <script>
-      (function(){
-        var p=location.pathname;
-        var h=(p.indexOf('/employee')===0)?'/employee/styles.css':(p.indexOf('/driver')===0)?'/driver/styles.css':'styles.css';
-        var l=document.createElement('link');
-        l.rel='stylesheet';
-        l.href=h;
-        document.head.appendChild(l);
-      })();
-    </script>
+    <script>var p=location.pathname;var b=(p.indexOf('/employee')===0)?'/employee/':(p.indexOf('/driver')===0)?'/driver/':'/';document.write('<base href="'+b+'">');</script>
+    <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -70,13 +62,8 @@
             </nav>
         </div>
     </div>
-    <script>
-      (function(){
-        var p=location.pathname;
-        var b=(p.indexOf('/employee')===0)?'/employee/':(p.indexOf('/driver')===0)?'/driver/':'';
-        function loadNext(arr,i){ if(i>=arr.length)return; var s=document.createElement('script'); s.src=b+arr[i]; s.onload=s.onerror=function(){loadNext(arr,i+1);}; document.body.appendChild(s); }
-        loadNext(['html5-qrcode.min.js','api.js','app.js'],0);
-      })();
-    </script>
+    <script src="html5-qrcode.min.js"></script>
+    <script src="api.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
