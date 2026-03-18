@@ -6,15 +6,20 @@ const db = require('./database/init');
 
 /** تاريخ اليوم بتوقيت العراق حسب وقت بداية اليوم (من الإعدادات) */
 function getTodayInIraq(dayStartHour = 0) {
-    const now = new Date();
-    const iraqHour = parseInt(now.toLocaleString('en-US', { timeZone: 'Asia/Baghdad', hour: 'numeric', hour12: false }), 10);
-    const iraqDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
-    if (iraqHour < dayStartHour) {
-        const d = new Date(iraqDate + 'T12:00:00');
-        d.setDate(d.getDate() - 1);
-        return d.toISOString().slice(0, 10);
+    try {
+        const now = new Date();
+        const iraqHour = parseInt(now.toLocaleString('en-US', { timeZone: 'Asia/Baghdad', hour: 'numeric', hour12: false }), 10);
+        const iraqDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+        if (!iraqDate || iraqDate.length < 10) throw new Error('Invalid date');
+        if (iraqHour < dayStartHour) {
+            const d = new Date(iraqDate + 'T12:00:00');
+            d.setDate(d.getDate() - 1);
+            return d.toISOString().slice(0, 10);
+        }
+        return iraqDate;
+    } catch (e) {
+        return new Date().toISOString().slice(0, 10);
     }
-    return iraqDate;
 }
 const orderService = require('./services/orderService');
 const driverService = require('./services/driverService');
