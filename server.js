@@ -2,8 +2,20 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { getTodayInIraq } = require('./utils/dateUtils');
 const db = require('./database/init');
+
+/** تاريخ اليوم بتوقيت العراق حسب وقت بداية اليوم (من الإعدادات) */
+function getTodayInIraq(dayStartHour = 0) {
+    const now = new Date();
+    const iraqHour = parseInt(now.toLocaleString('en-US', { timeZone: 'Asia/Baghdad', hour: 'numeric', hour12: false }), 10);
+    const iraqDate = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+    if (iraqHour < dayStartHour) {
+        const d = new Date(iraqDate + 'T12:00:00');
+        d.setDate(d.getDate() - 1);
+        return d.toISOString().slice(0, 10);
+    }
+    return iraqDate;
+}
 const orderService = require('./services/orderService');
 const driverService = require('./services/driverService');
 const feeCollectionService = require('./services/feeCollectionService');
