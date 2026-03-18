@@ -94,8 +94,6 @@ services:
       - app
       - employee-web
       - driver-web
-    profiles:
-      - https
 
 volumes:
   app-data:
