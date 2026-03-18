@@ -21,6 +21,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 COPY package.json ./
 COPY server.js server-driver.js server-employee.js ./
+COPY utils ./utils
 COPY database ./database
 COPY public ./public
 COPY driver-web ./driver-web
