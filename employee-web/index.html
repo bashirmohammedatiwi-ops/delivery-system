@@ -8,9 +8,11 @@
     <script>
       (function(){
         var p=location.pathname;
-        var b=(p.indexOf('/employee')===0)?'/employee':(p.indexOf('/driver')===0)?'/driver':'';
-        var pfx=b?(b+'/'):'';
-        document.write('<link rel="stylesheet" href="'+pfx+'styles.css">');
+        var h=(p.indexOf('/employee')===0)?'/employee/styles.css':(p.indexOf('/driver')===0)?'/driver/styles.css':'styles.css';
+        var l=document.createElement('link');
+        l.rel='stylesheet';
+        l.href=h;
+        document.head.appendChild(l);
       })();
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -71,11 +73,9 @@
     <script>
       (function(){
         var p=location.pathname;
-        var b=(p.indexOf('/employee')===0)?'/employee':(p.indexOf('/driver')===0)?'/driver':'';
-        var pfx=b?(b+'/'):'';
-        document.write('<script src="'+pfx+'html5-qrcode.min.js"><\/script>');
-        document.write('<script src="'+pfx+'api.js"><\/script>');
-        document.write('<script src="'+pfx+'app.js"><\/script>');
+        var b=(p.indexOf('/employee')===0)?'/employee/':(p.indexOf('/driver')===0)?'/driver/':'';
+        function loadNext(arr,i){ if(i>=arr.length)return; var s=document.createElement('script'); s.src=b+arr[i]; s.onload=s.onerror=function(){loadNext(arr,i+1);}; document.body.appendChild(s); }
+        loadNext(['html5-qrcode.min.js','api.js','app.js'],0);
       })();
     </script>
 </body>
