@@ -8,9 +8,7 @@
       (function(){
         var p=location.pathname;
         var b=(p.indexOf('/driver')===0)?'/driver/':(p.indexOf('/employee')===0)?'/employee/':'/';
-        var base=document.createElement('base');
-        base.href=b;
-        document.head.insertBefore(base,document.head.firstChild);
+        document.write('<base href="'+b+'">');
       })();
     </script>
     <link rel="stylesheet" href="styles.css">
