@@ -313,9 +313,9 @@ function getDriverStats(driverId, date) {
     const delivered = database.prepare(
         `SELECT COUNT(*) as c FROM Orders WHERE DriverID = ? AND Status = 'Delivered' AND date(CreatedDate) = date(?)`
     ).get(driverId, d);
-    /* المراجع: حسب تاريخ الإرجاع فقط (ليس تاريخ الإنشاء) */
+    /* المراجع: حسب تاريخ الإنشاء فقط (ليس تاريخ الإرجاع) */
     const returned = database.prepare(
-        `SELECT COUNT(*) as c FROM Orders WHERE ReturnedDate IS NOT NULL AND date(ReturnedDate) = date(?) AND (
+        `SELECT COUNT(*) as c FROM Orders WHERE date(CreatedDate) = date(?) AND (
             (ReturnedByDriverID = ? AND (Status = 'Returned' OR LOWER(TRIM(COALESCE(Status,''))) IN ('returned','راجع','canceled','ملغي')))
             OR (DriverID = ? AND Status = 'Returned')
         )`
@@ -331,8 +331,7 @@ function getDriverStats(driverId, date) {
          FROM Orders WHERE (
              (Status = 'Delivered' AND DriverID = ? AND date(CreatedDate) = date(?))
              OR ((Status = 'Returned' OR LOWER(TRIM(COALESCE(Status,''))) IN ('returned','راجع','canceled','ملغي')) 
-                 AND ReturnedDate IS NOT NULL AND date(ReturnedDate) = date(?)
-                 AND (ReturnedByDriverID = ? OR DriverID = ?))
+                 AND date(CreatedDate) = date(?) AND (ReturnedByDriverID = ? OR DriverID = ?))
          )`
     ).all(driverId, d, d, driverId, driverId);
 
@@ -382,21 +381,21 @@ function getDriverDeliveredOrders(driverId, date) {
     ).all(driverId, d);
 }
 
-/* طلبات مرتجعة — حسب تاريخ الإرجاع فقط (ليس تاريخ الإنشاء) */
+/* طلبات مرتجعة — حسب تاريخ الإنشاء فقط (ليس تاريخ الإرجاع) */
 function getDriverReturnedOrders(driverId, date) {
     const database = db.getDatabase();
     const d = date || new Date().toISOString().slice(0, 10);
     return database.prepare(
-        `SELECT o.*, COALESCE(rd.DriverName, d.DriverName) AS DriverName, r.RegionName 
+        `SELECT o.*, COALESCE(rd.DriverName, dr.DriverName) AS DriverName, r.RegionName 
          FROM Orders o 
          LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID 
-         LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+         LEFT JOIN Drivers dr ON o.DriverID = dr.DriverID 
          LEFT JOIN Regions r ON o.RegionID = r.RegionID 
-         WHERE o.ReturnedDate IS NOT NULL AND date(o.ReturnedDate) = date(?) AND (
+         WHERE date(o.CreatedDate) = date(?) AND (
              (o.ReturnedByDriverID = ? AND (o.Status = 'Returned' OR LOWER(TRIM(COALESCE(o.Status,''))) IN ('returned','راجع','canceled','ملغي')))
              OR (o.DriverID = ? AND o.Status = 'Returned')
          )
-         ORDER BY o.ReturnedDate DESC`
+         ORDER BY o.CreatedDate DESC, o.ReturnedDate DESC`
     ).all(d, driverId, driverId);
 }
 
