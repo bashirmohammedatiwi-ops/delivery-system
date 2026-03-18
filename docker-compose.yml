@@ -1,9 +1,7 @@
 # شركة ديما الحياة - نظام إدارة التوصيل
 # تشغيل: docker-compose up -d
 # تطبيق الموظفين متاح على البورت 3002
-# عند تعارض أسماء: docker rm -f $(docker ps -aq -f name=delivery) ثم docker-compose up -d
-
-name: alhayat-delivery
+# عند تعارض أسماء: docker rm -f delivery-driver-web delivery-employee-web delivery-system ثم docker-compose up -d
 
 services:
   app:
