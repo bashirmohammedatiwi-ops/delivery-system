@@ -52,6 +52,9 @@ app.use('/employee', express.static(path.join(__dirname, 'employee-web')));
 app.get('/employee', (_req, res) => res.redirect(301, '/employee/'));
 app.get('/employee/', (_req, res) => res.sendFile(path.join(__dirname, 'employee-web', 'index.html')));
 
+// سياسة الخصوصية (مطلوبة لـ App Store)
+app.get('/privacy', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html')));
+
 // ─── تهيئة قاعدة البيانات (مع إعادة المحاولة) ───
 let dbReady = false;
 async function initDbWithRetry(retries = 5, delayMs = 3000) {
