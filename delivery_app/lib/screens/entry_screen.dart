@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../config/api_config.dart';
 
 class EntryScreen extends StatelessWidget {
   const EntryScreen({super.key});
@@ -64,10 +62,7 @@ class EntryScreen extends StatelessWidget {
                   ),
                   const Spacer(),
                   InkWell(
-                    onTap: () => launchUrl(
-                      Uri.parse('${ApiConfig.baseUrl}/privacy'),
-                      mode: LaunchMode.externalApplication,
-                    ),
+                    onTap: () => Navigator.pushNamed(context, '/privacy'),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Text(

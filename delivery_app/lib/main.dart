@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'screens/entry_screen.dart';
 import 'screens/driver/driver_app.dart';
 import 'screens/employee/employee_app.dart';
+import 'screens/privacy_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,7 @@ class DeliveryApp extends StatelessWidget {
       routes: {
         '/driver': (ctx) => const DriverApp(),
         '/employee': (ctx) => const EmployeeApp(),
+        '/privacy': (ctx) => const PrivacyScreen(),
       },
     );
   }

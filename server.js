@@ -41,7 +41,15 @@ app.use(express.json({ limit: '10mb' }));
 app.get('/health', (_req, res) => res.status(200).send('OK'));
 
 // سياسة الخصوصية — قبل static حتى لا يُعاد index.html
-app.get('/privacy', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html')));
+app.get('/privacy', (req, res) => {
+    const filePath = path.resolve(__dirname, 'public', 'privacy.html');
+    res.sendFile(filePath, { maxAge: 0 }, (err) => {
+        if (err) {
+            console.error('sendFile /privacy:', err.message);
+            if (!res.headersSent) res.status(500).send('Error loading page');
+        }
+    });
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 

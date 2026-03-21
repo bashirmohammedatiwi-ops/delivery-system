@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:url_launcher/url_launcher.dart';
-import '../../../config/api_config.dart';
 import '../../../services/driver_api.dart';
 import '../driver_theme.dart';
 
@@ -92,10 +90,7 @@ class DriverSettingsTab extends StatelessWidget {
               ),
               const SizedBox(height: 24),
               InkWell(
-                onTap: () => launchUrl(
-                  Uri.parse('${ApiConfig.baseUrl}/privacy'),
-                  mode: LaunchMode.externalApplication,
-                ),
+                onTap: () => Navigator.pushNamed(context, '/privacy'),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
