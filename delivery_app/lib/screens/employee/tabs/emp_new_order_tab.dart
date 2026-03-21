@@ -190,6 +190,11 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             content: Text('تم الحفظ! رقم الشحنة: ${order['ShipmentNumber'] ?? ''}'),
             backgroundColor: EmployeeTheme.success,
             behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'طباعة',
+              textColor: Colors.white,
+              onPressed: () => _printLabel(),
+            ),
           ),
         );
       }
