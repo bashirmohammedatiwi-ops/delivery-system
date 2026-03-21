@@ -1,1 +1,4 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"
 #include "Generated.xcconfig"
+// انسخ Local.xcconfig.example إلى Local.xcconfig وضع DEVELOPMENT_TEAM (اختياري بعد إعداد Xcode)
+#include? "Local.xcconfig"

@@ -53,15 +53,18 @@ function getUnreviewedCount() {
 
 function maybeCreateNotification(order, performedByUserID, performedByName, isEmployee) {
     if (!isEmployee) return;
-    const amt = Number(order.AmountIQD) || 0;
-    const free = !!(order.FreeDelivery);
+    const amt = Number(order.AmountIQD ?? order.amountiqd) || 0;
+    const free = !!(order.FreeDelivery ?? order.freedelivery);
+    // إشعار فقط: توصيل مجاني يدوي على فاتورة أقل من 50,000 (المجاني التلقائي ≥ 50000 لا يُشعر)
     if (!free || amt >= FREE_DELIVERY_THRESHOLD) return;
     const database = db.getDatabase();
+    const orderId = order.OrderID ?? order.orderid;
+    if (orderId == null) return;
     const existing = database.prepare(
         'SELECT NotificationID FROM FreeDeliveryOverrideNotifications WHERE OrderID = ? AND Reviewed = 0'
-    ).get(order.OrderID);
+    ).get(orderId);
     if (existing) return;
-    createNotification(order.OrderID, performedByUserID, performedByName);
+    createNotification(orderId, performedByUserID, performedByName);
 }
 
 module.exports = {

@@ -1,0 +1,8 @@
+// انسخ هذا الملف باسم: Local.xcconfig (بجانبه في ios/Flutter/)
+// ثم ضع معرّف فريق Apple (10 أحرف) من Xcode: Runner > Signing & Capabilities > Team
+//
+// مهم: يجب أولاً إنشاء شهادة التطوير:
+//   Xcode > Settings > Accounts > أضف Apple ID > Manage Certificates > + > Apple Development
+//
+// سطر واحد فقط بعد النسخ:
+// DEVELOPMENT_TEAM = XXXXXXXXXX

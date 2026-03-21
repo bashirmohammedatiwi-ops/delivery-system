@@ -162,7 +162,8 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
         'Address': _address.text.trim(),
         'Pieces': int.tryParse(_pieces.text) ?? 1,
         'AmountIQD': amt,
-        'DeliveryFeeIQD': _freeDelivery ? 0 : _deliveryFee,
+        // أجرة المنطقة الفعلية دائماً؛ الخادم يصفّرها عند FreeDelivery ويملأ WaivedDeliveryIQD
+        'DeliveryFeeIQD': _deliveryFee,
         'FreeDelivery': _freeDelivery,
         'Notes': _notes.text.trim(),
       });
@@ -343,7 +344,11 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
           ),
           const SizedBox(height: 12),
           CheckboxListTile(
-            title: Text('توصيل مجاني (تلقائي عند 50,000 د.ع أو أكثر)', style: GoogleFonts.cairo(fontSize: 14)),
+            title: Text(
+              'توصيل مجاني (تلقائياً إذا مبلغ الفاتورة 50,000 د.ع فأكثر)\n'
+              'إذا كان المبلغ أقل من 50,000 وفعّلت التوصيل المجاني يُرسل تنبيه للوحة التحكم',
+              style: GoogleFonts.cairo(fontSize: 13, height: 1.35),
+            ),
             value: _freeDelivery,
             onChanged: (v) => setState(() => _freeDelivery = v ?? false),
             activeColor: EmployeeTheme.primary,

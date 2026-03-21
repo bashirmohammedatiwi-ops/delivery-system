@@ -43,3 +43,6 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# iOS: معرّف الفريق المحلي (لا ترفع الملف الحقيقي إلى Git)
+ios/Flutter/Local.xcconfig
