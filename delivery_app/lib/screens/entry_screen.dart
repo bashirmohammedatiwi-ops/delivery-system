@@ -23,9 +23,17 @@ class EntryScreen extends StatelessWidget {
             ),
             child: Padding(
               padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+              child: SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    minHeight: MediaQuery.of(context).size.height -
+                        MediaQuery.of(context).padding.top -
+                        MediaQuery.of(context).padding.bottom -
+                        48,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
                   const Text(
                     '🚚',
                     style: TextStyle(fontSize: 64),
@@ -60,7 +68,7 @@ class EntryScreen extends StatelessWidget {
                     subtitle: 'طلب جديد • استلام • الطلبات',
                     onTap: () => Navigator.pushNamed(context, '/employee'),
                   ),
-                  const Spacer(),
+                  const SizedBox(height: 24),
                   InkWell(
                     onTap: () => Navigator.pushNamed(context, '/privacy'),
                     child: Padding(
@@ -83,6 +91,8 @@ class EntryScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+          ),
             ),
           ),
         ),

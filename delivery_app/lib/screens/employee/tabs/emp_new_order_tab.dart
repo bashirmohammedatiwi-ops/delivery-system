@@ -26,7 +26,7 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
   final _address = TextEditingController();
   final _regionSearch = TextEditingController();
   final _pieces = TextEditingController(text: '1');
-  final _amount = TextEditingController(text: '0');
+  final _amount = TextEditingController();
   final _notes = TextEditingController();
   int? _regionId;
   double _deliveryFee = 0;
@@ -179,7 +179,7 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
       _regionId = null;
       _deliveryFee = 0;
       _pieces.text = '1';
-      _amount.text = '0';
+      _amount.text = '';
       _notes.clear();
       _storeName.text = _defaults['storeName']?.toString() ?? '';
       _storePhone.text = _defaults['storePhone']?.toString() ?? '';
