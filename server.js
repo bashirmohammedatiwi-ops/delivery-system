@@ -40,6 +40,9 @@ app.use(express.json({ limit: '10mb' }));
 // نقطة فحص الصحة لـ Docker (قبل أي مسار آخر)
 app.get('/health', (_req, res) => res.status(200).send('OK'));
 
+// سياسة الخصوصية — قبل static حتى لا يُعاد index.html
+app.get('/privacy', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html')));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // تطبيق السائق على /driver/ (يُقدّم من السيرفر الرئيسي - يعمل على الدومين والبورت)
@@ -51,9 +54,6 @@ app.get('/driver/', (_req, res) => res.sendFile(path.join(__dirname, 'driver-web
 app.use('/employee', express.static(path.join(__dirname, 'employee-web')));
 app.get('/employee', (_req, res) => res.redirect(301, '/employee/'));
 app.get('/employee/', (_req, res) => res.sendFile(path.join(__dirname, 'employee-web', 'index.html')));
-
-// سياسة الخصوصية (مطلوبة لـ App Store)
-app.get('/privacy', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'privacy.html')));
 
 // ─── تهيئة قاعدة البيانات (مع إعادة المحاولة) ───
 let dbReady = false;
