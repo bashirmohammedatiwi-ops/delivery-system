@@ -90,6 +90,15 @@ function getFullAddress(o) {
     return region || addr || '-';
 }
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
 // تنقية المدخل من أجهزة قراءة الباركود - استخراج الأرقام فقط (مثل DH2603000014 → 2603000014)
 function normalizeBarcodeInput(str) {
     if (!str || typeof str !== 'string') return '';
@@ -296,39 +305,68 @@ async function renderOrdersScreen(container, opts = {}) {
     const renderOrders = async () => {
         const list = await window.api.orders.getAll(filters);
         const drivers = await window.api.drivers.getAll();
+        const statNew = list.filter(o => o.Status === 'New').length;
+        const statAssigned = list.filter(o => o.Status === 'AssignedToDriver').length;
+        const statDelivered = list.filter(o => o.Status === 'Delivered').length;
+        const statReturned = list.filter(o => isOrderReturned(o)).length;
 
         container.innerHTML = `
             <div class="screen active orders-screen">
                 <div class="orders-layout">
                     <header class="orders-header">
                         <div class="orders-header-top">
-                            <h1 class="orders-title">${title}</h1>
+                            <div class="orders-header-text">
+                                <h1 class="orders-title">${title}</h1>
+                                <p class="orders-subtitle">بحث، فلترة بالحالة والسائق والتاريخ، وإجراءات سريعة على كل طلب</p>
+                            </div>
                             <span class="orders-count" id="ordersCount">${list.length} طلب</span>
                         </div>
-                        <p class="orders-subtitle">إدارة وعرض جميع الطلبات مع البحث والفلترة</p>
+                        <div class="orders-stats-bar" role="status">
+                            <div class="orders-stat orders-stat--all"><span class="orders-stat-value">${list.length}</span><span class="orders-stat-label">في النتائج</span></div>
+                            <div class="orders-stat orders-stat--new"><span class="orders-stat-value">${statNew}</span><span class="orders-stat-label">جديد</span></div>
+                            <div class="orders-stat orders-stat--assigned"><span class="orders-stat-value">${statAssigned}</span><span class="orders-stat-label">مع السائق</span></div>
+                            <div class="orders-stat orders-stat--done"><span class="orders-stat-value">${statDelivered}</span><span class="orders-stat-label">تم التوصيل</span></div>
+                            <div class="orders-stat orders-stat--return"><span class="orders-stat-value">${statReturned}</span><span class="orders-stat-label">راجع</span></div>
+                        </div>
                     </header>
                     <div class="orders-toolbar">
-                        <div class="orders-search-row">
-                            <div class="orders-search-wrap">
-                                <span class="orders-search-icon">🔍</span>
-                                <input type="text" id="search" placeholder="بحث: رقم الطلب، رقم الشحنة، الهاتف، المتجر..." class="orders-search-input">
+                        <div class="orders-toolbar-grid">
+                            <div class="orders-field orders-field--search">
+                                <label class="orders-field-label" for="search">بحث</label>
+                                <div class="orders-search-wrap">
+                                    <span class="orders-search-icon" aria-hidden="true">🔍</span>
+                                    <input type="text" id="search" placeholder="رقم الطلب، الشحنة، الهاتف، المتجر، المستلم…" class="orders-search-input" autocomplete="off">
+                                </div>
                             </div>
-                            <div class="orders-filters">
-                                <select id="filterDriver" class="orders-filter-select" title="السائق">
+                            <div class="orders-field">
+                                <label class="orders-field-label" for="filterDriver">السائق</label>
+                                <select id="filterDriver" class="orders-filter-select" title="تصفية حسب السائق">
                                     <option value="">كل السائقين</option>
                                     ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
                                 </select>
-                                <input type="date" id="dateFrom" class="orders-date-input" title="من تاريخ">
-                                <input type="date" id="dateTo" class="orders-date-input" title="إلى تاريخ">
-                                <button class="btn btn-primary" id="btnSearch">بحث</button>
+                            </div>
+                            <div class="orders-field orders-field--dates">
+                                <span class="orders-field-label">التاريخ</span>
+                                <div class="orders-date-row">
+                                    <input type="date" id="dateFrom" class="orders-date-input" title="من تاريخ" aria-label="من تاريخ">
+                                    <span class="orders-date-sep">—</span>
+                                    <input type="date" id="dateTo" class="orders-date-input" title="إلى تاريخ" aria-label="إلى تاريخ">
+                                </div>
+                            </div>
+                            <div class="orders-field orders-field--actions">
+                                <span class="orders-field-label orders-field-label--ghost">إجراءات</span>
+                                <div class="orders-toolbar-btns">
+                                    <button type="button" class="btn btn-primary" id="btnSearch">تطبيق</button>
+                                    <button type="button" class="btn btn-outline orders-btn-clear" id="btnClearFilters" title="مسح البحث والفلاتر">مسح</button>
+                                </div>
                             </div>
                         </div>
-                        <div class="orders-status-chips">
-                            <button type="button" class="orders-chip ${!filters.status ? 'active' : ''}" data-status="">الكل</button>
-                            <button type="button" class="orders-chip ${filters.status === 'New' ? 'active' : ''}" data-status="New">جديد</button>
-                            <button type="button" class="orders-chip ${filters.status === 'AssignedToDriver' ? 'active' : ''}" data-status="AssignedToDriver">مع السائق</button>
-                            <button type="button" class="orders-chip ${filters.status === 'Delivered' ? 'active' : ''}" data-status="Delivered">تم التوصيل</button>
-                            <button type="button" class="orders-chip ${filters.status === 'Returned' ? 'active' : ''}" data-status="Returned">راجع</button>
+                        <div class="orders-status-chips" role="tablist" aria-label="تصفية حسب الحالة">
+                            <button type="button" class="orders-chip ${!filters.status ? 'active' : ''}" data-status="" role="tab" aria-selected="${!filters.status}">الكل</button>
+                            <button type="button" class="orders-chip ${filters.status === 'New' ? 'active' : ''}" data-status="New" role="tab" aria-selected="${filters.status === 'New'}">جديد</button>
+                            <button type="button" class="orders-chip ${filters.status === 'AssignedToDriver' ? 'active' : ''}" data-status="AssignedToDriver" role="tab" aria-selected="${filters.status === 'AssignedToDriver'}">مع السائق</button>
+                            <button type="button" class="orders-chip ${filters.status === 'Delivered' ? 'active' : ''}" data-status="Delivered" role="tab" aria-selected="${filters.status === 'Delivered'}">تم التوصيل</button>
+                            <button type="button" class="orders-chip ${filters.status === 'Returned' ? 'active' : ''}" data-status="Returned" role="tab" aria-selected="${filters.status === 'Returned'}">راجع</button>
                         </div>
                     </div>
                     <div class="orders-table-card">
@@ -336,50 +374,75 @@ async function renderOrdersScreen(container, opts = {}) {
                             <table class="orders-table">
                                 <thead>
                                     <tr>
-                                        <th>رقم</th><th>رقم الطلب</th><th>رقم الشحنة</th><th>المتجر</th><th>هاتف المستلم</th>
-                                        <th class="col-address">العنوان</th><th>رابط</th><th>القطع</th><th>الفاتورة</th><th>التوصيل</th>
-                                        <th>النهائي</th><th>المستحق</th><th>السائق</th><th>الحالة</th><th>الطباعة</th><th>أنشأه</th><th>التاريخ</th><th>ملاحظات</th><th>إجراء</th>
+                                        <th class="orders-th-order">الطلب</th>
+                                        <th class="orders-th-party">المستلم والمتجر</th>
+                                        <th class="col-address orders-th-address">العنوان</th>
+                                        <th class="orders-th-money">المبالغ (د.ع)</th>
+                                        <th class="orders-th-ops">التشغيل</th>
+                                        <th class="orders-th-actions">إجراءات</th>
                                     </tr>
                                 </thead>
                                 <tbody id="ordersTableBody">
-                                    ${list.map(o => `
+                                    ${list.map(o => {
+                                        const notesRaw = (o.Notes || '').trim();
+                                        const notesTitle = notesRaw ? escapeHtml(notesRaw) : '';
+                                        const loc = (o.CustomerLocationLink || '').replace(/"/g, '&quot;');
+                                        return `
                                         <tr data-order-id="${o.OrderID}" class="${isOrderReturned(o) ? 'order-returned' : ''}">
-                                            <td class="orders-id">${o.OrderID}</td>
-                                            <td>${o.AdminOrderNo || '-'}</td>
-                                            <td><strong>${o.ShipmentNumber}</strong></td>
-                                            <td>${o.StoreName || '-'}</td>
-                                            <td>${o.CustomerPhone || '-'}</td>
-                                            <td class="col-address">${getFullAddress(o)}</td>
-                                            <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer" title="فتح رابط الموقع" class="orders-link">📍</a>` : '-'}</td>
-                                            <td>${o.Pieces || 1}</td>
-                                            <td class="iqd">${formatIQD(o.AmountIQD)}</td>
-                                            <td class="iqd">${o.FreeDelivery ? 'مجاني' : formatIQD(o.DeliveryFeeIQD)}</td>
-                                            <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
-                                            <td class="iqd">${formatIQD(getAmountDue(o))}</td>
-                                            <td>${o.DriverName || '-'}</td>
-                                            <td><span class="badge badge-${(o.Status || 'new').toLowerCase().replace('assignedtodriver','assigned').replace('delivered','delivered').replace('returned','returned')}">${STATUS_MAP[o.Status] || o.Status}</span></td>
-                                            <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}" title="${o.LabelPrinted ? 'تم طباعة الملصق' : 'لم يُطبع الملصق'}">${o.LabelPrinted ? 'تم' : '—'}</span></td>
-                                            <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                            <td class="orders-date">${(o.CreatedDate || '').slice(0, 16)}</td>
-                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
-                                            <td>
-                                                <div class="order-actions">
-                                                    <button type="button" class="btn btn-sm btn-print-order" data-order-id="${o.OrderID}" title="طباعة الملصق"><i class="bi bi-printer"></i></button>
-                                                    <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل">تعديل</button>
+                                            <td class="orders-cell-order">
+                                                <div class="orders-shipment-row">
+                                                    <span class="orders-shipment-num">${escapeHtml(o.ShipmentNumber)}</span>
+                                                    ${notesRaw ? `<span class="orders-note-dot" title="${notesTitle}" aria-label="توجد ملاحظات">📝</span>` : ''}
+                                                </div>
+                                                <div class="orders-order-meta">
+                                                    <span>#${o.OrderID}</span><span class="orders-meta-sep">·</span>
+                                                    <span>${escapeHtml(o.AdminOrderNo || '—')}</span><span class="orders-meta-sep">·</span>
+                                                    <span>${o.Pieces || 1} قطعة</span>
+                                                </div>
+                                                <span class="badge badge-${(o.Status || 'new').toLowerCase().replace('assignedtodriver','assigned').replace('delivered','delivered').replace('returned','returned')}">${STATUS_MAP[o.Status] || escapeHtml(o.Status || '') || '—'}</span>
+                                                ${isOrderReturned(o) && (o.ReturnReason || '').trim() ? `<div class="orders-return-reason" title="سبب الإرجاع (السائق)"><span class="orders-return-reason-label">سبب الرجوع:</span> ${escapeHtml((o.ReturnReason || '').trim())}</div>` : ''}
+                                            </td>
+                                            <td class="orders-cell-party">
+                                                <div class="orders-party-name">${escapeHtml(o.CustomerName || '—')}</div>
+                                                <div class="orders-party-phone">${escapeHtml(o.CustomerPhone || '—')}</div>
+                                                <div class="orders-party-store"><i class="bi bi-shop" aria-hidden="true"></i> ${escapeHtml(o.StoreName || '—')}</div>
+                                            </td>
+                                            <td class="col-address orders-cell-address">
+                                                <span class="orders-address-text">${escapeHtml(getFullAddress(o))}</span>
+                                                ${o.CustomerLocationLink ? `<a href="${loc}" target="_blank" rel="noopener noreferrer" class="orders-loc-link">موقع</a>` : ''}
+                                            </td>
+                                            <td class="orders-cell-money">
+                                                <ul class="orders-money-list">
+                                                    <li><span>فاتورة</span><strong class="iqd">${formatIQD(o.AmountIQD)}</strong></li>
+                                                    <li><span>توصيل</span><strong class="iqd">${o.FreeDelivery ? 'مجاني' : formatIQD(o.DeliveryFeeIQD)}</strong></li>
+                                                    <li><span>نهائي</span><strong class="iqd iqd-total">${formatIQD(o.TotalIQD)}</strong></li>
+                                                    <li><span>مستحق</span><strong class="iqd">${formatIQD(getAmountDue(o))}</strong></li>
+                                                </ul>
+                                            </td>
+                                            <td class="orders-cell-ops">
+                                                <div class="orders-ops-line"><span class="orders-ops-k">سائق</span><span class="orders-ops-v">${escapeHtml(o.DriverName || '—')}</span></div>
+                                                <div class="orders-ops-line"><span class="orders-ops-k">أنشأه</span><span class="orders-ops-v">${escapeHtml((o.CreatedByName || '—').toString())}</span></div>
+                                                <div class="orders-ops-line"><span class="orders-ops-k">تاريخ</span><span class="orders-ops-v orders-ops-date">${escapeHtml((o.CreatedDate || '').slice(0, 16))}</span></div>
+                                                <div class="orders-ops-line"><span class="orders-ops-k">ملصق</span><span class="orders-ops-v"><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'} orders-badge-tiny">${o.LabelPrinted ? 'مطبوع' : 'لم يُطبع'}</span></span></div>
+                                            </td>
+                                            <td class="orders-cell-actions">
+                                                <div class="order-actions order-actions--stack">
+                                                    <button type="button" class="btn btn-sm btn-print-order" data-order-id="${o.OrderID}" title="طباعة الملصق"><i class="bi bi-printer"></i><span class="order-action-label">طباعة</span></button>
+                                                    <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل الطلب"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="order-action-label">تعديل</span></button>
                                                     ${currentUser?.Role === 'admin' ? `
-                                                    <div class="status-quick-btns">
-                                                        <button type="button" class="btn-status-sm" data-order-id="${o.OrderID}" data-status="Delivered" title="تم التوصيل">✓</button>
-                                                        <button type="button" class="btn-status-sm" data-order-id="${o.OrderID}" data-status="Returned" title="راجع">⊙</button>
+                                                    <div class="status-quick-btns" title="تغيير سريع للحالة">
+                                                        <button type="button" class="btn-status-sm btn-status-sm--ok" data-order-id="${o.OrderID}" data-status="Delivered" title="تم التوصيل">✓</button>
+                                                        <button type="button" class="btn-status-sm btn-status-sm--ret" data-order-id="${o.OrderID}" data-status="Returned" title="راجع">↩</button>
                                                     </div>
-                                                    <button type="button" class="btn btn-sm btn-delete" data-order-id="${o.OrderID}" title="حذف">حذف</button>
+                                                    <button type="button" class="btn btn-sm btn-delete" data-order-id="${o.OrderID}" title="حذف الطلب"><i class="bi bi-trash" aria-hidden="true"></i></button>
                                                     ` : ''}
                                                 </div>
                                             </td>
-                                        </tr>
-                                    `).join('')}
+                                        </tr>`;
+                                    }).join('')}
                                 </tbody>
                             </table>
-                        </div>` : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p>لا توجد طلبات تطابق البحث</p></div>'}
+                        </div>` : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p class="orders-empty-title">لا توجد طلبات</p><p class="orders-empty-hint">جرّب تغيير البحث، التاريخ، أو حالة الطلب</p></div>'}
                     </div>
                 </div>
             </div>
@@ -407,6 +470,14 @@ async function renderOrdersScreen(container, opts = {}) {
 
         document.getElementById('btnSearch').addEventListener('click', apply);
         document.getElementById('search').addEventListener('keypress', e => { if (e.key === 'Enter') apply(); });
+        document.getElementById('btnClearFilters')?.addEventListener('click', () => {
+            filters.search = '';
+            filters.driverId = '';
+            filters.status = '';
+            filters.dateFrom = '';
+            filters.dateTo = '';
+            renderOrders();
+        });
 
         if (!statusClickAttached) {
             statusClickAttached = true;
@@ -2060,13 +2131,16 @@ const screens = {
                             <div class="report-section-title">تفاصيل الطلبات <span class="report-count-badge">${allOrders.length} طلب</span></div>
                             <div class="report-table-wrap report-table-wrap--scrollable report-table-wrap--orders">
                                 <table class="report-table report-table--orders">
-                                <thead><tr><th>الحالة</th><th>رقم</th><th>الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>هاتف</th><th class="col-address">العنوان</th><th>فاتورة</th><th>توصيل</th><th>نهائي</th><th>مستحق</th><th>سداد</th><th>طبع</th><th>استلام</th><th>أنشأه</th></tr></thead>
+                                <thead><tr><th>الحالة</th><th>رقم</th><th>الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>هاتف</th><th class="col-address">العنوان</th><th>فاتورة</th><th>توصيل</th><th>نهائي</th><th>مستحق</th><th>سداد</th><th>طبع</th><th>استلام</th><th>أنشأه</th><th class="col-notes">ملاحظات الطلب</th><th class="col-notes">سبب الإرجاع</th></tr></thead>
                                 <tbody>
                                     ${allOrders.map(o => {
                                         const returned = isOrderReturned(o);
                                         const statusTxt = STATUS_MAP[o.Status || o.status] || (o.Status || o.status) || '-';
                                         const labelPrinted = o.LabelPrinted ? 'تم' : 'لم يُطبع';
                                         const receiveTxt = returned ? (o.ReturnedOrderReceived ? 'تم' : 'لم يُسلّم') : '-';
+                                        const esc = (t) => (t == null ? '' : String(t)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                                        const notesCell = (o.Notes && String(o.Notes).trim()) ? esc(o.Notes) : '-';
+                                        const returnReasonCell = returned ? esc((o.ReturnReason || '').trim() || '-') : '-';
                                         return `<tr class="${returned ? 'order-returned' : ''}">
                                             <td>${statusTxt}</td>
                                             <td>${o.AdminOrderNo || '-'}</td>
@@ -2084,6 +2158,8 @@ const screens = {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
                                             <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
+                                            <td class="col-notes" title="${esc(o.Notes || '')}">${notesCell}</td>
+                                            <td class="col-notes" title="${returned ? esc((o.ReturnReason || '').trim()) : ''}">${returnReasonCell}</td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>

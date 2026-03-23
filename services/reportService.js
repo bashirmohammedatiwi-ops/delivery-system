@@ -667,7 +667,9 @@ async function generateCompanyReportPDF(report) {
         { width: 26, label: 'سداد' },
         { width: 32, label: 'طباعة' },
         { width: 36, label: 'استلام' },
-        { width: 38, label: 'أنشأه' }
+        { width: 38, label: 'أنشأه' },
+        { width: 48, label: 'ملاحظات' },
+        { width: 42, label: 'سبب الإرجاع' }
     ];
     const wrap = (s, n) => (s || '-').toString().slice(0, n);
     const BOTTOM_MARGIN = 85;
@@ -695,7 +697,9 @@ async function generateCompanyReportPDF(report) {
             o.FeesCollected ? 'تم' : '-',
             o.LabelPrinted ? 'تم' : '-',
             receiveTxtCompany(o),
-            wrap(o.CreatedByName, 14)
+            wrap(o.CreatedByName, 14),
+            wrap(o.Notes, 24),
+            isOrderReturned(o) ? wrap((o.ReturnReason || '').trim() || '-', 22) : '-'
         ];
         const detNumericCols = [1, 2, 6, 8, 9, 10, 11];
         const detRowH = getTableRowHeight(doc, detCols, cells, font, null, detNumericCols);
@@ -820,7 +824,7 @@ function getCompanyReportByRange(dateFrom, dateTo) {
                o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName, r.RegionArea,
                o.Pieces, o.AmountIQD,
                o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
-               o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate,
+               o.Notes, o.ReturnReason, o.DriverID, o.CreatedDate, o.DeliveredDate,
                COALESCE(d.DriverName, rd.DriverName) AS DriverName,
                u.DisplayName AS CreatedByName,
                COALESCE(o.LabelPrinted, 0) AS LabelPrinted,
