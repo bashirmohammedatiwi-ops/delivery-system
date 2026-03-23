@@ -106,11 +106,11 @@ function generateBarcodeBase64(shipmentNumber) {
             {
                 bcid: 'code128',
                 text: String(shipmentNumber || ''),
-                scale: 20,
-                height: 8,
+                scale: 18,
+                height: 5,
                 includetext: true,
                 textxalign: 'center',
-                textsize: 9
+                textsize: 8
             },
             (err, png) => {
                 if (err) reject(err);
@@ -174,7 +174,7 @@ function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
 }
 
 /**
- * ملصق أبيض/أسود — باركود بارز (الرقم يظهر تحت الأشرطة فقط)، باقي الحقول منظّمة
+ * ملصق أبيض/أسود — باركود بعرض ٧٥٪ وارتفاع مضبوط، فواصل خطوط موحّدة
  */
 async function createLabelPDF(order) {
     const w = 420;
@@ -211,26 +211,29 @@ async function createLabelPDF(order) {
     doc.lineWidth(1.2).strokeColor(K);
     doc.rect(M, M, cw, h - M * 2).stroke();
 
-    /* رأس مضغوط ثم باركود مباشرة (بدون تكرار رقم الشحنة كبيراً في الأعلى) */
-    const headerH = 38;
-    hLine(doc, innerL, innerL + innerW, y + 2, 1, false);
+    /* رأس — خط ثقيل علوي، فاصل تحت الرأس */
+    const headerH = 36;
+    const sepMajor = 0.75;
+    const sepMid = 0.5;
+    const sepFine = 0.35;
+    hLine(doc, innerL, innerL + innerW, y + 2, sepMajor, false);
     setArBold();
-    doc.fontSize(17);
-    textRTL(doc, 'شركة ديما الحياة', innerL + 6, y + 7, { width: innerW - 12, align: 'center', fill: K });
+    doc.fontSize(16);
+    textRTL(doc, 'شركة ديما الحياة', innerL + 6, y + 6, { width: innerW - 12, align: 'center', fill: K });
     setAr();
-    doc.fontSize(10.5);
-    textRTL(doc, 'ملصق توصيل', innerL + 6, y + 24, { width: innerW - 12, align: 'center', fill: K });
+    doc.fontSize(10);
+    textRTL(doc, 'ملصق توصيل', innerL + 6, y + 22, { width: innerW - 12, align: 'center', fill: K });
     y += headerH;
-    hLine(doc, innerL, innerL + innerW, y, 0.9, false);
-    y += 8;
+    hLine(doc, innerL, innerL + innerW, y, sepMid, false);
+    y += 6;
 
-    const row2H = 36;
+    const row2H = 34;
     const gapMid = 6;
     const half = (innerW - gapMid) / 2;
     const labCol = 72;
-    let moneyH = 52;
-    /** بعد فاصل الأزواج: خط رفيع + فراغ قبل مربع العنوان (بدون عنوان «عنوان التسليم») */
-    const addrBlockH = 8;
+    let moneyH = 48;
+    /** بعد خط الأزواج: منقط + فراغ قبل مربع العنوان */
+    const afterPairsGap = 5;
 
     setAr();
     doc.fontSize(11);
@@ -244,7 +247,7 @@ async function createLabelPDF(order) {
     notesH = Math.min(Math.max(notesH, 22), 72);
 
     const yBarcodeTop = y;
-    const barPadY = 4;
+    const barPadY = 3;
     /** عرض الباركود = ٧٥٪ من العرض الداخلي (لا نضيّقه بسبب الارتفاع إلا إن اضطرّ الملصق) */
     const targetBarW = innerW * 0.75;
     const barcodeBuf = Buffer.from(await generateBarcodeBase64(order.ShipmentNumber), 'base64');
@@ -253,25 +256,24 @@ async function createLabelPDF(order) {
         barDim && barDim.width > 0 && barDim.height > 0
             ? barDim.height * (targetBarW / barDim.width)
             : 72;
-    const neededBarRow = Math.max(56, Math.ceil(dhAtTargetW + barPadY * 2 + 4));
-    const barRowMax = 132;
+    const neededBarRow = Math.max(52, Math.ceil(dhAtTargetW + barPadY * 2 + 3));
+    const barRowMax = 90;
     /** لا نضيّق صف الباركود دون داعٍ إن كان يفي بعرض ٧٥٪ */
     const minBarRowFloor = Math.min(neededBarRow, barRowMax);
 
-    let barRowH = Math.min(Math.max(102, neededBarRow), barRowMax);
+    let barRowH = Math.min(Math.max(76, neededBarRow), barRowMax);
 
-    /** y بعد خطّي الباركود وقبل y+=5 الذي يسبق صف الأزواج */
+    /** أسفل مربع الباركود + خط فاصل + فراغ قبل أول سطر اتصال */
     function yBeforePairRows(barH) {
-        return yBarcodeTop + barH + 6;
+        return yBarcodeTop + barH + 4;
     }
 
     function measureContentBottom(barH) {
-        let b = yBeforePairRows(barH) + 5 + 2 * (3 + row2H);
-        b += 7;
-        b += addrBlockH;
+        let b = yBeforePairRows(barH) + 2 * (3 + row2H);
+        b += afterPairsGap;
         b += addrH + 6;
         b += moneyH + 4;
-        b += 14 + 4 + notesH + 8;
+        b += 12 + 4 + notesH + 7;
         return b;
     }
 
@@ -279,7 +281,7 @@ async function createLabelPDF(order) {
     while (measureContentBottom(barRowH) > fy && addrH > 22) addrH -= 4;
     while (measureContentBottom(barRowH) > fy && notesH > 16) notesH -= 3;
     while (measureContentBottom(barRowH) > fy && barRowH > minBarRowFloor) barRowH -= 2;
-    while (measureContentBottom(barRowH) > fy && barRowH > 56) barRowH -= 2;
+    while (measureContentBottom(barRowH) > fy && barRowH > 48) barRowH -= 2;
 
     while (barRowH < barRowMax && measureContentBottom(barRowH + 2) <= fy) barRowH += 2;
 
@@ -290,7 +292,7 @@ async function createLabelPDF(order) {
     y = yBarcodeTop;
     const bx = innerL;
     const barW = innerW;
-    doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.9).stroke();
+    doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(sepMid).stroke();
     const maxH = barRowH - barPadY * 2;
     let dw = targetBarW;
     let dh =
@@ -306,35 +308,32 @@ async function createLabelPDF(order) {
     const iy = y + barPadY + (maxH - dh) / 2;
     doc.image(barcodeBuf, ix, iy, { width: dw, height: dh });
     y += barRowH;
-    hLine(doc, innerL, innerL + innerW, y + 3, 0.55, true);
-    y += 5;
-    hLine(doc, innerL, innerL + innerW, y, 0.85, false);
-
-    y += 6;
+    hLine(doc, innerL, innerL + innerW, y + 1, sepMid, false);
+    y += 4;
 
     function pairRow(labelR, valR, labelL, valL) {
         const xR = innerL;
         const xL = xR + half + gapMid;
         const vWR = half - labCol - 4;
         const vWL = half - labCol - 4;
-        hLine(doc, innerL, innerL + innerW, y, 0.45, true);
+        hLine(doc, innerL, innerL + innerW, y, sepFine, true);
         y += 3;
-        doc.rect(xR, y, half, row2H).fill(W).strokeColor(K).lineWidth(0.5).stroke();
-        doc.rect(xL, y, half, row2H).fill(W).strokeColor(K).lineWidth(0.5).stroke();
-        doc.moveTo(xR + half, y).lineTo(xR + half, y + row2H).lineWidth(0.45).strokeColor(K).stroke();
+        doc.rect(xR, y, half, row2H).fill(W).strokeColor(K).lineWidth(sepFine).stroke();
+        doc.rect(xL, y, half, row2H).fill(W).strokeColor(K).lineWidth(sepFine).stroke();
+        doc.moveTo(xR + half, y).lineTo(xR + half, y + row2H).lineWidth(sepFine).strokeColor(K).stroke();
         setArBold();
         doc.fontSize(10);
-        textRTL(doc, labelR + ':', xR + vWR + 4, y + 11, { width: labCol - 2, align: 'right', fill: K });
-        textRTL(doc, labelL + ':', xL + vWL + 4, y + 11, { width: labCol - 2, align: 'right', fill: K });
+        textRTL(doc, labelR + ':', xR + vWR + 4, y + 10, { width: labCol - 2, align: 'right', fill: K });
+        textRTL(doc, labelL + ':', xL + vWL + 4, y + 10, { width: labCol - 2, align: 'right', fill: K });
         const drawVal = (val, x, vw) => {
             const t = String(val ?? '—');
             if (isPhoneLike(t)) {
-                doc.font('Helvetica-Bold').fontSize(16).fillColor(K);
-                doc.text(t, x, y + 8, { width: vw, align: 'right' });
+                doc.font('Helvetica-Bold').fontSize(15).fillColor(K);
+                doc.text(t, x, y + 7, { width: vw, align: 'right' });
             } else {
                 setAr();
-                doc.fontSize(12.5);
-                textRTL(doc, t, x, y + 9, { width: vw, align: 'right', fill: K });
+                doc.fontSize(12);
+                textRTL(doc, t, x, y + 8, { width: vw, align: 'right', fill: K });
             }
         };
         drawVal(valR, xR + 4, vWR - 2);
@@ -345,13 +344,10 @@ async function createLabelPDF(order) {
 
     pairRow('المتجر', order.StoreName || '—', 'هاتف المتجر', order.StorePhone || '—');
     pairRow('المستلم', order.CustomerName || '—', 'هاتف المستلم', order.CustomerPhone || '—');
-    hLine(doc, innerL, innerL + innerW, y + 1, 0.4, true);
-    y += 7;
+    hLine(doc, innerL, innerL + innerW, y + 1, sepFine, true);
+    y += afterPairsGap;
 
-    hLine(doc, innerL, innerL + innerW, y, 0.4, false);
-    y += 8;
-
-    doc.rect(innerL, y, innerW, addrH).fill(W).strokeColor(K).lineWidth(0.6).stroke();
+    doc.rect(innerL, y, innerW, addrH).fill(W).strokeColor(K).lineWidth(sepMid).stroke();
     setArBold();
     doc.fillColor(K).fontSize(addrFont);
     textRTL(doc, fullAddr, innerL + 8, y + 8, { width: addrW, align: 'right', fill: K });
@@ -368,11 +364,11 @@ async function createLabelPDF(order) {
     const xFinal = mx;
     const xDel = mx + third + colGap;
     const xInv = mx + 2 * (third + colGap);
-    doc.rect(xFinal, y, third, moneyH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
-    doc.rect(xDel, y, third, moneyH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
-    doc.rect(xInv, y, third, moneyH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
-    doc.moveTo(xFinal + third, y).lineTo(xFinal + third, y + moneyH).lineWidth(0.5).strokeColor(K).stroke();
-    doc.moveTo(xDel + third, y).lineTo(xDel + third, y + moneyH).lineWidth(0.5).strokeColor(K).stroke();
+    doc.rect(xFinal, y, third, moneyH).fill(W).strokeColor(K).lineWidth(sepFine).stroke();
+    doc.rect(xDel, y, third, moneyH).fill(W).strokeColor(K).lineWidth(sepFine).stroke();
+    doc.rect(xInv, y, third, moneyH).fill(W).strokeColor(K).lineWidth(sepFine).stroke();
+    doc.moveTo(xFinal + third, y).lineTo(xFinal + third, y + moneyH).lineWidth(sepFine).strokeColor(K).stroke();
+    doc.moveTo(xDel + third, y).lineTo(xDel + third, y + moneyH).lineWidth(sepFine).strokeColor(K).stroke();
     setArBold();
     doc.fontSize(10);
     textRTL(doc, 'المبلغ النهائي', xFinal + 4, y + 4, { width: third - 8, align: 'center', fill: K });
@@ -387,16 +383,16 @@ async function createLabelPDF(order) {
     textRTL(doc, inv, xInv + 4, y + 22, { width: third - 8, align: 'center', fill: K });
     setAr();
     y += moneyH;
-    hLine(doc, innerL, innerL + innerW, y, 0.95, false);
+    hLine(doc, innerL, innerL + innerW, y, sepMid, false);
     y += 4;
 
     setArBold();
-    doc.fontSize(11.5);
+    doc.fontSize(11);
     textRTL(doc, 'ملاحظات', innerL + 8, y + 2, { width: innerW - 16, align: 'right', fill: K });
-    y += 14;
-    hLine(doc, innerL + 24, innerL + innerW - 24, y, 0.6, true);
+    y += 12;
+    hLine(doc, innerL + 20, innerL + innerW - 20, y, sepFine, true);
     y += 4;
-    doc.rect(innerL, y, innerW, notesH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
+    doc.rect(innerL, y, innerW, notesH).fill(W).strokeColor(K).lineWidth(sepFine).stroke();
     setAr();
     doc.fillColor(K).fontSize(11.5);
     if (hasNotesContent) {
@@ -407,15 +403,15 @@ async function createLabelPDF(order) {
         textRTL(doc, '—', innerL + 8, y + 8, { width: addrW, align: 'center', fill: K });
     }
     y += notesH + 4;
-    hLine(doc, innerL, innerL + innerW, y, 0.9, false);
-    y += 4;
+    hLine(doc, innerL, innerL + innerW, y, sepMid, false);
+    y += 3;
 
-    hLine(doc, innerL, innerL + innerW, fy - 2, 1.2, false);
-    doc.rect(innerL, fy, innerW, footH).fill(W).strokeColor(K).lineWidth(0.9).stroke();
+    hLine(doc, innerL, innerL + innerW, fy - 1, sepMajor, false);
+    doc.rect(innerL, fy, innerW, footH).fill(W).strokeColor(K).lineWidth(sepMid).stroke();
     const xSep1 = mx + third + colGap;
     const xSep2 = mx + 2 * third + 2 * colGap;
-    doc.moveTo(xSep1, fy).lineTo(xSep1, fy + footH).lineWidth(0.5).strokeColor(K).stroke();
-    doc.moveTo(xSep2, fy).lineTo(xSep2, fy + footH).lineWidth(0.5).strokeColor(K).stroke();
+    doc.moveTo(xSep1, fy).lineTo(xSep1, fy + footH).lineWidth(sepFine).strokeColor(K).stroke();
+    doc.moveTo(xSep2, fy).lineTo(xSep2, fy + footH).lineWidth(sepFine).strokeColor(K).stroke();
 
     const dateStr = formatLabelDateTime(order.CreatedDate || new Date().toISOString());
     const c1 = mx + 4;
