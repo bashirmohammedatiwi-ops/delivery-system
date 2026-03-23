@@ -10,53 +10,69 @@ class EmployeeLoginScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topRight,
-            end: Alignment.bottomLeft,
-            colors: [
-              Color(0xFF6D28D9),
-              Color(0xFF7C3AED),
-              Color(0xFF334155),
-              Color(0xFF475569),
-            ],
-            stops: [0.0, 0.3, 0.7, 1.0],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(color: Color(0xFF312E81)),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            tooltip: 'رجوع',
+            onPressed: () => Navigator.of(context).maybePop(),
           ),
         ),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-            child: Column(
-              children: [
-                const SizedBox(height: 48),
+        body: Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFEDE9FE),
+                Color(0xFFF8FAFC),
+              ],
+            ),
+          ),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF9333EA)],
+                    ),
                     shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 24,
+                        color: const Color(0x338B5CF6),
+                        blurRadius: 26,
                         offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.description_rounded, size: 64, color: Colors.white),
+                  child: const Icon(
+                    Icons.description_rounded,
+                    size: 60,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   'تطبيق الموظفين',
                   style: GoogleFonts.cairo(
-                    fontSize: 28,
+                    fontSize: 30,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: const Color(0xFF312E81),
                     letterSpacing: -0.5,
-                    shadows: [Shadow(color: Colors.black26, blurRadius: 8, offset: const Offset(0, 2))],
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -65,12 +81,13 @@ class EmployeeLoginScreen extends StatelessWidget {
                   style: GoogleFonts.cairo(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Colors.white.withValues(alpha: 0.9),
+                    color: const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 56),
                 _LoginForm(onLoggedIn: onLoggedIn),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -137,9 +154,9 @@ class _LoginFormState extends State<_LoginForm> {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
+            color: const Color(0x14000000),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -179,21 +196,39 @@ class _LoginFormState extends State<_LoginForm> {
             ),
           ],
           const SizedBox(height: 28),
-          Material(
-            borderRadius: BorderRadius.circular(16),
-            color: EmployeeTheme.primary,
-            child: InkWell(
-              onTap: _loading ? null : _login,
+          Container(
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF7C3AED), Color(0xFF9333EA)],
+              ),
               borderRadius: BorderRadius.circular(16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                alignment: Alignment.center,
-                child: _loading
-                    ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : Text(
-                        'دخول',
-                        style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
-                      ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _loading ? null : _login,
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  alignment: Alignment.center,
+                  child: _loading
+                      ? const SizedBox(
+                          height: 24,
+                          width: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'دخول',
+                          style: GoogleFonts.cairo(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
               ),
             ),
           ),

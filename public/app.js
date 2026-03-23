@@ -361,7 +361,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}" title="${o.LabelPrinted ? 'تم طباعة الملصق' : 'لم يُطبع الملصق'}">${o.LabelPrinted ? 'تم' : '—'}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
                                             <td class="orders-date">${(o.CreatedDate || '').slice(0, 16)}</td>
-                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 40)}${(o.Notes || '').length > 40 ? '…' : ''}</td>
+                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
                                             <td>
                                                 <div class="order-actions">
                                                     <button type="button" class="btn btn-sm btn-print-order" data-order-id="${o.OrderID}" title="طباعة الملصق"><i class="bi bi-printer"></i></button>
@@ -1992,7 +1992,7 @@ const screens = {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
                                             <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().slice(0, 30)}</td>
+                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>

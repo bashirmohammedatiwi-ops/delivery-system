@@ -2384,7 +2384,13 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .report-table--orders thead th { padding: 8px 10px; font-size: 0.8rem; white-space: nowrap; }
 .report-table--orders tbody td { padding: 6px 10px; font-size: 0.85rem; }
 .report-table--orders .col-address { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.report-table--orders .col-notes { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.report-table--orders .col-notes {
+    min-width: 180px;
+    max-width: 340px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 .report-table--orders .iqd { white-space: nowrap; }
 .report-table--orders .badge { padding: 2px 6px; font-size: 0.75rem; }
 
@@ -2559,7 +2565,13 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .status-map { font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; }
 .empty-table-msg { padding: 40px; text-align: center; color: var(--text-muted); }
 .col-address { min-width: 160px; }
-.col-notes { min-width: 100px; max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.col-notes {
+    min-width: 180px;
+    max-width: 340px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
 
 .users-table .role-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; }
 .users-table .role-badge.admin { background: var(--accent-purple-soft); color: var(--accent-purple); border: 1px solid rgba(139, 92, 246, 0.3); }
