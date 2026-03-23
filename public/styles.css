@@ -2646,16 +2646,21 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .report-table tbody tr.order-returned:hover { background: #FECACA; }
 
 /* جدول تفاصيل الطلبات: صفوف مدمجة لعرض المزيد */
-.report-table--orders { font-size: 0.875rem; }
+.report-table--orders {
+    font-size: 0.875rem;
+    table-layout: auto;
+}
 .report-table--orders thead th { padding: 8px 10px; font-size: 0.8rem; white-space: nowrap; }
-.report-table--orders tbody td { padding: 6px 10px; font-size: 0.85rem; }
+.report-table--orders tbody td { padding: 6px 10px; font-size: 0.85rem; vertical-align: top; }
 .report-table--orders .col-address { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ملاحظات الطلب: عرض كامل مع التفاف وأسطر جديدة من قاعدة البيانات */
 .report-table--orders .col-notes {
-    min-width: 180px;
-    max-width: 340px;
-    white-space: normal;
+    min-width: 260px;
+    max-width: min(720px, 55vw);
+    white-space: pre-wrap;
     overflow-wrap: anywhere;
     word-break: break-word;
+    line-height: 1.45;
 }
 .report-table--orders .iqd { white-space: nowrap; }
 .report-table--orders .badge { padding: 2px 6px; font-size: 0.75rem; }

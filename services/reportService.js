@@ -448,7 +448,7 @@ async function generateDriverReportPDF(report) {
             o.LabelPrinted ? 'تم' : '-',
             receiveTxt(o),
             wrap(o.CreatedByName, 14),
-            wrap(o.Notes, 30)
+            txt(o.Notes)
         ];
         const rowH = getTableRowHeight(doc, cols, cells, font, null, numericCols);
         if (y + rowH > PAGE_HEIGHT - BOTTOM_MARGIN) {

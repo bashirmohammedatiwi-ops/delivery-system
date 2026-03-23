@@ -2063,7 +2063,7 @@ const screens = {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
                                             <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                            <td class="col-notes" title="${(o.Notes || '').replace(/"/g, '&quot;')}">${(o.Notes || '-').toString().replace(/</g, '&lt;').replace(/>/g, '&gt;')}</td>
+                                            <td class="col-notes" title="${escapeHtml((o.Notes || '').toString())}">${(o.Notes && String(o.Notes).trim()) ? escapeHtml(o.Notes) : '-'}</td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>
