@@ -106,11 +106,11 @@ function generateBarcodeBase64(shipmentNumber) {
             {
                 bcid: 'code128',
                 text: String(shipmentNumber || ''),
-                scale: 17,
-                height: 22,
+                scale: 20,
+                height: 8,
                 includetext: true,
                 textxalign: 'center',
-                textsize: 13
+                textsize: 9
             },
             (err, png) => {
                 if (err) reject(err);
@@ -244,8 +244,21 @@ async function createLabelPDF(order) {
     notesH = Math.min(Math.max(notesH, 22), 72);
 
     const yBarcodeTop = y;
-    const barRowMax = 122;
-    let barRowH = Math.min(102, barRowMax);
+    const barPadY = 4;
+    /** عرض الباركود = ٧٥٪ من العرض الداخلي (لا نضيّقه بسبب الارتفاع إلا إن اضطرّ الملصق) */
+    const targetBarW = innerW * 0.75;
+    const barcodeBuf = Buffer.from(await generateBarcodeBase64(order.ShipmentNumber), 'base64');
+    const barDim = pngIhdrDimensions(barcodeBuf);
+    const dhAtTargetW =
+        barDim && barDim.width > 0 && barDim.height > 0
+            ? barDim.height * (targetBarW / barDim.width)
+            : 72;
+    const neededBarRow = Math.max(56, Math.ceil(dhAtTargetW + barPadY * 2 + 4));
+    const barRowMax = 132;
+    /** لا نضيّق صف الباركود دون داعٍ إن كان يفي بعرض ٧٥٪ */
+    const minBarRowFloor = Math.min(neededBarRow, barRowMax);
+
+    let barRowH = Math.min(Math.max(102, neededBarRow), barRowMax);
 
     /** y بعد خطّي الباركود وقبل y+=5 الذي يسبق صف الأزواج */
     function yBeforePairRows(barH) {
@@ -262,39 +275,35 @@ async function createLabelPDF(order) {
         return b;
     }
 
-    while (measureContentBottom(barRowH) > fy && barRowH > 56) barRowH -= 2;
     while (measureContentBottom(barRowH) > fy && moneyH > 44) moneyH -= 2;
     while (measureContentBottom(barRowH) > fy && addrH > 22) addrH -= 4;
     while (measureContentBottom(barRowH) > fy && notesH > 16) notesH -= 3;
+    while (measureContentBottom(barRowH) > fy && barRowH > minBarRowFloor) barRowH -= 2;
+    while (measureContentBottom(barRowH) > fy && barRowH > 56) barRowH -= 2;
 
     while (barRowH < barRowMax && measureContentBottom(barRowH + 2) <= fy) barRowH += 2;
 
     let slack = fy - measureContentBottom(barRowH);
     if (slack > 0) addrH = Math.min(addrH + slack, 110);
 
-    /* باركود: يملأ المنطقة قدر الإمكان — الرقم مطبوع تحت الأشرطة */
+    /* باركود بعرض ثابت ٧٥٪ — الرقم تحت الأشرطة */
     y = yBarcodeTop;
     const bx = innerL;
     const barW = innerW;
     doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.9).stroke();
-    const barcodeBuf = Buffer.from(await generateBarcodeBase64(order.ShipmentNumber), 'base64');
-    const padY = 4;
-    const maxH = barRowH - padY * 2;
-    /** عرض الباركود ≈ ٣/٤ عرض الملصق الداخلي، متمركز */
-    const targetBarW = innerW * 0.75;
-    const dim = pngIhdrDimensions(barcodeBuf);
+    const maxH = barRowH - barPadY * 2;
     let dw = targetBarW;
-    let dh = maxH;
-    if (dim && dim.width > 0 && dim.height > 0) {
-        dh = dim.height * (targetBarW / dim.width);
-        if (dh > maxH) {
-            const r = maxH / dh;
-            dh = maxH;
-            dw = targetBarW * r;
-        }
+    let dh =
+        barDim && barDim.width > 0 && barDim.height > 0
+            ? barDim.height * (targetBarW / barDim.width)
+            : maxH;
+    if (dh > maxH) {
+        const s = maxH / dh;
+        dh = maxH;
+        dw = targetBarW * s;
     }
     const ix = innerL + (innerW - dw) / 2;
-    const iy = y + padY + (maxH - dh) / 2;
+    const iy = y + barPadY + (maxH - dh) / 2;
     doc.image(barcodeBuf, ix, iy, { width: dw, height: dh });
     y += barRowH;
     hLine(doc, innerL, innerL + innerW, y + 3, 0.55, true);
