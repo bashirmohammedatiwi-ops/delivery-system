@@ -314,62 +314,75 @@ async function renderOrdersScreen(container, opts = {}) {
             <div class="screen active orders-screen">
                 <div class="orders-layout">
                     <header class="orders-header">
-                        <div class="orders-header-top">
-                            <div class="orders-header-text">
-                                <h1 class="orders-title">${title}</h1>
-                                <p class="orders-subtitle">بحث، فلترة بالحالة والسائق والتاريخ، وإجراءات سريعة على كل طلب</p>
+                        <div class="orders-hero">
+                            <div class="orders-hero-text">
+                                <div class="orders-hero-title-row">
+                                    <h1 class="orders-title">${title}</h1>
+                                    <span class="orders-count-pill" id="ordersCount">${list.length} طلب</span>
+                                </div>
+                                <p class="orders-subtitle">إدارة وعرض جميع الطلبات مع البحث والفلترة</p>
                             </div>
-                            <span class="orders-count" id="ordersCount">${list.length} طلب</span>
                         </div>
-                        <div class="orders-stats-bar" role="status">
-                            <div class="orders-stat orders-stat--all"><span class="orders-stat-value">${list.length}</span><span class="orders-stat-label">في النتائج</span></div>
-                            <div class="orders-stat orders-stat--new"><span class="orders-stat-value">${statNew}</span><span class="orders-stat-label">جديد</span></div>
-                            <div class="orders-stat orders-stat--assigned"><span class="orders-stat-value">${statAssigned}</span><span class="orders-stat-label">مع السائق</span></div>
-                            <div class="orders-stat orders-stat--done"><span class="orders-stat-value">${statDelivered}</span><span class="orders-stat-label">تم التوصيل</span></div>
-                            <div class="orders-stat orders-stat--return"><span class="orders-stat-value">${statReturned}</span><span class="orders-stat-label">راجع</span></div>
+                        <div class="orders-stats-scroll" role="status" aria-label="ملخص الحالات في النتائج">
+                            <div class="orders-stats-bar">
+                                <div class="orders-stat orders-stat--all"><span class="orders-stat-value">${list.length}</span><span class="orders-stat-label">في النتائج</span></div>
+                                <div class="orders-stat orders-stat--new"><span class="orders-stat-value">${statNew}</span><span class="orders-stat-label">جديد</span></div>
+                                <div class="orders-stat orders-stat--assigned"><span class="orders-stat-value">${statAssigned}</span><span class="orders-stat-label">مع السائق</span></div>
+                                <div class="orders-stat orders-stat--done"><span class="orders-stat-value">${statDelivered}</span><span class="orders-stat-label">تم التوصيل</span></div>
+                                <div class="orders-stat orders-stat--return"><span class="orders-stat-value">${statReturned}</span><span class="orders-stat-label">راجع</span></div>
+                            </div>
                         </div>
                     </header>
                     <div class="orders-toolbar">
-                        <div class="orders-toolbar-grid">
-                            <div class="orders-field orders-field--search">
-                                <label class="orders-field-label" for="search">بحث</label>
-                                <div class="orders-search-wrap">
-                                    <span class="orders-search-icon" aria-hidden="true">🔍</span>
-                                    <input type="text" id="search" placeholder="رقم الطلب، الشحنة، الهاتف، المتجر، المستلم…" class="orders-search-input" autocomplete="off">
+                        <section class="orders-panel orders-panel--search" aria-labelledby="orders-search-heading">
+                            <h2 class="orders-panel-heading" id="orders-search-heading"><i class="bi bi-search" aria-hidden="true"></i> بحث سريع</h2>
+                            <div class="orders-search-wrap">
+                                <span class="orders-search-icon" aria-hidden="true"><i class="bi bi-search"></i></span>
+                                <input type="text" id="search" placeholder="رقم الطلب، رقم الشحنة، الهاتف، المتجر، المستلم…" class="orders-search-input" autocomplete="off" aria-label="بحث في الطلبات">
+                            </div>
+                        </section>
+                        <section class="orders-panel orders-panel--filters" aria-label="فلترة الطلبات">
+                            <div class="orders-toolbar-grid">
+                                <div class="orders-field">
+                                    <label class="orders-field-label" for="filterDriver">السائق</label>
+                                    <select id="filterDriver" class="orders-filter-select" title="تصفية حسب السائق">
+                                        <option value="">كل السائقين</option>
+                                        ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="orders-field orders-field--dates">
+                                    <span class="orders-field-label">نطاق التاريخ</span>
+                                    <div class="orders-date-row">
+                                        <input type="date" id="dateFrom" class="orders-date-input" title="من تاريخ" aria-label="من تاريخ">
+                                        <span class="orders-date-sep">—</span>
+                                        <input type="date" id="dateTo" class="orders-date-input" title="إلى تاريخ" aria-label="إلى تاريخ">
+                                    </div>
+                                </div>
+                                <div class="orders-field orders-field--actions">
+                                    <span class="orders-field-label orders-field-label--ghost">تطبيق</span>
+                                    <div class="orders-toolbar-btns">
+                                        <button type="button" class="btn btn-primary orders-btn-apply" id="btnSearch">تطبيق الفلاتر</button>
+                                        <button type="button" class="btn btn-outline orders-btn-clear" id="btnClearFilters" title="مسح البحث والفلاتر">مسح الكل</button>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="orders-field">
-                                <label class="orders-field-label" for="filterDriver">السائق</label>
-                                <select id="filterDriver" class="orders-filter-select" title="تصفية حسب السائق">
-                                    <option value="">كل السائقين</option>
-                                    ${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}
-                                </select>
-                            </div>
-                            <div class="orders-field orders-field--dates">
-                                <span class="orders-field-label">التاريخ</span>
-                                <div class="orders-date-row">
-                                    <input type="date" id="dateFrom" class="orders-date-input" title="من تاريخ" aria-label="من تاريخ">
-                                    <span class="orders-date-sep">—</span>
-                                    <input type="date" id="dateTo" class="orders-date-input" title="إلى تاريخ" aria-label="إلى تاريخ">
+                            <div class="orders-chips-block">
+                                <span class="orders-chips-label">حالة الطلب</span>
+                                <div class="orders-status-chips" role="tablist" aria-label="تصفية حسب الحالة">
+                                    <button type="button" class="orders-chip ${!filters.status ? 'active' : ''}" data-status="" role="tab" aria-selected="${!filters.status}">الكل</button>
+                                    <button type="button" class="orders-chip ${filters.status === 'New' ? 'active' : ''}" data-status="New" role="tab" aria-selected="${filters.status === 'New'}">جديد</button>
+                                    <button type="button" class="orders-chip ${filters.status === 'AssignedToDriver' ? 'active' : ''}" data-status="AssignedToDriver" role="tab" aria-selected="${filters.status === 'AssignedToDriver'}">مع السائق</button>
+                                    <button type="button" class="orders-chip ${filters.status === 'Delivered' ? 'active' : ''}" data-status="Delivered" role="tab" aria-selected="${filters.status === 'Delivered'}">تم التوصيل</button>
+                                    <button type="button" class="orders-chip ${filters.status === 'Returned' ? 'active' : ''}" data-status="Returned" role="tab" aria-selected="${filters.status === 'Returned'}">راجع</button>
                                 </div>
                             </div>
-                            <div class="orders-field orders-field--actions">
-                                <span class="orders-field-label orders-field-label--ghost">إجراءات</span>
-                                <div class="orders-toolbar-btns">
-                                    <button type="button" class="btn btn-primary" id="btnSearch">تطبيق</button>
-                                    <button type="button" class="btn btn-outline orders-btn-clear" id="btnClearFilters" title="مسح البحث والفلاتر">مسح</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="orders-status-chips" role="tablist" aria-label="تصفية حسب الحالة">
-                            <button type="button" class="orders-chip ${!filters.status ? 'active' : ''}" data-status="" role="tab" aria-selected="${!filters.status}">الكل</button>
-                            <button type="button" class="orders-chip ${filters.status === 'New' ? 'active' : ''}" data-status="New" role="tab" aria-selected="${filters.status === 'New'}">جديد</button>
-                            <button type="button" class="orders-chip ${filters.status === 'AssignedToDriver' ? 'active' : ''}" data-status="AssignedToDriver" role="tab" aria-selected="${filters.status === 'AssignedToDriver'}">مع السائق</button>
-                            <button type="button" class="orders-chip ${filters.status === 'Delivered' ? 'active' : ''}" data-status="Delivered" role="tab" aria-selected="${filters.status === 'Delivered'}">تم التوصيل</button>
-                            <button type="button" class="orders-chip ${filters.status === 'Returned' ? 'active' : ''}" data-status="Returned" role="tab" aria-selected="${filters.status === 'Returned'}">راجع</button>
-                        </div>
+                        </section>
                     </div>
                     <div class="orders-table-card">
+                        <div class="orders-table-headbar">
+                            <span class="orders-table-headbar-title">قائمة الطلبات</span>
+                            <span class="orders-table-headbar-meta">${list.length} سجل</span>
+                        </div>
                         ${list.length > 0 ? `<div class="orders-table-wrap">
                             <table class="orders-table">
                                 <thead>
@@ -377,6 +390,7 @@ async function renderOrdersScreen(container, opts = {}) {
                                         <th class="orders-th-order">الطلب</th>
                                         <th class="orders-th-party">المستلم والمتجر</th>
                                         <th class="col-address orders-th-address">العنوان</th>
+                                        <th class="orders-th-link">موقع</th>
                                         <th class="orders-th-money">المبالغ (د.ع)</th>
                                         <th class="orders-th-ops">التشغيل</th>
                                         <th class="orders-th-actions">إجراءات</th>
@@ -407,9 +421,11 @@ async function renderOrdersScreen(container, opts = {}) {
                                                 <div class="orders-party-phone">${escapeHtml(o.CustomerPhone || '—')}</div>
                                                 <div class="orders-party-store"><i class="bi bi-shop" aria-hidden="true"></i> ${escapeHtml(o.StoreName || '—')}</div>
                                             </td>
-                                            <td class="col-address orders-cell-address">
+                                            <td class="col-address orders-cell-address" title="${escapeHtml(getFullAddress(o))}">
                                                 <span class="orders-address-text">${escapeHtml(getFullAddress(o))}</span>
-                                                ${o.CustomerLocationLink ? `<a href="${loc}" target="_blank" rel="noopener noreferrer" class="orders-loc-link">موقع</a>` : ''}
+                                            </td>
+                                            <td class="orders-cell-link">
+                                                ${o.CustomerLocationLink ? `<a href="${loc}" target="_blank" rel="noopener noreferrer" class="orders-loc-pill" title="فتح رابط الموقع"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><span>فتح</span></a>` : '<span class="orders-loc-empty">—</span>'}
                                             </td>
                                             <td class="orders-cell-money">
                                                 <ul class="orders-money-list">
