@@ -179,7 +179,7 @@ function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
  */
 async function createLabelPDF(order) {
     const w = 420;
-    const h = 500;
+    const h = 420;
     const doc = new PDFDocument({ size: [w, h], margin: 0 });
     const chunks = [];
     doc.on('data', chunks.push.bind(chunks));
@@ -203,7 +203,7 @@ async function createLabelPDF(order) {
     const notesRaw = order.Notes != null ? String(order.Notes).trim() : '';
     const hasNotesContent = !!notesRaw;
 
-    const footH = 54;
+    const footH = 42;
     const fy = h - M - footH;
 
     const innerL = M + 4;
@@ -232,9 +232,52 @@ async function createLabelPDF(order) {
     y += heroH;
     hLine(doc, innerL, innerL + innerW, y, 0.9, true);
 
-    /* باركود: ارتفاع أقل، عرض أكبر، في المنتصف */
-    const barRowH = 72;
+    const row2H = 32;
+    const gapMid = 6;
+    const half = (innerW - gapMid) / 2;
+    const labCol = 72;
+    let moneyH = 44;
+    /** من نهاية صف الأزواج حتى أعلى مربع العنوان: 7 + 15 + 5 */
+    const addrBlockH = 27;
+
+    setAr();
+    doc.fontSize(11);
+    const addrW = innerW - 16;
+    const addrFont = 13.5;
+    let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 10;
+    addrH = Math.min(Math.max(addrH, 26), 92);
+    let notesH = rtlBlockHeight(doc, hasNotesContent ? notesRaw : '—', addrW, 11.5) + 12;
+    notesH = Math.min(Math.max(notesH, 22), 72);
+
     y += 5;
+    const yBarcodeTop = y;
+    let barRowH = 66;
+
+    /** y بعد خطّي الباركود وقبل y+=5 الذي يسبق صف الأزواج */
+    function yBeforePairRows(barH) {
+        return yBarcodeTop + barH + 6;
+    }
+
+    function measureContentBottom(barH) {
+        let b = yBeforePairRows(barH) + 5 + 2 * (3 + row2H);
+        b += 5;
+        b += addrBlockH;
+        b += addrH + 8;
+        b += moneyH + 8;
+        b += 14 + 4 + notesH + 8;
+        return b;
+    }
+
+    while (measureContentBottom(barRowH) > fy && barRowH > 46) barRowH -= 2;
+    while (measureContentBottom(barRowH) > fy && moneyH > 30) moneyH -= 2;
+    while (measureContentBottom(barRowH) > fy && addrH > 22) addrH -= 4;
+    while (measureContentBottom(barRowH) > fy && notesH > 16) notesH -= 3;
+
+    let slack = fy - measureContentBottom(barRowH);
+    if (slack > 0) addrH = Math.min(addrH + slack, 110);
+
+    /* باركود: في المنتصف، الارتفاع يُضبط للملصق المربع */
+    y = yBarcodeTop;
     const bx = innerL;
     const barW = innerW;
     doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.7).stroke();
@@ -259,41 +302,6 @@ async function createLabelPDF(order) {
     y += 6;
     hLine(doc, innerL, innerL + innerW, y, 1, false);
 
-    const row2H = 36;
-    const gapMid = 6;
-    const half = (innerW - gapMid) / 2;
-    const labCol = 74;
-    const moneyH = 50;
-    const addrTitleH = 16;
-
-    setAr();
-    doc.fontSize(11);
-
-    const addrW = innerW - 16;
-    const addrFont = 13.5;
-    let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 12;
-    addrH = Math.min(Math.max(addrH, 30), 100);
-
-    /* قسم الملاحظات دائماً (نص أو شرطة) */
-    let notesH = rtlBlockHeight(doc, hasNotesContent ? notesRaw : '—', addrW, 11.5) + 14;
-    notesH = Math.min(Math.max(notesH, 28), 88);
-
-    function estBottom() {
-        let b = y + 5;
-        b += 2 * (3 + row2H);
-        b += 2 + 5;
-        b += addrTitleH + 2;
-        b += addrH + 4 + 4;
-        b += moneyH + 4 + 4;
-        b += 14 + 4 + notesH + 4 + 4;
-        return b;
-    }
-    while (estBottom() > fy && addrH > 26) addrH -= 6;
-    while (estBottom() > fy && notesH > 22) notesH -= 5;
-
-    let slack = fy - estBottom();
-    if (slack > 0) addrH = Math.min(addrH + slack, 130);
-
     y += 5;
 
     function pairRow(labelR, valR, labelL, valL) {
@@ -307,9 +315,9 @@ async function createLabelPDF(order) {
         doc.rect(xL, y, half, row2H).fill(W).strokeColor(K).lineWidth(0.5).stroke();
         doc.moveTo(xR + half, y).lineTo(xR + half, y + row2H).lineWidth(0.45).strokeColor(K).stroke();
         setArBold();
-        doc.fontSize(10.5);
-        textRTL(doc, labelR + ':', xR + vWR + 4, y + 11, { width: labCol - 2, align: 'right', fill: K });
-        textRTL(doc, labelL + ':', xL + vWL + 4, y + 11, { width: labCol - 2, align: 'right', fill: K });
+        doc.fontSize(10);
+        textRTL(doc, labelR + ':', xR + vWR + 4, y + 10, { width: labCol - 2, align: 'right', fill: K });
+        textRTL(doc, labelL + ':', xL + vWL + 4, y + 10, { width: labCol - 2, align: 'right', fill: K });
         const drawVal = (val, x, vw) => {
             const t = String(val ?? '—');
             if (isPhoneLike(t)) {
@@ -332,12 +340,15 @@ async function createLabelPDF(order) {
     hLine(doc, innerL, innerL + innerW, y + 2, 0.45, true);
     y += 5;
 
-    /* عنوان التسليم: خطوط + نص أسود (بدون مربع أسود) */
+    /* عنوان التسليم: خط كامل فوقها ثم النص ثم خط قبل مربع العنوان */
+    hLine(doc, innerL, innerL + innerW, y + 2, 1, false);
+    y += 7;
     setArBold();
     doc.fontSize(12.5);
-    textRTL(doc, 'عنوان التسليم', innerL + 6, y + 2, { width: innerW - 12, align: 'right', fill: K });
-    y += addrTitleH;
-    hLine(doc, innerL + 20, innerL + innerW - 20, y, 0.9, false);
+    textRTL(doc, 'عنوان التسليم', innerL + 6, y + 1, { width: innerW - 12, align: 'right', fill: K });
+    y += 15;
+    hLine(doc, innerL + 16, innerL + innerW - 16, y, 0.75, false);
+    y += 5;
 
     doc.rect(innerL, y, innerW, addrH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
     setAr();
