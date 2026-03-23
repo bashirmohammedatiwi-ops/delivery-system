@@ -2649,18 +2649,39 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 .report-table--orders {
     font-size: 0.875rem;
     table-layout: auto;
+    /* لا تضغط الأعمدة لملء 100% — يتوسع الجدول أفقياً داخل report-table-wrap */
+    width: max-content;
+    min-width: 100%;
 }
 .report-table--orders thead th { padding: 8px 10px; font-size: 0.8rem; white-space: nowrap; }
 .report-table--orders tbody td { padding: 6px 10px; font-size: 0.85rem; vertical-align: top; }
-.report-table--orders .col-address { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* ملاحظات الطلب: عرض كامل مع التفاف وأسطر جديدة من قاعدة البيانات */
-.report-table--orders .col-notes {
-    min-width: 260px;
-    max-width: min(720px, 55vw);
+/* عنوان متعدد الأسطر بدون قص بنقاط */
+.report-table--orders .col-address {
+    min-width: 200px;
+    max-width: 420px;
     white-space: pre-wrap;
+    overflow: visible;
+    text-overflow: clip;
     overflow-wrap: anywhere;
     word-break: break-word;
     line-height: 1.45;
+}
+/* ملاحظات الطلب: نص كامل مع التفاف */
+.report-table--orders .col-notes {
+    min-width: 320px;
+    max-width: none;
+    white-space: pre-wrap;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    line-height: 1.45;
+}
+.report-table--orders .report-cell-multiline {
+    display: block;
+    white-space: inherit;
+    overflow-wrap: inherit;
+    word-break: inherit;
 }
 .report-table--orders .iqd { white-space: nowrap; }
 .report-table--orders .badge { padding: 2px 6px; font-size: 0.75rem; }

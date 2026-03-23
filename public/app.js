@@ -2052,7 +2052,7 @@ const screens = {
                                             <td>${o.StoreName || '-'}</td>
                                             <td>${o.CustomerName || '-'}</td>
                                             <td>${o.CustomerPhone || '-'}</td>
-                                            <td class="col-address">${getFullAddress(o)}</td>
+                                            <td class="col-address"><span class="report-cell-multiline">${escapeHtml(getFullAddress(o))}</span></td>
                                             <td>${o.CustomerLocationLink ? `<a href="${(o.CustomerLocationLink || '').replace(/"/g, '&quot;')}" target="_blank" rel="noopener" title="فتح رابط الموقع">📍 فتح</a>` : '-'}</td>
                                             <td>${o.Pieces || 1}</td>
                                             <td class="iqd">${formatIQD(o.AmountIQD)}</td>
@@ -2063,7 +2063,7 @@ const screens = {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
                                             <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                            <td class="col-notes" title="${escapeHtml((o.Notes || '').toString())}">${(o.Notes && String(o.Notes).trim()) ? escapeHtml(o.Notes) : '-'}</td>
+                                            <td class="col-notes" title="${escapeHtml((o.Notes || '').toString())}"><span class="report-cell-multiline">${(o.Notes && String(o.Notes).trim()) ? escapeHtml(o.Notes) : '-'}</span></td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>
@@ -2141,6 +2141,7 @@ const screens = {
                                         const esc = (t) => (t == null ? '' : String(t)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
                                         const notesCell = (o.Notes && String(o.Notes).trim()) ? esc(o.Notes) : '-';
                                         const returnReasonCell = returned ? esc((o.ReturnReason || '').trim() || '-') : '-';
+                                        const addrCell = `<span class="report-cell-multiline">${esc(getFullAddress(o))}</span>`;
                                         return `<tr class="${returned ? 'order-returned' : ''}">
                                             <td>${statusTxt}</td>
                                             <td>${o.AdminOrderNo || '-'}</td>
@@ -2149,7 +2150,7 @@ const screens = {
                                             <td>${o.StoreName || '-'}</td>
                                             <td>${o.CustomerName || '-'}</td>
                                             <td>${o.CustomerPhone || '-'}</td>
-                                            <td class="col-address">${getFullAddress(o)}</td>
+                                            <td class="col-address">${addrCell}</td>
                                             <td class="iqd">${formatIQD(o.AmountIQD)}</td>
                                             <td class="iqd">${o.FreeDelivery ? 'مجاني ' + formatIQD(driverAmt(o)) : formatIQD(driverAmt(o))}</td>
                                             <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
@@ -2158,8 +2159,8 @@ const screens = {
                                             <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
                                             <td><span class="badge ${returned ? (o.ReturnedOrderReceived ? 'badge-delivered' : 'badge-returned') : ''}" title="${returned ? (o.ReturnedOrderReceived ? 'تم استلامه عند الشركة' : 'لم يُسلّم للشركة بعد') : ''}">${receiveTxt}</span></td>
                                             <td>${(o.CreatedByName || '-').toString().replace(/</g, '&lt;')}</td>
-                                            <td class="col-notes" title="${esc(o.Notes || '')}">${notesCell}</td>
-                                            <td class="col-notes" title="${returned ? esc((o.ReturnReason || '').trim()) : ''}">${returnReasonCell}</td>
+                                            <td class="col-notes" title="${esc(o.Notes || '')}"><span class="report-cell-multiline">${notesCell}</span></td>
+                                            <td class="col-notes" title="${returned ? esc((o.ReturnReason || '').trim()) : ''}"><span class="report-cell-multiline">${returnReasonCell}</span></td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>
