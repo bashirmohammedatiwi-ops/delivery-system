@@ -228,16 +228,18 @@ async function createLabelPDF(order) {
     const gapMid = 6;
     const half = (innerW - gapMid) / 2;
     const labCol = 72;
-    let moneyH = 48;
-    /** بعد أول فاصل تحت الأزواج: 9 + 20 + 6 (فاصل + شريط العنوان + خط قبل مربع العنوان) */
-    const addrBlockH = 35;
+    let moneyH = 52;
+    /** بعد فاصل الأزواج: خط رفيع + فراغ قبل مربع العنوان (بدون عنوان «عنوان التسليم») */
+    const addrBlockH = 8;
 
     setAr();
     doc.fontSize(11);
     const addrW = innerW - 16;
-    const addrFont = 13.5;
-    let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 10;
-    addrH = Math.min(Math.max(addrH, 26), 92);
+    const addrFont = 15;
+    setArBold();
+    let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 14;
+    addrH = Math.min(Math.max(addrH, 32), 100);
+    setAr();
     let notesH = rtlBlockHeight(doc, hasNotesContent ? notesRaw : '—', addrW, 11.5) + 12;
     notesH = Math.min(Math.max(notesH, 22), 72);
 
@@ -254,14 +256,14 @@ async function createLabelPDF(order) {
         let b = yBeforePairRows(barH) + 5 + 2 * (3 + row2H);
         b += 7;
         b += addrBlockH;
-        b += addrH + 8;
-        b += moneyH + 8;
+        b += addrH + 6;
+        b += moneyH + 4;
         b += 14 + 4 + notesH + 8;
         return b;
     }
 
     while (measureContentBottom(barRowH) > fy && barRowH > 56) barRowH -= 2;
-    while (measureContentBottom(barRowH) > fy && moneyH > 34) moneyH -= 2;
+    while (measureContentBottom(barRowH) > fy && moneyH > 44) moneyH -= 2;
     while (measureContentBottom(barRowH) > fy && addrH > 22) addrH -= 4;
     while (measureContentBottom(barRowH) > fy && notesH > 16) notesH -= 3;
 
@@ -276,19 +278,22 @@ async function createLabelPDF(order) {
     const barW = innerW;
     doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.9).stroke();
     const barcodeBuf = Buffer.from(await generateBarcodeBase64(order.ShipmentNumber), 'base64');
-    const padX = 3;
     const padY = 4;
-    const maxW = barW - padX * 2;
     const maxH = barRowH - padY * 2;
+    /** عرض الباركود ≈ ٣/٤ عرض الملصق الداخلي، متمركز */
+    const targetBarW = innerW * 0.75;
     const dim = pngIhdrDimensions(barcodeBuf);
-    let dw = maxW;
+    let dw = targetBarW;
     let dh = maxH;
     if (dim && dim.width > 0 && dim.height > 0) {
-        const r = Math.min(maxW / dim.width, maxH / dim.height);
-        dw = dim.width * r;
-        dh = dim.height * r;
+        dh = dim.height * (targetBarW / dim.width);
+        if (dh > maxH) {
+            const r = maxH / dh;
+            dh = maxH;
+            dw = targetBarW * r;
+        }
     }
-    const ix = bx + padX + (maxW - dw) / 2;
+    const ix = innerL + (innerW - dw) / 2;
     const iy = y + padY + (maxH - dh) / 2;
     doc.image(barcodeBuf, ix, iy, { width: dw, height: dh });
     y += barRowH;
@@ -334,26 +339,16 @@ async function createLabelPDF(order) {
     hLine(doc, innerL, innerL + innerW, y + 1, 0.4, true);
     y += 7;
 
-    /* عنوان التسليم: فاصل رفيع أعلى بمسافة واضحة عن النص (لا يقطع العنوان أو المبالغ) */
-    hLine(doc, innerL, innerL + innerW, y, 0.45, false);
-    y += 9;
-    doc.rect(innerL + 2, y, innerW - 4, 18).fill(W).strokeColor(K).lineWidth(0.45).stroke();
+    hLine(doc, innerL, innerL + innerW, y, 0.4, false);
+    y += 8;
+
+    doc.rect(innerL, y, innerW, addrH).fill(W).strokeColor(K).lineWidth(0.6).stroke();
     setArBold();
-    doc.fontSize(11.5);
-    textRTL(doc, 'عنوان التسليم', innerL + 10, y + 4, { width: innerW - 20, align: 'right', fill: K });
-    y += 20;
-    hLine(doc, innerL + 18, innerL + innerW - 18, y + 1, 0.5, true);
-    y += 6;
-
-    doc.rect(innerL, y, innerW, addrH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
-    setAr();
     doc.fillColor(K).fontSize(addrFont);
-    textRTL(doc, fullAddr, innerL + 8, y + 7, { width: addrW, align: 'right', fill: K });
-    y += addrH + 4;
-    hLine(doc, innerL, innerL + innerW, y, 1, false);
-    y += 4;
+    textRTL(doc, fullAddr, innerL + 8, y + 8, { width: addrW, align: 'right', fill: K });
+    y += addrH + 6;
 
-    /* المبالغ — ترتيب قراءة عربية: الفاتورة يمين | التوصيل وسط | النهائي يسار */
+    /* المبالغ — الخط الكامل تحت الأرقام وليس فوقها */
     const inv = formatIQD(order.AmountIQD) + ' د.ع';
     const driverDelivery = order.FreeDelivery ? (order.WaivedDeliveryIQD || 0) : (order.DeliveryFeeIQD || 0);
     const delTxt = order.FreeDelivery ? 'توصيل مجاني' : formatIQD(driverDelivery) + ' د.ع';
@@ -370,20 +365,20 @@ async function createLabelPDF(order) {
     doc.moveTo(xFinal + third, y).lineTo(xFinal + third, y + moneyH).lineWidth(0.5).strokeColor(K).stroke();
     doc.moveTo(xDel + third, y).lineTo(xDel + third, y + moneyH).lineWidth(0.5).strokeColor(K).stroke();
     setArBold();
-    doc.fontSize(10.5);
-    textRTL(doc, 'المبلغ النهائي', xFinal + 4, y + 5, { width: third - 8, align: 'center', fill: K });
-    textRTL(doc, 'أجرة التوصيل', xDel + 4, y + 5, { width: third - 8, align: 'center', fill: K });
-    textRTL(doc, 'مبلغ الفاتورة', xInv + 4, y + 5, { width: third - 8, align: 'center', fill: K });
+    doc.fontSize(10);
+    textRTL(doc, 'المبلغ النهائي', xFinal + 4, y + 4, { width: third - 8, align: 'center', fill: K });
+    textRTL(doc, 'أجرة التوصيل', xDel + 4, y + 4, { width: third - 8, align: 'center', fill: K });
+    textRTL(doc, 'مبلغ الفاتورة', xInv + 4, y + 4, { width: third - 8, align: 'center', fill: K });
     setArBold();
-    doc.fontSize(18);
-    textRTL(doc, totalTxt, xFinal + 4, y + 18, { width: third - 8, align: 'center', fill: K });
+    doc.fontSize(17);
+    textRTL(doc, totalTxt, xFinal + 4, y + 20, { width: third - 8, align: 'center', fill: K });
     setArBold();
-    doc.fontSize(16);
-    textRTL(doc, delTxt, xDel + 4, y + 21, { width: third - 8, align: 'center', fill: K });
-    textRTL(doc, inv, xInv + 4, y + 21, { width: third - 8, align: 'center', fill: K });
+    doc.fontSize(15);
+    textRTL(doc, delTxt, xDel + 4, y + 22, { width: third - 8, align: 'center', fill: K });
+    textRTL(doc, inv, xInv + 4, y + 22, { width: third - 8, align: 'center', fill: K });
     setAr();
-    y += moneyH + 4;
-    hLine(doc, innerL, innerL + innerW, y, 1, false);
+    y += moneyH;
+    hLine(doc, innerL, innerL + innerW, y, 0.95, false);
     y += 4;
 
     setArBold();
