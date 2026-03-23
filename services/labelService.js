@@ -106,11 +106,11 @@ function generateBarcodeBase64(shipmentNumber) {
             {
                 bcid: 'code128',
                 text: String(shipmentNumber || ''),
-                scale: 14,
-                height: 18,
+                scale: 17,
+                height: 22,
                 includetext: true,
                 textxalign: 'center',
-                textsize: 12
+                textsize: 13
             },
             (err, png) => {
                 if (err) reject(err);
@@ -174,7 +174,7 @@ function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
 }
 
 /**
- * ملصق أبيض/أسود — تنسيق واضح، خطوط فاصلة، باركود بعرض كامل
+ * ملصق أبيض/أسود — باركود بارز (الرقم يظهر تحت الأشرطة فقط)، باقي الحقول منظّمة
  */
 async function createLabelPDF(order) {
     const w = 420;
@@ -211,25 +211,18 @@ async function createLabelPDF(order) {
     doc.lineWidth(1.2).strokeColor(K);
     doc.rect(M, M, cw, h - M * 2).stroke();
 
-    /* رأس: خلفية بيضاء + خطوط فاصلة (بدون تظليل أسود) */
-    const headerH = 42;
-    hLine(doc, innerL, innerL + innerW, y + 2, 1.2, false);
+    /* رأس مضغوط ثم باركود مباشرة (بدون تكرار رقم الشحنة كبيراً في الأعلى) */
+    const headerH = 38;
+    hLine(doc, innerL, innerL + innerW, y + 2, 1, false);
     setArBold();
-    doc.fontSize(19);
-    textRTL(doc, 'شركة ديما الحياة', innerL + 6, y + 8, { width: innerW - 12, align: 'center', fill: K });
+    doc.fontSize(17);
+    textRTL(doc, 'شركة ديما الحياة', innerL + 6, y + 7, { width: innerW - 12, align: 'center', fill: K });
     setAr();
-    doc.fontSize(11.5);
-    textRTL(doc, 'ملصق توصيل', innerL + 6, y + 28, { width: innerW - 12, align: 'center', fill: K });
+    doc.fontSize(10.5);
+    textRTL(doc, 'ملصق توصيل', innerL + 6, y + 24, { width: innerW - 12, align: 'center', fill: K });
     y += headerH;
-    hLine(doc, innerL, innerL + innerW, y, 1, false);
-
-    /* رقم الشحنة */
-    const heroH = 44;
-    y += 6;
-    doc.font('Helvetica-Bold').fillColor(K).fontSize(22);
-    doc.text(String(order.ShipmentNumber || '—'), innerL, y + 11, { width: innerW, align: 'center' });
-    y += heroH;
-    hLine(doc, innerL, innerL + innerW, y, 0.9, true);
+    hLine(doc, innerL, innerL + innerW, y, 0.9, false);
+    y += 8;
 
     const row2H = 36;
     const gapMid = 6;
@@ -248,9 +241,9 @@ async function createLabelPDF(order) {
     let notesH = rtlBlockHeight(doc, hasNotesContent ? notesRaw : '—', addrW, 11.5) + 12;
     notesH = Math.min(Math.max(notesH, 22), 72);
 
-    y += 5;
     const yBarcodeTop = y;
-    let barRowH = 78;
+    const barRowMax = 122;
+    let barRowH = Math.min(102, barRowMax);
 
     /** y بعد خطّي الباركود وقبل y+=5 الذي يسبق صف الأزواج */
     function yBeforePairRows(barH) {
@@ -267,22 +260,24 @@ async function createLabelPDF(order) {
         return b;
     }
 
-    while (measureContentBottom(barRowH) > fy && barRowH > 52) barRowH -= 2;
+    while (measureContentBottom(barRowH) > fy && barRowH > 56) barRowH -= 2;
     while (measureContentBottom(barRowH) > fy && moneyH > 34) moneyH -= 2;
     while (measureContentBottom(barRowH) > fy && addrH > 22) addrH -= 4;
     while (measureContentBottom(barRowH) > fy && notesH > 16) notesH -= 3;
 
+    while (barRowH < barRowMax && measureContentBottom(barRowH + 2) <= fy) barRowH += 2;
+
     let slack = fy - measureContentBottom(barRowH);
     if (slack > 0) addrH = Math.min(addrH + slack, 110);
 
-    /* باركود: في المنتصف، الارتفاع يُضبط للملصق المربع */
+    /* باركود: يملأ المنطقة قدر الإمكان — الرقم مطبوع تحت الأشرطة */
     y = yBarcodeTop;
     const bx = innerL;
     const barW = innerW;
-    doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.7).stroke();
+    doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.9).stroke();
     const barcodeBuf = Buffer.from(await generateBarcodeBase64(order.ShipmentNumber), 'base64');
-    const padX = 4;
-    const padY = 5;
+    const padX = 3;
+    const padY = 4;
     const maxW = barW - padX * 2;
     const maxH = barRowH - padY * 2;
     const dim = pngIhdrDimensions(barcodeBuf);
@@ -297,11 +292,11 @@ async function createLabelPDF(order) {
     const iy = y + padY + (maxH - dh) / 2;
     doc.image(barcodeBuf, ix, iy, { width: dw, height: dh });
     y += barRowH;
-    hLine(doc, innerL, innerL + innerW, y + 4, 0.85, true);
-    y += 6;
-    hLine(doc, innerL, innerL + innerW, y, 1, false);
-
+    hLine(doc, innerL, innerL + innerW, y + 3, 0.55, true);
     y += 5;
+    hLine(doc, innerL, innerL + innerW, y, 0.85, false);
+
+    y += 6;
 
     function pairRow(labelR, valR, labelL, valL) {
         const xR = innerL;
