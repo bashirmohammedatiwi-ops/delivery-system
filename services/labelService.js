@@ -4,22 +4,9 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 
-const COLORS = {
-    brand: '#047857',
-    brandDark: '#064e3b',
-    paper: '#ffffff',
-    muted: '#64748b',
-    line: '#cbd5e1',
-    lineSoft: '#e2e8f0',
-    text: '#0f172a',
-    textSoft: '#475569',
-    heroBg: '#ecfdf5',
-    stripe: '#f8fafc',
-    stripeAlt: '#f1f5f9',
-    totalBg: '#d1fae5',
-    totalBorder: '#34d399',
-    white: '#ffffff'
-};
+/** طابعة أحادية اللون: أسود على أبيض فقط */
+const K = '#000000';
+const W = '#ffffff';
 
 function rev(str) {
     if (!str || typeof str !== 'string') return str;
@@ -49,10 +36,12 @@ function wrapRTL(doc, text, width) {
     return lines;
 }
 
+/** نص عربي مع تفاف ومحاذاة يمين/وسط مناسبة لـ PDFKit */
 function textRTL(doc, str, x, y, options) {
     const width = options?.width ?? Infinity;
     const align = options?.align ?? 'right';
-    const lineGap = options?.lineGap ?? 1;
+    const lineGap = options?.lineGap ?? 0.5;
+    const fill = options?.fill ?? K;
     const lineH = doc.currentLineHeight();
     const raw = String(str || '-').trim() || '-';
     const lines = width < Infinity ? wrapRTL(doc, raw, width) : [raw];
@@ -63,7 +52,7 @@ function textRTL(doc, str, x, y, options) {
         let xx = x;
         if (align === 'right') xx = x + width - lw;
         else if (align === 'center') xx = x + (width - lw) / 2;
-        doc.text(displayLine, xx, y + dy, { align: 'left' });
+        doc.fillColor(fill).text(displayLine, xx, y + dy, { align: 'left' });
         dy += lineH + lineGap;
     });
     return dy;
@@ -73,7 +62,7 @@ function rtlBlockHeight(doc, str, width, fontSize) {
     doc.fontSize(fontSize);
     const lines = wrapRTL(doc, String(str || '-').trim() || '-', width);
     const lineH = doc.currentLineHeight();
-    return Math.max(lineH, lines.length * lineH + (lines.length - 1));
+    return Math.max(lineH, lines.length * lineH + Math.max(0, lines.length - 1) * 0.5);
 }
 
 function getArabicFont(doc) {
@@ -117,11 +106,11 @@ function generateBarcodeBase64(shipmentNumber) {
             {
                 bcid: 'code128',
                 text: String(shipmentNumber || ''),
-                scale: 2,
-                height: 10,
+                scale: 5,
+                height: 22,
                 includetext: true,
                 textxalign: 'center',
-                textsize: 8
+                textsize: 11
             },
             (err, png) => {
                 if (err) reject(err);
@@ -132,7 +121,12 @@ function generateBarcodeBase64(shipmentNumber) {
 }
 
 async function generateQRBase64(shipmentNumber) {
-    return QRCode.toDataURL(String(shipmentNumber || ''), { width: 200, margin: 1, errorCorrectionLevel: 'M' });
+    return QRCode.toDataURL(String(shipmentNumber || ''), {
+        width: 240,
+        margin: 0,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#000000', light: '#ffffff' }
+    });
 }
 
 function formatIQD(value) {
@@ -140,7 +134,8 @@ function formatIQD(value) {
 }
 
 /**
- * ملصق شحنة (~١٤٨×١٦٩ مم) — عرض ٤٢٠ نقطة للتوافق مع الطابعات، ارتفاع ٤٨٠ لاستيعاب العنوان والملاحظات
+ * ملصق أبيض/أسود — مناسب للطابعات الحرارية
+ * 420×480 نقطة، عربي (أميري) + أرقام واضحة
  */
 async function createLabelPDF(order) {
     const w = 420;
@@ -153,11 +148,14 @@ async function createLabelPDF(order) {
     });
 
     const fonts = getArabicFont(doc);
-    const setAr = () => doc.font(fonts.regular);
-    const setArBold = () => doc.font(fonts.bold);
-    const setNumBold = () => doc.font('Helvetica-Bold');
+    const setAr = () => {
+        doc.font(fonts.regular).fillColor(K);
+    };
+    const setArBold = () => {
+        doc.font(fonts.bold).fillColor(K);
+    };
 
-    const M = 10;
+    const M = 7;
     const cw = w - M * 2;
     let y = M;
 
@@ -165,196 +163,184 @@ async function createLabelPDF(order) {
     const hasNotes = order.Notes && String(order.Notes).trim();
     const notesText = hasNotes ? String(order.Notes).trim() : '';
 
-    /* ─── إطار خارجي ناعم ─── */
-    doc.save();
-    doc.roundedRect(M - 2, M - 2, cw + 4, h - (M - 2) * 2, 8).lineWidth(1.2).strokeColor(COLORS.line).stroke();
-    doc.restore();
+    const footH = 48;
+    const fy = h - M - footH;
 
-    /* ─── شريط علامة تجارية ─── */
-    const headerH = 38;
-    doc.roundedRect(M, y, cw, headerH, 6).fill(COLORS.brandDark);
-    doc.fillColor(COLORS.white).opacity(1);
+    /* إطار مزدوج */
+    doc.lineWidth(1.5).strokeColor(K);
+    doc.rect(M, M, cw, h - M * 2).stroke();
+    doc.lineWidth(0.6);
+    doc.rect(M + 2, M + 2, cw - 4, h - M * 2 - 4).stroke();
+
+    /* شريط علوي: أسود + نص أبيض */
+    const headerH = 34;
+    doc.rect(M + 3, y + 3, cw - 6, headerH).fill(K);
     setArBold();
-    doc.fontSize(15);
-    textRTL(doc, 'شركة ديما الحياة', M + 8, y + 7, { width: cw - 16, align: 'center' });
+    doc.fontSize(14);
+    textRTL(doc, 'شركة ديما الحياة', M + 10, y + 8, { width: cw - 20, align: 'center', fill: W });
     setAr();
-    doc.fontSize(8.5);
-    doc.fillColor('#A7F3D0');
-    textRTL(doc, 'ملصق توصيل — نظام إدارة التوصيل', M + 8, y + 24, { width: cw - 16, align: 'center' });
-    y += headerH + 6;
+    doc.fontSize(8);
+    textRTL(doc, 'ملصق توصيل', M + 10, y + 22, { width: cw - 20, align: 'center', fill: W });
+    y += headerH + 8;
 
-    /* ─── رقم الشحنة بارز (LTR للأرقام) ─── */
-    const heroH = 36;
-    doc.roundedRect(M, y, cw, heroH, 4).fill(COLORS.heroBg);
-    doc.roundedRect(M, y, cw, heroH, 4).lineWidth(0.6).strokeColor(COLORS.totalBorder).stroke();
-    setNumBold();
-    doc.fillColor(COLORS.brandDark).fontSize(20);
-    doc.text(String(order.ShipmentNumber || '—'), M, y + 9, { width: cw, align: 'center' });
-    setAr();
+    /* رقم الشحنة */
+    const heroH = 40;
+    doc.rect(M + 3, y, cw - 6, heroH).fill(W).strokeColor(K).lineWidth(1).stroke();
+    doc.font('Helvetica-Bold').fillColor(K).fontSize(22);
+    doc.text(String(order.ShipmentNumber || '—'), M + 6, y + 10, { width: cw - 12, align: 'center' });
     y += heroH + 6;
 
-    /* ─── باركود + QR ─── */
-    const qrSize = 52;
-    const gapCodes = 8;
-    const barW = cw - qrSize - gapCodes;
-    const codeRowH = 48;
-    doc.roundedRect(M, y, barW, codeRowH, 3).fill(COLORS.paper);
-    doc.roundedRect(M, y, barW, codeRowH, 3).lineWidth(0.5).strokeColor(COLORS.lineSoft).stroke();
-    doc.roundedRect(M + barW + gapCodes, y, qrSize, codeRowH, 3).fill(COLORS.paper);
-    doc.roundedRect(M + barW + gapCodes, y, qrSize, codeRowH, 3).lineWidth(0.5).strokeColor(COLORS.lineSoft).stroke();
+    /* صف الباركود (عريض) + QR */
+    const qrBox = 68;
+    const gapQ = 6;
+    const barW = cw - 6 - qrBox - gapQ;
+    const codeRowH = 88;
+    const bx = M + 3;
+    doc.rect(bx, y, barW, codeRowH).fill(W).strokeColor(K).lineWidth(0.8).stroke();
+    doc.rect(bx + barW + gapQ, y, qrBox, codeRowH).fill(W).strokeColor(K).lineWidth(0.8).stroke();
 
     const barcodePng = await generateBarcodeBase64(order.ShipmentNumber);
-    doc.image(Buffer.from(barcodePng, 'base64'), M + 6, y + 3, { fit: [barW - 12, codeRowH - 6] });
+    doc.image(Buffer.from(barcodePng, 'base64'), bx + 4, y + 4, { fit: [barW - 8, codeRowH - 8] });
 
     const qrData = await generateQRBase64(order.ShipmentNumber);
-    const qrImgY = y + (codeRowH - qrSize + 6) / 2;
-    doc.image(qrData, M + barW + gapCodes + (qrSize - 46) / 2, qrImgY, { width: 46 });
-    y += codeRowH + 8;
+    const qrDraw = Math.min(qrBox - 10, codeRowH - 10);
+    doc.image(qrData, bx + barW + gapQ + (qrBox - qrDraw) / 2, y + (codeRowH - qrDraw) / 2, { width: qrDraw });
+    y += codeRowH + 6;
 
-    /* ─── مساحة المحتوى: لا يتجاوز التذييل ─── */
-    const footH = 42;
-    const fy = h - M - footH;
-    const row2H = 22;
-    const moneyH = 30;
-    const addrTitleH = 16;
+    const row2H = 26;
+    const gapMid = 5;
+    const half = (cw - 6 - gapMid) / 2;
+    const labCol = 56;
+    const moneyH = 34;
+    const addrTitleH = 15;
 
     setAr();
     doc.fontSize(9);
 
-    const addrW = cw - 16;
+    const addrW = cw - 20;
     const addrFont = 10;
-    let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 14;
-    addrH = Math.min(Math.max(addrH, 28), 86);
+    let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 12;
+    addrH = Math.min(Math.max(addrH, 30), 100);
 
     let notesH = 0;
     let showNotes = !!hasNotes;
     if (showNotes) {
-        notesH = rtlBlockHeight(doc, notesText, addrW, 8.5) + 12;
-        notesH = Math.min(Math.max(notesH, 20), 62);
+        notesH = rtlBlockHeight(doc, notesText, addrW, 9) + 10;
+        notesH = Math.min(Math.max(notesH, 22), 70);
     }
 
-    function contentBottomEstimate() {
-        let b = y + row2H * 2 + addrTitleH + addrH + moneyH + 6;
-        if (showNotes && notesH > 0) b += 14 + notesH + 6;
+    function estBottom() {
+        let b = y + row2H * 2 + addrTitleH + addrH + moneyH + 5;
+        if (showNotes && notesH > 0) b += 12 + notesH + 5;
         return b;
     }
-    while (contentBottomEstimate() > fy && addrH > 26) addrH -= 8;
-    while (contentBottomEstimate() > fy && showNotes && notesH > 18) notesH -= 6;
-    if (contentBottomEstimate() > fy) showNotes = false;
+    while (estBottom() > fy && addrH > 28) addrH -= 6;
+    while (estBottom() > fy && showNotes && notesH > 18) notesH -= 5;
+    if (estBottom() > fy) showNotes = false;
 
-    function pairRow(labelRight, valRight, labelLeft, valLeft, bgAlt) {
-        const half = (cw - 6) / 2;
-        const labW = 58;
-        const vW = half - labW - 4;
-        const xR = M;
-        const xRLab = xR + vW + 4;
-        const xL = M + half + 6;
-        const xLLab = xL + vW + 4;
-        const bg = bgAlt ? COLORS.stripeAlt : COLORS.stripe;
-        doc.rect(xR, y, half, row2H).fill(bg);
-        doc.rect(xL, y, half, row2H).fill(bg);
-        doc.rect(xR, y, half, row2H).lineWidth(0.35).strokeColor(COLORS.lineSoft).stroke();
-        doc.rect(xL, y, half, row2H).lineWidth(0.35).strokeColor(COLORS.lineSoft).stroke();
+    /* توزيع المسافة الرأسية الفائضة على منطقة العنوان */
+    let slack = fy - estBottom();
+    if (slack > 0) addrH = Math.min(addrH + slack, 120);
+
+    function pairRow(labelR, valR, labelL, valL) {
+        const xR = M + 3;
+        const xL = xR + half + gapMid;
+        const vWR = half - labCol - 4;
+        const vWL = half - labCol - 4;
+        doc.rect(xR, y, half, row2H).fill(W).strokeColor(K).lineWidth(0.45).stroke();
+        doc.rect(xL, y, half, row2H).fill(W).strokeColor(K).lineWidth(0.45).stroke();
         setArBold();
-        doc.fillColor(COLORS.muted).fontSize(7.5);
-        textRTL(doc, labelRight + ':', xRLab + 2, y + 6, { width: labW - 4, align: 'right' });
-        textRTL(doc, labelLeft + ':', xLLab + 2, y + 6, { width: labW - 4, align: 'right' });
+        doc.fontSize(7.5);
+        textRTL(doc, labelR + ':', xR + vWR + 4, y + 8, { width: labCol - 2, align: 'right' });
+        textRTL(doc, labelL + ':', xL + vWL + 4, y + 8, { width: labCol - 2, align: 'right' });
         setAr();
-        doc.fillColor(COLORS.text).fontSize(9.5);
-        textRTL(doc, String(valRight ?? '—'), xR + 4, y + 5, { width: vW - 4, align: 'right' });
-        setAr();
-        doc.fillColor(COLORS.text).fontSize(9.5);
-        textRTL(doc, String(valLeft ?? '—'), xL + 4, y + 5, { width: vW - 4, align: 'right' });
+        doc.fontSize(10);
+        textRTL(doc, String(valR ?? '—'), xR + 4, y + 7, { width: vWR - 2, align: 'right' });
+        textRTL(doc, String(valL ?? '—'), xL + 4, y + 7, { width: vWL - 2, align: 'right' });
         y += row2H;
     }
 
-    pairRow('المتجر', order.StoreName || '—', 'هاتف المتجر', order.StorePhone || '—', false);
-    pairRow('المستلم', order.CustomerName || '—', 'هاتف المستلم', order.CustomerPhone || '—', true);
+    pairRow('المتجر', order.StoreName || '—', 'هاتف المتجر', order.StorePhone || '—');
+    pairRow('المستلم', order.CustomerName || '—', 'هاتف المستلم', order.CustomerPhone || '—');
 
-    /* عنوان التسليم */
-    doc.rect(M, y, cw, 16).fill(COLORS.brand);
+    /* عنوان التسليم — شريط مميز أحادي اللون */
+    doc.rect(M + 3, y, cw - 6, addrTitleH).fill(K);
     setArBold();
-    doc.fillColor(COLORS.white).fontSize(9);
-    textRTL(doc, 'عنوان التسليم', M + 8, y + 4, { width: cw - 16, align: 'right' });
-    y += 16;
+    doc.fontSize(9);
+    textRTL(doc, 'عنوان التسليم', M + 8, y + 3, { width: cw - 16, align: 'right', fill: W });
+    y += addrTitleH;
 
-    doc.rect(M, y, cw, addrH).fill(COLORS.paper);
-    doc.rect(M, y, cw, addrH).lineWidth(0.45).strokeColor(COLORS.line).stroke();
+    doc.rect(M + 3, y, cw - 6, addrH).fill(W).strokeColor(K).lineWidth(0.6).stroke();
     setAr();
-    doc.fillColor(COLORS.text).fontSize(addrFont);
-    textRTL(doc, fullAddr, M + 8, y + 6, { width: cw - 16, align: 'right' });
-    y += addrH + 6;
+    doc.fillColor(K).fontSize(addrFont);
+    textRTL(doc, fullAddr, M + 10, y + 6, { width: addrW, align: 'right' });
+    y += addrH + 5;
 
-    /* شريط المبالغ */
-    const third = (cw - 8) / 3;
+    /* المبالغ — ثلاث خانات متساوية بعرض الملصق */
     const inv = formatIQD(order.AmountIQD) + ' د.ع';
     const driverDelivery = order.FreeDelivery ? (order.WaivedDeliveryIQD || 0) : (order.DeliveryFeeIQD || 0);
-    const delTxt = order.FreeDelivery ? 'مجاني' : formatIQD(driverDelivery) + ' د.ع';
+    const delTxt = order.FreeDelivery ? 'توصيل مجاني' : formatIQD(driverDelivery) + ' د.ع';
     const totalTxt = formatIQD(order.TotalIQD) + ' د.ع';
-
-    const moneyY = y;
-    doc.rect(M, moneyY, third, moneyH).fill(COLORS.stripe);
-    doc.rect(M + third + 4, moneyY, third, moneyH).fill(COLORS.stripe);
-    doc.rect(M + (third + 4) * 2, moneyY, third, moneyH).fill(COLORS.totalBg);
-    [0, 1, 2].forEach((i) => {
-        const x0 = M + i * (third + 4);
-        doc.rect(x0, moneyY, third, moneyH).lineWidth(0.45).strokeColor(i === 2 ? COLORS.totalBorder : COLORS.lineSoft).stroke();
-    });
+    const colGap = 4;
+    const third = (cw - 6 - colGap * 2) / 3;
+    const mx = M + 3;
+    for (let i = 0; i < 3; i++) {
+        const x0 = mx + i * (third + colGap);
+        doc.rect(x0, y, third, moneyH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
+    }
     setArBold();
-    doc.fillColor(COLORS.muted).fontSize(7);
-    textRTL(doc, 'الفاتورة', M + 6, moneyY + 5, { width: third - 12, align: 'center' });
-    textRTL(doc, 'التوصيل', M + third + 10, moneyY + 5, { width: third - 12, align: 'center' });
-    textRTL(doc, 'النهائي', M + (third + 4) * 2 + 6, moneyY + 5, { width: third - 12, align: 'center' });
+    doc.fontSize(7);
+    textRTL(doc, 'مبلغ الفاتورة', mx + 4, y + 4, { width: third - 8, align: 'center' });
+    textRTL(doc, 'أجرة التوصيل', mx + third + colGap + 4, y + 4, { width: third - 8, align: 'center' });
+    textRTL(doc, 'المبلغ النهائي', mx + (third + colGap) * 2 + 4, y + 4, { width: third - 8, align: 'center' });
     setAr();
-    doc.fillColor(COLORS.text).fontSize(9);
-    textRTL(doc, inv, M + 6, moneyY + 16, { width: third - 12, align: 'center' });
-    doc.fillColor(order.FreeDelivery ? COLORS.brand : COLORS.text).fontSize(9);
-    textRTL(doc, delTxt, M + third + 10, moneyY + 16, { width: third - 12, align: 'center' });
+    doc.fontSize(10);
+    textRTL(doc, inv, mx + 4, y + 16, { width: third - 8, align: 'center' });
+    textRTL(doc, delTxt, mx + third + colGap + 4, y + 16, { width: third - 8, align: 'center' });
     setArBold();
-    doc.fillColor(COLORS.brandDark).fontSize(11);
-    textRTL(doc, totalTxt, M + (third + 4) * 2 + 6, moneyY + 14, { width: third - 12, align: 'center' });
+    doc.fontSize(11);
+    textRTL(doc, totalTxt, mx + (third + colGap) * 2 + 4, y + 14, { width: third - 8, align: 'center' });
     setAr();
-    y += moneyH + 6;
+    y += moneyH + 5;
 
     if (showNotes && notesH > 0) {
-        doc.rect(M, y, cw, 14).fill('#fff7ed');
-        doc.rect(M, y, cw, 14).lineWidth(0.35).strokeColor('#fdba74').stroke();
+        doc.rect(M + 3, y, cw - 6, 12).fill(K);
         setArBold();
-        doc.fillColor('#9a3412').fontSize(8);
-        textRTL(doc, 'ملاحظات', M + 8, y + 3, { width: cw - 16, align: 'right' });
-        y += 14;
-        doc.rect(M, y, cw, notesH).fill('#fffbeb');
-        doc.rect(M, y, cw, notesH).lineWidth(0.35).strokeColor('#fed7aa').stroke();
+        doc.fontSize(8);
+        textRTL(doc, 'ملاحظات', M + 8, y + 2, { width: cw - 16, align: 'right', fill: W });
+        y += 12;
+        doc.rect(M + 3, y, cw - 6, notesH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
         setAr();
-        doc.fillColor('#7c2d12').fontSize(8.5);
-        textRTL(doc, notesText, M + 8, y + 5, { width: cw - 16, align: 'right' });
-        y += notesH + 6;
+        doc.fillColor(K).fontSize(9);
+        textRTL(doc, notesText, M + 10, y + 5, { width: addrW, align: 'right' });
+        y += notesH + 5;
     }
 
-    /* تذييل */
-    doc.roundedRect(M, fy, cw, footH, 4).fill(COLORS.stripeAlt);
-    doc.roundedRect(M, fy, cw, footH, 4).lineWidth(0.55).strokeColor(COLORS.line).stroke();
+    /* تذييل — ثلاثة أعمدة على كامل العرض */
+    doc.rect(M + 3, fy, cw - 6, footH).fill(W).strokeColor(K).lineWidth(1).stroke();
+    const xSep1 = mx + third + colGap;
+    const xSep2 = mx + 2 * third + 2 * colGap;
+    doc.moveTo(xSep1, fy).lineTo(xSep1, fy + footH).lineWidth(0.5).strokeColor(K).stroke();
+    doc.moveTo(xSep2, fy).lineTo(xSep2, fy + footH).lineWidth(0.5).strokeColor(K).stroke();
+
     const dateStr = (order.CreatedDate || new Date().toISOString()).replace('T', ' ').slice(0, 16);
-    const halfF = (cw - 8) / 2;
+    const c1 = mx + 4;
+    const c2 = xSep1 + 4;
+    const c3 = xSep2 + 4;
+    const tw = third - 8;
+
     setArBold();
-    doc.fillColor(COLORS.muted).fontSize(7);
-    textRTL(doc, 'عدد القطع', M + 8, fy + 8, { width: 72, align: 'right' });
-    setNumBold();
-    doc.fillColor(COLORS.text).fontSize(11);
-    doc.text(String(order.Pieces || 1), M + 8, fy + 18, { width: halfF - 16, align: 'right' });
-    setArBold();
-    doc.fillColor(COLORS.muted).fontSize(7);
-    textRTL(doc, 'تاريخ الإنشاء', M + halfF + 4, fy + 8, { width: 80, align: 'right' });
+    doc.fillColor(K).fontSize(7);
+    textRTL(doc, 'عدد القطع', c1, fy + 6, { width: tw, align: 'center' });
+    textRTL(doc, 'تاريخ الإنشاء', c2, fy + 6, { width: tw, align: 'center' });
+    textRTL(doc, 'رقم الطلب (إداري)', c3, fy + 6, { width: tw, align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(14).fillColor(K);
+    doc.text(String(order.Pieces || 1), c1, fy + 22, { width: tw, align: 'center' });
     setAr();
-    doc.fillColor(COLORS.textSoft).fontSize(8.5);
-    textRTL(doc, dateStr, M + halfF + 4, fy + 17, { width: halfF - 12, align: 'right' });
-    doc.moveTo(M + 8, fy + 28).lineTo(M + cw - 8, fy + 28).lineWidth(0.35).strokeColor(COLORS.lineSoft).stroke();
-    setArBold();
-    doc.fillColor(COLORS.muted).fontSize(7.5);
-    textRTL(doc, 'رقم الطلب (إداري)', M + 8, fy + 32, { width: 120, align: 'right' });
-    setNumBold();
-    doc.fillColor(COLORS.brand).fontSize(13);
-    doc.text(String(order.AdminOrderNo ?? '—'), M + 8, fy + 30, { width: cw - 24, align: 'right' });
+    doc.fillColor(K).fontSize(9);
+    textRTL(doc, dateStr, c2, fy + 20, { width: tw, align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(15).fillColor(K);
+    doc.text(String(order.AdminOrderNo ?? '—'), c3, fy + 20, { width: tw, align: 'center' });
 
     doc.end();
     return pdfPromise;
