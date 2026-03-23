@@ -106,11 +106,12 @@ function generateBarcodeBase64(shipmentNumber) {
             {
                 bcid: 'code128',
                 text: String(shipmentNumber || ''),
-                scale: 7,
-                height: 30,
+                /* أشرطة أقصر + وحدات أعرض = باركود أفقي يتمركز في المربع */
+                scale: 10,
+                height: 11,
                 includetext: true,
                 textxalign: 'center',
-                textsize: 13
+                textsize: 11
             },
             (err, png) => {
                 if (err) reject(err);
@@ -131,6 +132,37 @@ async function generateQRBase64(shipmentNumber) {
 
 function formatIQD(value) {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(value || 0));
+}
+
+/** أبعاد PNG من ترويسة IHDR */
+function pngIhdrDimensions(buf) {
+    if (!buf || buf.length < 24 || buf[0] !== 0x89) return null;
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+}
+
+/** تنظيف رقم الطلب الإداري من رموز مثل * ، الفاصلة */
+function cleanAdminOrderNo(v) {
+    if (v == null || v === '') return '—';
+    let s = String(v).trim();
+    s = s.replace(/^[\s*#:،]+/, '').replace(/[\s,،;.]+$/g, '').trim();
+    const onlyDigits = s.replace(/[^\d]/g, '');
+    if (onlyDigits.length > 0 && /^[\s*#،,.\d]+$/.test(String(v).trim())) return onlyDigits;
+    return s || '—';
+}
+
+function formatLabelDateTime(d) {
+    const raw = (d || '').replace('T', ' ').trim();
+    if (!raw) return '—';
+    const date = raw.slice(0, 10);
+    const time = raw.slice(11, 16);
+    if (date.length === 10 && time.length >= 4) return `${date}    ${time}`;
+    return raw.slice(0, 19);
+}
+
+function isPhoneLike(s) {
+    const t = String(s ?? '').trim();
+    if (!t || t === '—') return false;
+    return /^[\d+\s\-٠-٩۰-۹]+$/.test(t) && /\d/.test(t);
 }
 
 function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
@@ -181,56 +213,70 @@ async function createLabelPDF(order) {
     doc.rect(M, M, cw, h - M * 2).stroke();
 
     /* رأس: خلفية بيضاء + خطوط فاصلة (بدون تظليل أسود) */
-    const headerH = 38;
+    const headerH = 42;
     hLine(doc, innerL, innerL + innerW, y + 2, 1.2, false);
     setArBold();
-    doc.fontSize(17);
+    doc.fontSize(19);
     textRTL(doc, 'شركة ديما الحياة', innerL + 6, y + 8, { width: innerW - 12, align: 'center', fill: K });
     setAr();
-    doc.fontSize(10);
-    textRTL(doc, 'ملصق توصيل', innerL + 6, y + 26, { width: innerW - 12, align: 'center', fill: K });
+    doc.fontSize(11.5);
+    textRTL(doc, 'ملصق توصيل', innerL + 6, y + 28, { width: innerW - 12, align: 'center', fill: K });
     y += headerH;
     hLine(doc, innerL, innerL + innerW, y, 1, false);
 
     /* رقم الشحنة */
-    const heroH = 46;
+    const heroH = 50;
     y += 6;
-    doc.font('Helvetica-Bold').fillColor(K).fontSize(26);
+    doc.font('Helvetica-Bold').fillColor(K).fontSize(30);
     doc.text(String(order.ShipmentNumber || '—'), innerL, y + 10, { width: innerW, align: 'center' });
     y += heroH;
     hLine(doc, innerL, innerL + innerW, y, 0.9, true);
 
-    /* باركود بعرض الملصق بالكامل (بدون QR) */
-    const barRowH = 108;
+    /* باركود: ارتفاع أقل، عرض أكبر، في المنتصف */
+    const barRowH = 72;
     y += 5;
     const bx = innerL;
     const barW = innerW;
     doc.rect(bx, y, barW, barRowH).fill(W).strokeColor(K).lineWidth(0.7).stroke();
-    const barcodePng = await generateBarcodeBase64(order.ShipmentNumber);
-    doc.image(Buffer.from(barcodePng, 'base64'), bx + 4, y + 3, { fit: [barW - 8, barRowH - 6] });
+    const barcodeBuf = Buffer.from(await generateBarcodeBase64(order.ShipmentNumber), 'base64');
+    const padX = 8;
+    const padY = 6;
+    const maxW = barW - padX * 2;
+    const maxH = barRowH - padY * 2;
+    const dim = pngIhdrDimensions(barcodeBuf);
+    let dw = maxW;
+    let dh = maxH;
+    if (dim && dim.width > 0 && dim.height > 0) {
+        const r = Math.min(maxW / dim.width, maxH / dim.height);
+        dw = dim.width * r;
+        dh = dim.height * r;
+    }
+    const ix = bx + padX + (maxW - dw) / 2;
+    const iy = y + padY + (maxH - dh) / 2;
+    doc.image(barcodeBuf, ix, iy, { width: dw, height: dh });
     y += barRowH;
     hLine(doc, innerL, innerL + innerW, y + 4, 0.85, true);
     y += 6;
     hLine(doc, innerL, innerL + innerW, y, 1, false);
 
-    const row2H = 32;
+    const row2H = 36;
     const gapMid = 6;
     const half = (innerW - gapMid) / 2;
-    const labCol = 68;
-    const moneyH = 42;
-    const addrTitleH = 14;
+    const labCol = 74;
+    const moneyH = 50;
+    const addrTitleH = 16;
 
     setAr();
-    doc.fontSize(10);
+    doc.fontSize(11);
 
     const addrW = innerW - 16;
-    const addrFont = 12;
+    const addrFont = 13.5;
     let addrH = rtlBlockHeight(doc, fullAddr, addrW, addrFont) + 12;
     addrH = Math.min(Math.max(addrH, 30), 100);
 
     /* قسم الملاحظات دائماً (نص أو شرطة) */
-    let notesH = rtlBlockHeight(doc, hasNotesContent ? notesRaw : '—', addrW, 10.5) + 12;
-    notesH = Math.min(Math.max(notesH, 26), 82);
+    let notesH = rtlBlockHeight(doc, hasNotesContent ? notesRaw : '—', addrW, 11.5) + 14;
+    notesH = Math.min(Math.max(notesH, 28), 88);
 
     function estBottom() {
         let b = y + 5;
@@ -261,13 +307,23 @@ async function createLabelPDF(order) {
         doc.rect(xL, y, half, row2H).fill(W).strokeColor(K).lineWidth(0.5).stroke();
         doc.moveTo(xR + half, y).lineTo(xR + half, y + row2H).lineWidth(0.45).strokeColor(K).stroke();
         setArBold();
-        doc.fontSize(9);
-        textRTL(doc, labelR + ':', xR + vWR + 4, y + 10, { width: labCol - 2, align: 'right', fill: K });
-        textRTL(doc, labelL + ':', xL + vWL + 4, y + 10, { width: labCol - 2, align: 'right', fill: K });
+        doc.fontSize(10.5);
+        textRTL(doc, labelR + ':', xR + vWR + 4, y + 11, { width: labCol - 2, align: 'right', fill: K });
+        textRTL(doc, labelL + ':', xL + vWL + 4, y + 11, { width: labCol - 2, align: 'right', fill: K });
+        const drawVal = (val, x, vw) => {
+            const t = String(val ?? '—');
+            if (isPhoneLike(t)) {
+                doc.font('Helvetica-Bold').fontSize(13).fillColor(K);
+                doc.text(t, x, y + 9, { width: vw, align: 'right' });
+            } else {
+                setAr();
+                doc.fontSize(12.5);
+                textRTL(doc, t, x, y + 8, { width: vw, align: 'right', fill: K });
+            }
+        };
+        drawVal(valR, xR + 4, vWR - 2);
+        drawVal(valL, xL + 4, vWL - 2);
         setAr();
-        doc.fontSize(11.5);
-        textRTL(doc, String(valR ?? '—'), xR + 4, y + 8, { width: vWR - 2, align: 'right', fill: K });
-        textRTL(doc, String(valL ?? '—'), xL + 4, y + 8, { width: vWL - 2, align: 'right', fill: K });
         y += row2H;
     }
 
@@ -278,7 +334,7 @@ async function createLabelPDF(order) {
 
     /* عنوان التسليم: خطوط + نص أسود (بدون مربع أسود) */
     setArBold();
-    doc.fontSize(11);
+    doc.fontSize(12.5);
     textRTL(doc, 'عنوان التسليم', innerL + 6, y + 2, { width: innerW - 12, align: 'right', fill: K });
     y += addrTitleH;
     hLine(doc, innerL + 20, innerL + innerW - 20, y, 0.9, false);
@@ -308,37 +364,36 @@ async function createLabelPDF(order) {
     doc.moveTo(xFinal + third, y).lineTo(xFinal + third, y + moneyH).lineWidth(0.5).strokeColor(K).stroke();
     doc.moveTo(xDel + third, y).lineTo(xDel + third, y + moneyH).lineWidth(0.5).strokeColor(K).stroke();
     setArBold();
-    doc.fontSize(9);
+    doc.fontSize(10.5);
     textRTL(doc, 'المبلغ النهائي', xFinal + 4, y + 5, { width: third - 8, align: 'center', fill: K });
     textRTL(doc, 'أجرة التوصيل', xDel + 4, y + 5, { width: third - 8, align: 'center', fill: K });
     textRTL(doc, 'مبلغ الفاتورة', xInv + 4, y + 5, { width: third - 8, align: 'center', fill: K });
-    setAr();
-    doc.fontSize(11.5);
     setArBold();
-    doc.fontSize(13);
-    textRTL(doc, totalTxt, xFinal + 4, y + 18, { width: third - 8, align: 'center', fill: K });
-    setAr();
-    doc.fontSize(11.5);
-    textRTL(doc, delTxt, xDel + 4, y + 20, { width: third - 8, align: 'center', fill: K });
-    textRTL(doc, inv, xInv + 4, y + 20, { width: third - 8, align: 'center', fill: K });
+    doc.fontSize(15);
+    textRTL(doc, totalTxt, xFinal + 4, y + 20, { width: third - 8, align: 'center', fill: K });
+    setArBold();
+    doc.fontSize(14);
+    textRTL(doc, delTxt, xDel + 4, y + 22, { width: third - 8, align: 'center', fill: K });
+    textRTL(doc, inv, xInv + 4, y + 22, { width: third - 8, align: 'center', fill: K });
     setAr();
     y += moneyH + 4;
     hLine(doc, innerL, innerL + innerW, y, 1, false);
     y += 4;
 
     setArBold();
-    doc.fontSize(10);
+    doc.fontSize(11.5);
     textRTL(doc, 'ملاحظات', innerL + 8, y + 2, { width: innerW - 16, align: 'right', fill: K });
     y += 14;
     hLine(doc, innerL + 24, innerL + innerW - 24, y, 0.6, true);
     y += 4;
     doc.rect(innerL, y, innerW, notesH).fill(W).strokeColor(K).lineWidth(0.55).stroke();
     setAr();
-    doc.fillColor(K).fontSize(10.5);
+    doc.fillColor(K).fontSize(11.5);
     if (hasNotesContent) {
         textRTL(doc, notesRaw, innerL + 8, y + 6, { width: addrW, align: 'right', fill: K });
     } else {
-        doc.fontSize(11);
+        setArBold();
+        doc.fontSize(13);
         textRTL(doc, '—', innerL + 8, y + 8, { width: addrW, align: 'center', fill: K });
     }
     y += notesH + 4;
@@ -352,26 +407,24 @@ async function createLabelPDF(order) {
     doc.moveTo(xSep1, fy).lineTo(xSep1, fy + footH).lineWidth(0.5).strokeColor(K).stroke();
     doc.moveTo(xSep2, fy).lineTo(xSep2, fy + footH).lineWidth(0.5).strokeColor(K).stroke();
 
-    const dateStr = (order.CreatedDate || new Date().toISOString()).replace('T', ' ').slice(0, 16);
+    const dateStr = formatLabelDateTime(order.CreatedDate || new Date().toISOString());
     const c1 = mx + 4;
     const c2 = xSep1 + 4;
     const c3 = xSep2 + 4;
     const tw = third - 8;
 
     setArBold();
-    doc.fontSize(8.5);
-    textRTL(doc, 'عدد القطع', c1, fy + 7, { width: tw, align: 'center', fill: K });
-    textRTL(doc, 'تاريخ الإنشاء', c2, fy + 7, { width: tw, align: 'center', fill: K });
-    textRTL(doc, 'رقم الطلب الإداري', c3, fy + 7, { width: tw, align: 'center', fill: K });
-    doc.font('Helvetica-Bold').fontSize(17).fillColor(K);
+    doc.fontSize(9.5);
+    textRTL(doc, 'عدد القطع', c1, fy + 6, { width: tw, align: 'center', fill: K });
+    textRTL(doc, 'تاريخ الإنشاء', c2, fy + 6, { width: tw, align: 'center', fill: K });
+    textRTL(doc, 'رقم الطلب الإداري', c3, fy + 6, { width: tw, align: 'center', fill: K });
+    doc.font('Helvetica-Bold').fontSize(20).fillColor(K);
     doc.text(String(order.Pieces || 1), c1, fy + 24, { width: tw, align: 'center' });
-    setAr();
-    doc.fontSize(10.5);
-    textRTL(doc, dateStr, c2, fy + 22, { width: tw, align: 'center', fill: K });
-    doc.font('Helvetica-Bold').fontSize(18).fillColor(K);
-    const adminNo = String(order.AdminOrderNo ?? '—');
-    /* عزل اتجاه الأرقام لتفادي انعكاس الأقواس أو الترتيب مع العربية */
-    doc.text('\u202A' + adminNo + '\u202C', c3, fy + 22, { width: tw, align: 'center' });
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(K);
+    doc.text(dateStr, c2, fy + 22, { width: tw, align: 'center' });
+    const adminClean = cleanAdminOrderNo(order.AdminOrderNo);
+    doc.font('Helvetica-Bold').fontSize(20).fillColor(K);
+    doc.text(adminClean, c3, fy + 22, { width: tw, align: 'center' });
 
     doc.end();
     return pdfPromise;
