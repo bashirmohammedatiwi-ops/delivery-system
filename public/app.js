@@ -115,6 +115,7 @@ async function showEditOrderModal(container, order, onSuccess) {
     try {
         regions = await window.api.regions.getAll();
     } catch (_) {}
+    const isAdmin = currentUser?.Role === 'admin';
     const driverDelivery = order.FreeDelivery ? (order.WaivedDeliveryIQD || 0) : (order.DeliveryFeeIQD || 0);
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
@@ -130,6 +131,11 @@ async function showEditOrderModal(container, order, onSuccess) {
                     <div class="form-group">
                         <label>رقم الشحنة (غير قابل للتعديل)</label>
                         <input type="text" value="${order.ShipmentNumber}" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label>تاريخ الطلب</label>
+                        <input type="date" id="editOrderDate" ${isAdmin ? '' : 'disabled'} value="${(order.CreatedDate || '').slice(0, 10)}">
+                        ${isAdmin ? '' : '<div class="form-hint" style="margin-top:4px">المدير فقط يمكنه التعديل</div>'}
                     </div>
                     <div class="form-group">
                         <label>المتجر</label>
@@ -287,6 +293,13 @@ async function showEditOrderModal(container, order, onSuccess) {
             FreeDelivery: document.getElementById('editFreeDelivery').checked,
             Notes: document.getElementById('editNotes').value
         };
+        // لا نرسل تاريخ الطلب إلا إذا كان المستخدم مديراً (حتى لو كان الحقل معطلاً/ظاهر).
+        if (isAdmin) {
+            const dateVal = document.getElementById('editOrderDate')?.value;
+            if (dateVal && /^\d{4}-\d{2}-\d{2}$/.test(dateVal)) {
+                data.CreatedDate = dateVal + ' 00:00:00';
+            }
+        }
         try {
             await window.api.orders.update(order.OrderID, data);
             closeModal();
@@ -2102,8 +2115,9 @@ const screens = {
                 const grandTotal = report.summary.reduce((s, x) => s + x.net, 0);
                 const grandDue = report.summary.reduce((s, x) => s + (x.totalDue || 0), 0);
                 const allOrders = report.summary.flatMap(s => s.orders);
+                const hasAnyOrders = (report.totalOrders || 0) > 0 || (report.totalReturned || 0) > 0;
 
-                document.getElementById('companyReportContent').innerHTML = report.totalOrders === 0
+                document.getElementById('companyReportContent').innerHTML = !hasAnyOrders
                     ? '<div class="report-empty">لا توجد طلبات في الفترة المحددة</div>'
                     : `
                     <div class="report-view">
@@ -2112,6 +2126,10 @@ const screens = {
                             <div class="report-summary-card"><div class="label">إجمالي الطلبات</div><div class="value">${report.totalOrders}</div></div>
                             <div class="report-summary-card"><div class="label">عدد المرتجعات</div><div class="value">${report.totalReturned || 0}</div></div>
                             <div class="report-summary-card"><div class="label">عدد السائقين</div><div class="value">${report.summary.length}</div></div>
+                            <div class="report-summary-card report-summary-card--system">
+                                <div class="label">سعر النظام</div>
+                                <div class="value">${formatIQD(report.systemInvoiceTotal || 0)}</div>
+                            </div>
                             <div class="report-summary-card"><div class="label">إجمالي الفواتير</div><div class="value">${formatIQD(report.summary.reduce((a,x)=>a+x.totalAmount,0))} د.ع</div></div>
                             <div class="report-summary-card"><div class="label">أجور التوصيل</div><div class="value">${formatIQD(report.summary.reduce((a,x)=>a+x.totalDelivery,0))} د.ع</div></div>
                             <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(grandTotal)} د.ع</div></div>
@@ -2185,7 +2203,7 @@ const screens = {
                         </div>
                     </div>
                 `;
-                document.getElementById('companyReportActions').style.display = report.totalOrders > 0 ? 'flex' : 'none';
+                document.getElementById('companyReportActions').style.display = hasAnyOrders ? 'flex' : 'none';
             });
 
             document.getElementById('btnPrintDriverReport').addEventListener('click', () => {

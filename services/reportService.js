@@ -860,6 +860,8 @@ function getCompanyReportByRange(dateFrom, dateTo) {
         s.totalDue = valid.reduce((a, o) => a + getAmountDue(o), 0);
         s.count = valid.length;
     }
+    // مجموع سعر الفواتير لكل الطلبات بغض النظر عن الحالة (يشمل المرتجعات/الملغاة)
+    const systemInvoiceTotal = orders.reduce((sum, o) => sum + (Number(o.AmountIQD) || 0), 0);
     const validAll = orders.filter(o => !isOrderReturned(o));
     const totalReturned = orders.filter(o => isOrderReturned(o)).length;
     const countFreeDelivery = validAll.filter(o => o.FreeDelivery).length;
@@ -884,6 +886,7 @@ function getCompanyReportByRange(dateFrom, dateTo) {
         summary,
         totalOrders: validAll.length,
         totalReturned,
+        systemInvoiceTotal,
         countFreeDelivery,
         countPaidDelivery,
         deliveryFeeBreakdown,

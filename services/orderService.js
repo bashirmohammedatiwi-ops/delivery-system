@@ -215,12 +215,15 @@ function updateOrder(orderId, orderData) {
     const newStatus = orderData.Status != null && validStatuses.includes(orderData.Status) ? orderData.Status : order.Status;
 
     const regionId = orderData.RegionID != null ? parseInt(orderData.RegionID) : (order.RegionID != null ? order.RegionID : null);
+    const createdDateVal = orderData.CreatedDate != null ? String(orderData.CreatedDate).trim() : null;
+    const createdDateFinal = createdDateVal === '' ? null : createdDateVal;
 
     database.prepare(`
         UPDATE Orders SET
             AdminOrderNo = ?, StoreName = ?, StorePhone = ?, CustomerName = ?, CustomerPhone = ?,
             Address = ?, RegionID = ?, Pieces = ?, AmountIQD = ?, DeliveryFeeIQD = ?, FreeDelivery = ?,
             WaivedDeliveryIQD = ?, TotalIQD = ?, Notes = ?, CustomerLocationLink = ?, Status = ?
+            , CreatedDate = COALESCE(?, CreatedDate)
         WHERE OrderID = ?
     `).run(
         (orderData.AdminOrderNo ?? order.AdminOrderNo ?? '').trim() || null,
@@ -239,6 +242,7 @@ function updateOrder(orderId, orderData) {
         orderData.Notes ?? order.Notes ?? '',
         (orderData.CustomerLocationLink ?? order.CustomerLocationLink ?? '').toString().trim() || null,
         newStatus,
+        createdDateFinal,
         orderId
     );
 

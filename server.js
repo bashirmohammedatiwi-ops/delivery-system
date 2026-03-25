@@ -695,7 +695,29 @@ app.post('/api/orders/update-status', requireAppAuth, requireAdmin, async (req, 
 
 app.put('/api/orders/:id', requireAppAuth, async (req, res) => {
     try {
-        const order = orderService.updateOrder(parseInt(req.params.id), req.body);
+        // لا يسمح لأي دور غير المدير بتعديل تاريخ الطلب (CreatedDate)
+        const body = req.body || {};
+        const createdDateProvided = Object.prototype.hasOwnProperty.call(body, 'CreatedDate');
+        const orderDateProvided = Object.prototype.hasOwnProperty.call(body, 'orderDate');
+
+        if ((createdDateProvided || orderDateProvided) && req.appUser?.Role !== 'admin') {
+            return res.status(403).json({ error: 'صلاحية المدير مطلوبة لتعديل تاريخ الطلب' });
+        }
+
+        // دعم اسم بديل (إن وُجد) مع توحيد التنسيق
+        if (orderDateProvided && !createdDateProvided) {
+            body.CreatedDate = body.orderDate;
+        }
+        delete body.orderDate;
+
+        if (body.CreatedDate != null) {
+            let cd = String(body.CreatedDate).trim();
+            // لو وصل تاريخ فقط بدون وقت: نضيف 00:00:00 لتناسق أفضل مع القيم الحالية
+            if (/^\d{4}-\d{2}-\d{2}$/.test(cd)) cd = cd + ' 00:00:00';
+            body.CreatedDate = cd;
+        }
+
+        const order = orderService.updateOrder(parseInt(req.params.id), body);
         const appUser = req.appUser;
         const isEmployee = appUser && appUser.Role === 'employee';
         notificationService.maybeCreateNotification(order, appUser?.UserID, appUser?.DisplayName || appUser?.Username, isEmployee);
