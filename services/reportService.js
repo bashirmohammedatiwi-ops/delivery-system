@@ -766,6 +766,8 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         ORDER BY o.OrderID
     `).all(driverId, driverId, dateFrom, dTo);
     feeCollectionService.markOrdersWithFeesCollected(orders);
+    // مجموع سعر الفواتير لكل الطلبات بغض النظر عن الحالة (يشمل المرتجعات/الملغاة)
+    const systemInvoiceTotal = orders.reduce((sum, o) => sum + (Number(o.AmountIQD) || 0), 0);
     const validOrders = orders.filter(o => !isOrderReturned(o));
     const countReturned = orders.filter(o => isOrderReturned(o)).length;
     const totalAmount = validOrders.reduce((s, o) => s + (o.AmountIQD || 0), 0);
@@ -803,6 +805,7 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
         countRusafa,
         totalAmount,
         totalDelivery,
+        systemInvoiceTotal,
         net,
         totalDue,
         countFreeDelivery,
@@ -824,7 +827,7 @@ function getCompanyReportByRange(dateFrom, dateTo) {
                o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName, r.RegionArea,
                o.Pieces, o.AmountIQD,
                o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
-               o.Notes, o.ReturnReason, o.DriverID, o.CreatedDate, o.DeliveredDate,
+               o.Notes, o.ReturnReason, o.DriverID, o.ReturnedByDriverID, o.CreatedDate, o.DeliveredDate,
                COALESCE(d.DriverName, rd.DriverName) AS DriverName,
                u.DisplayName AS CreatedByName,
                COALESCE(o.LabelPrinted, 0) AS LabelPrinted,
@@ -844,7 +847,8 @@ function getCompanyReportByRange(dateFrom, dateTo) {
     const orders = raw;
     const byDriver = {};
     for (const o of orders) {
-        const key = o.DriverID || 0;
+        // للطلبات الراجعة: DriverID تكون NULL (لأنها تُحفظ في ReturnedByDriverID)، لذلك نجمع حسب ReturnedByDriverID.
+        const key = (o.DriverID != null && o.DriverID !== '') ? o.DriverID : (o.ReturnedByDriverID || 0);
         const name = o.DriverName || 'غير معين';
         if (!byDriver[key]) byDriver[key] = { driverName: name, orders: [], count: 0 };
         byDriver[key].orders.push(o);

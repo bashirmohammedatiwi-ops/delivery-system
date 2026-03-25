@@ -75,8 +75,13 @@ function createOrder(orderData) {
 function getOrderByShipmentNumber(shipmentNumber) {
     const database = db.getDatabase();
     return database.prepare(
-        `SELECT o.*, d.DriverName, u.DisplayName AS CreatedByName, r.RegionName 
-         FROM Orders o LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+        `SELECT o.*,
+                 COALESCE(d.DriverName, rd.DriverName) AS DriverName,
+                 u.DisplayName AS CreatedByName,
+                 r.RegionName 
+         FROM Orders o
+         LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+         LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID 
          LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID 
          LEFT JOIN Regions r ON o.RegionID = r.RegionID 
          WHERE o.ShipmentNumber = ?`
@@ -130,8 +135,13 @@ function returnOrderFromDriver(shipmentNumber) {
 
 function getOrders(filters = {}) {
     const database = db.getDatabase();
-    let sql = `SELECT o.*, d.DriverName, u.DisplayName AS CreatedByName, r.RegionName, r.RegionArea 
-               FROM Orders o LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+    let sql = `SELECT o.*,
+                       COALESCE(d.DriverName, rd.DriverName) AS DriverName,
+                       u.DisplayName AS CreatedByName,
+                       r.RegionName, r.RegionArea 
+               FROM Orders o 
+               LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+               LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID 
                LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID 
                LEFT JOIN Regions r ON o.RegionID = r.RegionID 
                WHERE 1=1`;
@@ -187,8 +197,13 @@ function updateOrderStatus(orderId, status, deliveredDate = null) {
 function getOrderById(orderId) {
     const database = db.getDatabase();
     return database.prepare(
-        `SELECT o.*, d.DriverName, u.DisplayName AS CreatedByName, r.RegionName 
-         FROM Orders o LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+        `SELECT o.*,
+                 COALESCE(d.DriverName, rd.DriverName) AS DriverName,
+                 u.DisplayName AS CreatedByName,
+                 r.RegionName 
+         FROM Orders o
+         LEFT JOIN Drivers d ON o.DriverID = d.DriverID 
+         LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID 
          LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID 
          LEFT JOIN Regions r ON o.RegionID = r.RegionID 
          WHERE o.OrderID = ?`
