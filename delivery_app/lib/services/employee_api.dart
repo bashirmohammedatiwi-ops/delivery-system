@@ -53,6 +53,13 @@ class EmployeeApi {
     return res is Map<String, dynamic> ? res : <String, dynamic>{};
   }
 
+  static Future<Map<String, dynamic>> getCustomerStatsByPhone(String phoneDigits) async {
+    final p = phoneDigits.trim();
+    if (p.isEmpty) return <String, dynamic>{'deliveredCount': 0, 'returnedCount': 0};
+    final res = await ApiService.instance.get('/api/orders/customer-stats?phone=${Uri.encodeComponent(p)}');
+    return res is Map<String, dynamic> ? res : <String, dynamic>{'deliveredCount': 0, 'returnedCount': 0};
+  }
+
   static Future<Map<String, dynamic>> getSettingsDefaults() async {
     final res = await ApiService.instance.get('/api/settings/defaults');
     return res is Map<String, dynamic> ? res : <String, dynamic>{};

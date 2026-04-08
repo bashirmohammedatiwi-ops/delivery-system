@@ -1,11 +1,12 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
+import 'dart:async';
 import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
+import '../../../utils/open_pdf_bytes/open_pdf_bytes.dart';
 
 class EmpNewOrderTab extends StatefulWidget {
   final VoidCallback? onCreated;
@@ -38,6 +39,10 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
   String? _error;
   Map<String, dynamic> _defaults = {};
   Map<String, dynamic>? _lastOrder;
+  Timer? _phoneStatsDebounce;
+  bool _phoneStatsLoading = false;
+  int _customerDeliveredCount = 0;
+  int _customerReturnedCount = 0;
   static const _freeThreshold = 50000.0;
 
   @override
@@ -67,6 +72,7 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
 
   @override
   void dispose() {
+    _phoneStatsDebounce?.cancel();
     _empCode.dispose();
     _adminOrderNo.dispose();
     _storeName.dispose();
@@ -115,6 +121,37 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
   double get _amountDue => _freeDelivery ? (_amountVal - _deliveryFee) : _amountVal;
 
   void _updateAmountDisplay() => setState(() {});
+
+  void _onCustomerPhoneChanged(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    _phoneStatsDebounce?.cancel();
+    if (digits.length < 11) {
+      if (mounted) {
+        setState(() {
+          _phoneStatsLoading = false;
+          _customerDeliveredCount = 0;
+          _customerReturnedCount = 0;
+        });
+      }
+      return;
+    }
+    _phoneStatsDebounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+      setState(() => _phoneStatsLoading = true);
+      try {
+        final stats = await EmployeeApi.getCustomerStatsByPhone(digits);
+        if (!mounted) return;
+        setState(() {
+          _customerDeliveredCount = (stats['deliveredCount'] is num) ? (stats['deliveredCount'] as num).toInt() : 0;
+          _customerReturnedCount = (stats['returnedCount'] is num) ? (stats['returnedCount'] as num).toInt() : 0;
+          _phoneStatsLoading = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _phoneStatsLoading = false);
+      }
+    });
+  }
 
   Future<void> _submit() async {
     if (_empCode.text.trim().isEmpty) {
@@ -171,19 +208,7 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
         _lastOrder = order is Map<String, dynamic> ? order : null;
         _loading = false;
       });
-      _empCode.clear();
-      _adminOrderNo.clear();
-      _customer.clear();
-      _phone.clear();
-      _address.clear();
-      _regionSearch.clear();
-      _regionId = null;
-      _deliveryFee = 0;
-      _pieces.text = '1';
-      _amount.text = '';
-      _notes.clear();
-      _storeName.text = _defaults['storeName']?.toString() ?? '';
-      _storePhone.text = _defaults['storePhone']?.toString() ?? '';
+      // لا نمسح الحقول بعد الحفظ: تبقى تفاصيل الطلب ظاهرة إلى أن يتم الطباعة
       widget.onCreated?.call();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -191,11 +216,6 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             content: Text('تم الحفظ! رقم الشحنة: ${order['ShipmentNumber'] ?? ''}'),
             backgroundColor: EmployeeTheme.success,
             behavior: SnackBarBehavior.floating,
-            action: SnackBarAction(
-              label: 'طباعة',
-              textColor: Colors.white,
-              onPressed: () => _printLabel(),
-            ),
           ),
         );
       }
@@ -210,14 +230,50 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
   Future<void> _printLabel() async {
     if (_lastOrder == null) return;
     try {
+      setState(() => _loading = true);
+      final orderId = int.tryParse('${_lastOrder!['OrderID']}') ?? 0;
+      if (orderId < 1) throw Exception('معرّف الطلب غير صالح');
       final bytes = await EmployeeApi.getLabelPdf(_lastOrder!);
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/label_${_lastOrder!['OrderID'] ?? DateTime.now().millisecondsSinceEpoch}.pdf');
-      await file.writeAsBytes(bytes);
-      await OpenFile.open(file.path);
-      await EmployeeApi.markLabelPrinted((_lastOrder!['OrderID'] ?? 0) as int);
+      // تسجيل الطباعة بعد نجاح توليد الـ PDF وقبل فتح الملف لتفادي بقاء "لم يُطبع" عند فشل فتح النافذة أو تأخر التحديث.
+      await EmployeeApi.markLabelPrinted(orderId);
+      widget.onCreated?.call();
+      await openPdfBytes(
+        Uint8List.fromList(bytes),
+        filename: 'label_$orderId.pdf',
+      );
+
+      // بعد الطباعة: مسح كل الحقول لبدء طلب جديد
+      if (mounted) {
+        setState(() {
+          _lastOrder = null;
+          _loading = false;
+
+          _empCode.clear();
+          _adminOrderNo.clear();
+          _customer.clear();
+          _phone.clear();
+          _address.clear();
+          _regionSearch.clear();
+          _regionId = null;
+          _showRegionDropdown = false;
+          _deliveryFee = 0;
+          _freeDelivery = false;
+          _pieces.text = '1';
+          _amount.text = '';
+          _notes.clear();
+          _error = null;
+          _phoneStatsLoading = false;
+          _customerDeliveredCount = 0;
+          _customerReturnedCount = 0;
+
+          // إعادة القيم الافتراضية للمتجر (إن لم تكن مخزّنة ضمن الواجهة)
+          _storeName.text = _defaults['storeName']?.toString() ?? '';
+          _storePhone.text = _defaults['storePhone']?.toString() ?? '';
+        });
+      }
     } catch (e) {
       if (mounted) {
+        setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الطباعة: ${e.toString()}'), backgroundColor: EmployeeTheme.danger));
       }
     }
@@ -225,11 +281,14 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    final contentPadding = EdgeInsets.fromLTRB(24, 24, 24, _lastOrder != null ? 120 : 24);
+    return Stack(
+      children: [
+        SingleChildScrollView(
+          padding: contentPadding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
@@ -254,11 +313,15 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             controller: _empCode,
             decoration: EmployeeTheme.inputDecoration(label: 'رمز الموظف *', hint: 'يُدخل في كل طلب'),
             obscureText: true,
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _adminOrderNo,
             decoration: EmployeeTheme.inputDecoration(label: 'رقم الطلب الإداري', hint: 'رقم الطلب عندكم'),
+            keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           TextField(
@@ -270,7 +333,40 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             controller: _phone,
             decoration: EmployeeTheme.inputDecoration(label: 'هاتف المستلم *', hint: '07701234567'),
             keyboardType: TextInputType.phone,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            onChanged: _onCustomerPhoneChanged,
           ),
+          if (_phone.text.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: EmployeeTheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: EmployeeTheme.primary.withValues(alpha: 0.2)),
+              ),
+              child: _phoneStatsLoading
+                  ? Row(
+                      children: [
+                        SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: EmployeeTheme.primary)),
+                        const SizedBox(width: 10),
+                        Text('جاري جلب إحصائية الزبون...', style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        Icon(Icons.insights_rounded, size: 16, color: EmployeeTheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'طلبات موصلة سابقاً: $_customerDeliveredCount   |   طلبات راجعة: $_customerReturnedCount',
+                            style: GoogleFonts.cairo(fontSize: 12.5, fontWeight: FontWeight.w600, color: EmployeeTheme.onSurface),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
           const SizedBox(height: 16),
           Stack(
             children: [
@@ -325,12 +421,14 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             controller: _pieces,
             decoration: EmployeeTheme.inputDecoration(label: 'عدد القطع', hint: '1'),
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _amount,
             decoration: EmployeeTheme.inputDecoration(label: 'مبلغ الفاتورة (د.ع)', hint: 'يمكن أن يكون 0'),
             keyboardType: TextInputType.number,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) {
               final amt = _amountVal;
               if (amt >= _freeThreshold && !_freeDelivery) setState(() => _freeDelivery = true);
@@ -389,7 +487,8 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
           ],
           const SizedBox(height: 28),
           FilledButton(
-            onPressed: _loading ? null : _submit,
+            // بعد الحفظ: نعطّل زر الحفظ مؤقتاً حتى يتم الطباعة
+            onPressed: (_loading || _lastOrder != null) ? null : _submit,
             style: FilledButton.styleFrom(
               backgroundColor: EmployeeTheme.primary,
               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -399,22 +498,28 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
                 ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : Text('حفظ الطلب', style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w700)),
           ),
-          if (_lastOrder != null) ...[
-            const SizedBox(height: 14),
-            OutlinedButton.icon(
-              onPressed: _printLabel,
-              icon: const Icon(Icons.print_rounded),
-              label: const Text('طباعة الملصق'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: EmployeeTheme.primary,
-                side: BorderSide(color: EmployeeTheme.primary),
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ],
+          ),
+        ),
+        if (_lastOrder != null)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: FilledButton.icon(
+                onPressed: _loading ? null : _printLabel,
+                icon: const Icon(Icons.print_rounded),
+                label: const Text('طباعة الملصق'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
               ),
             ),
-          ],
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

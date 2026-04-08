@@ -670,6 +670,16 @@ app.get('/api/orders/:id', requireAppAuth, async (req, res) => {
     }
 });
 
+app.get('/api/orders/customer-stats', requireAppAuth, async (req, res) => {
+    try {
+        const phone = String(req.query.phone || '').trim();
+        const stats = orderService.getCustomerPhoneStats(phone);
+        res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/orders/update-status', requireAppAuth, requireAdmin, async (req, res) => {
     try {
         const { orderId, status } = req.body;

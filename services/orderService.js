@@ -462,6 +462,27 @@ function markReturnedOrderReceived(orderId) {
     return { success: true, order: getOrderById(orderId) };
 }
 
+function getCustomerPhoneStats(customerPhone) {
+    const database = db.getDatabase();
+    const digits = String(customerPhone || '').replace(/\D/g, '');
+    if (!digits) return { deliveredCount: 0, returnedCount: 0 };
+
+    const rows = database.prepare(
+        `SELECT CustomerPhone, Status FROM Orders WHERE CustomerPhone IS NOT NULL AND TRIM(CustomerPhone) != ''`
+    ).all();
+
+    let deliveredCount = 0;
+    let returnedCount = 0;
+    for (const r of rows) {
+        const rowDigits = String(r.CustomerPhone || '').replace(/\D/g, '');
+        if (rowDigits !== digits) continue;
+        const s = String(r.Status || '').trim();
+        if (s === 'Delivered') deliveredCount++;
+        else if (s === 'Returned' || /راجع|returned|canceled|ملغي/i.test(s)) returnedCount++;
+    }
+    return { deliveredCount, returnedCount };
+}
+
 module.exports = {
     createOrder,
     getOrderByShipmentNumber,
@@ -479,6 +500,7 @@ module.exports = {
     getDriverDeliveredOrders,
     getDriverReturnedOrders,
     markReturnedOrderReceived,
+    getCustomerPhoneStats,
     getPendingOrdersByArea,
     getPendingOrdersList
 };

@@ -19,6 +19,7 @@ class EmployeeMainScreen extends StatefulWidget {
 class _EmployeeMainScreenState extends State<EmployeeMainScreen> {
   int _index = 0;
   Map<String, dynamic>? _user;
+  int _ordersTabVersion = 0;
 
   @override
   void initState() {
@@ -43,15 +44,24 @@ class _EmployeeMainScreenState extends State<EmployeeMainScreen> {
   Widget _buildTab() {
     switch (_index) {
       case 0:
-        return EmpNewOrderTab(onCreated: () => setState(() => _index = 2));
+        return EmpNewOrderTab(
+          onCreated: () => setState(() {
+            // تغيير نسخة التبويب يساعد على إعادة تحميل حالة الطلبات بعد الطباعة.
+            _ordersTabVersion++;
+          }),
+        );
       case 1:
         return const EmpReceiveTab();
       case 2:
-        return const EmpOrdersTab();
+        return EmpOrdersTab(key: ValueKey('orders_$_ordersTabVersion'));
       case 3:
         return EmpSettingsTab(onLogout: widget.onLogout);
       default:
-        return EmpNewOrderTab(onCreated: () => setState(() => _index = 2));
+        return EmpNewOrderTab(
+          onCreated: () => setState(() {
+            _ordersTabVersion++;
+          }),
+        );
     }
   }
 

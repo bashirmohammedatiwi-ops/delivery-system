@@ -1,12 +1,13 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:open_file/open_file.dart';
-import 'package:path_provider/path_provider.dart';
+import 'dart:typed_data';
 import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
+import '../../../utils/open_pdf_bytes/open_pdf_bytes.dart';
+import '../../../utils/order_label_printed.dart';
 
 class EmpOrdersTab extends StatefulWidget {
   const EmpOrdersTab({super.key});
@@ -78,19 +79,39 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
     });
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showSpinner = true}) async {
+    if (showSpinner) setState(() => _loading = true);
     try {
       final list = await EmployeeApi.getOrders(limit: 500);
+      if (!mounted) return;
       setState(() {
         _allOrders = list is List ? list : [];
-        _loading = false;
+        if (showSpinner) _loading = false;
       });
       _filter(_search.text);
     } catch (_) {
-      setState(() => _loading = false);
+      if (!mounted) return;
+      setState(() {
+        if (showSpinner) _loading = false;
+      });
       _filter(_search.text);
     }
+  }
+
+  void _patchLabelPrintedLocal(int orderId) {
+    if (!mounted) return;
+    setState(() {
+      for (final item in _allOrders) {
+        final m = item as Map<String, dynamic>;
+        final oid = m['OrderID'];
+        final same = oid == orderId || (oid is num && oid.toInt() == orderId);
+        if (same) {
+          m['LabelPrinted'] = 1;
+          break;
+        }
+      }
+      _filter(_search.text);
+    });
   }
 
   Future<void> _printOrder(Map<String, dynamic> order) async {
@@ -101,15 +122,19 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
       }
       final orderMap = fullOrder is Map<String, dynamic> ? fullOrder : order;
       final bytes = await EmployeeApi.getLabelPdf(orderMap);
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/label_${order['OrderID'] ?? DateTime.now().millisecondsSinceEpoch}.pdf');
-      await file.writeAsBytes(bytes);
-      await OpenFile.open(file.path);
-      await EmployeeApi.markLabelPrinted((order['OrderID'] ?? 0) as int);
+      final id = int.tryParse('${order['OrderID']}') ?? 0;
+      if (id < 1) throw Exception('معرّف الطلب غير صالح');
+      // تسجيل الطباعة على الخادم بعد نجاح توليد الـ PDF وقبل فتح الملف، حتى لا يبقى "لم يُطبع" إذا فشل فتح النافذة أو تأخر التحديث.
+      await EmployeeApi.markLabelPrinted(id);
+      if (mounted) _patchLabelPrintedLocal(id);
+      await openPdfBytes(
+        Uint8List.fromList(bytes),
+        filename: 'label_$id.pdf',
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم فتح الملصق')));
       }
-      _load();
+      await _load(showSpinner: false);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الطباعة: ${e.toString()}')));
@@ -180,7 +205,7 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
                         itemBuilder: (_, i) {
                           final o = _filteredOrders[i] as Map<String, dynamic>;
                           final status = _statusMap[o['Status']] ?? o['Status'];
-                          final labelPrinted = o['LabelPrinted'] == true || o['LabelPrinted'] == 1;
+                          final labelPrinted = isOrderLabelPrinted(o);
                           return Container(
                             margin: const EdgeInsets.only(bottom: 14),
                             padding: const EdgeInsets.all(18),
@@ -440,6 +465,8 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
               TextFormField(
                 controller: _adminOrderNo,
                 decoration: const InputDecoration(labelText: 'رقم الطلب الإداري', border: OutlineInputBorder()),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -451,6 +478,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                 controller: _customerPhone,
                 decoration: const InputDecoration(labelText: 'هاتف المستلم', border: OutlineInputBorder()),
                 keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
@@ -477,6 +505,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                 controller: _amount,
                 decoration: const InputDecoration(labelText: 'مبلغ الفاتورة (د.ع)', border: OutlineInputBorder()),
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 onChanged: (_) => setState(() {}),
               ),
               const SizedBox(height: 12),
