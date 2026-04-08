@@ -670,7 +670,7 @@ app.get('/api/orders/:id', requireAppAuth, async (req, res) => {
     }
 });
 
-app.get('/api/orders/customer-stats', requireAppAuth, async (req, res) => {
+app.get('/api/customers/order-stats', requireAppAuth, async (req, res) => {
     try {
         const phone = String(req.query.phone || '').trim();
         const stats = orderService.getCustomerPhoneStats(phone);

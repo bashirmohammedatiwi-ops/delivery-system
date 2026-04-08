@@ -8,6 +8,37 @@ import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
 import '../../../utils/open_pdf_bytes/open_pdf_bytes.dart';
 
+class EnglishDigitsFormatter extends TextInputFormatter {
+  static const Map<String, String> _arabicToEnglish = {
+    '٠': '0',
+    '١': '1',
+    '٢': '2',
+    '٣': '3',
+    '٤': '4',
+    '٥': '5',
+    '٦': '6',
+    '٧': '7',
+    '٨': '8',
+    '٩': '9',
+    '۰': '0',
+    '۱': '1',
+    '۲': '2',
+    '۳': '3',
+    '۴': '4',
+    '۵': '5',
+    '۶': '6',
+    '۷': '7',
+    '۸': '8',
+    '۹': '9',
+  };
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final converted = newValue.text.split('').map((c) => _arabicToEnglish[c] ?? c).join();
+    return newValue.copyWith(text: converted);
+  }
+}
+
 class EmpNewOrderTab extends StatefulWidget {
   final VoidCallback? onCreated;
 
@@ -314,14 +345,14 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             decoration: EmployeeTheme.inputDecoration(label: 'رمز الموظف *', hint: 'يُدخل في كل طلب'),
             obscureText: true,
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _adminOrderNo,
             decoration: EmployeeTheme.inputDecoration(label: 'رقم الطلب الإداري', hint: 'رقم الطلب عندكم'),
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           TextField(
@@ -333,7 +364,7 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             controller: _phone,
             decoration: EmployeeTheme.inputDecoration(label: 'هاتف المستلم *', hint: '07701234567'),
             keyboardType: TextInputType.phone,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly],
             onChanged: _onCustomerPhoneChanged,
           ),
           if (_phone.text.trim().isNotEmpty) ...[
@@ -421,14 +452,14 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
             controller: _pieces,
             decoration: EmployeeTheme.inputDecoration(label: 'عدد القطع', hint: '1'),
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly],
           ),
           const SizedBox(height: 16),
           TextField(
             controller: _amount,
             decoration: EmployeeTheme.inputDecoration(label: 'مبلغ الفاتورة (د.ع)', hint: 'يمكن أن يكون 0'),
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            inputFormatters: [EnglishDigitsFormatter(), FilteringTextInputFormatter.digitsOnly],
             onChanged: (_) {
               final amt = _amountVal;
               if (amt >= _freeThreshold && !_freeDelivery) setState(() => _freeDelivery = true);

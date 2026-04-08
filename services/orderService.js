@@ -466,6 +466,8 @@ function getCustomerPhoneStats(customerPhone) {
     const database = db.getDatabase();
     const digits = String(customerPhone || '').replace(/\D/g, '');
     if (!digits) return { deliveredCount: 0, returnedCount: 0 };
+    const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+    const last11 = digits.length >= 11 ? digits.slice(-11) : digits;
 
     const rows = database.prepare(
         `SELECT CustomerPhone, Status FROM Orders WHERE CustomerPhone IS NOT NULL AND TRIM(CustomerPhone) != ''`
@@ -475,7 +477,14 @@ function getCustomerPhoneStats(customerPhone) {
     let returnedCount = 0;
     for (const r of rows) {
         const rowDigits = String(r.CustomerPhone || '').replace(/\D/g, '');
-        if (rowDigits !== digits) continue;
+        if (!rowDigits) continue;
+        const rowLast10 = rowDigits.length >= 10 ? rowDigits.slice(-10) : rowDigits;
+        const rowLast11 = rowDigits.length >= 11 ? rowDigits.slice(-11) : rowDigits;
+        const samePhone =
+            rowDigits === digits ||
+            rowLast11 === last11 ||
+            rowLast10 === last10;
+        if (!samePhone) continue;
         const s = String(r.Status || '').trim();
         if (s === 'Delivered') deliveredCount++;
         else if (s === 'Returned' || /راجع|returned|canceled|ملغي/i.test(s)) returnedCount++;

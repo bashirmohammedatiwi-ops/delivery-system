@@ -56,7 +56,7 @@ class EmployeeApi {
   static Future<Map<String, dynamic>> getCustomerStatsByPhone(String phoneDigits) async {
     final p = phoneDigits.trim();
     if (p.isEmpty) return <String, dynamic>{'deliveredCount': 0, 'returnedCount': 0};
-    final res = await ApiService.instance.get('/api/orders/customer-stats?phone=${Uri.encodeComponent(p)}');
+    final res = await ApiService.instance.get('/api/customers/order-stats?phone=${Uri.encodeComponent(p)}');
     return res is Map<String, dynamic> ? res : <String, dynamic>{'deliveredCount': 0, 'returnedCount': 0};
   }
 
