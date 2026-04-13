@@ -164,6 +164,28 @@ function isPhoneLike(s) {
     return /^[\d+\s\-٠-٩۰-۹]+$/.test(t) && /\d/.test(t);
 }
 
+/** تحويل الأرقام العربية/الفارسية إلى أرقام لاتينية لتفادي انعكاسها بصرياً في PDF */
+function normalizeDigitsForLabelPdf(str) {
+    if (str == null) return '';
+    const map = {
+        '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+        '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9'
+    };
+    return String(str).replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (c) => map[c] || c);
+}
+
+/**
+ * عزل مجموعات الأرقام اللاتينية ككتلة LTR داخل فقرة RTL (PDFKit لا يطبّق BiDi كالمتصفح).
+ * بدون ذلك قد يظهر مثلاً ٦٢ أو 62 معكوساً (٢٦ / 26).
+ */
+function isolateLtrDigitSequences(str) {
+    return String(str).replace(/[0-9]+(?:[.,][0-9]+)*/g, (m) => '\u2066' + m + '\u2069');
+}
+
+function prepareLabelFreeText(str) {
+    return isolateLtrDigitSequences(normalizeDigitsForLabelPdf(str));
+}
+
 function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
     doc.save();
     doc.strokeColor(K).lineWidth(lineWidth);
@@ -198,9 +220,12 @@ async function createLabelPDF(order) {
     const cw = w - M * 2;
     let y = M;
 
-    const fullAddr = [order.RegionName, order.Address].filter(Boolean).join(' — ') || order.Address || '-';
-    const notesRaw = order.Notes != null ? String(order.Notes).trim() : '';
-    const hasNotesContent = !!notesRaw;
+    const fullAddr = prepareLabelFreeText(
+        [order.RegionName, order.Address].filter(Boolean).join(' — ') || order.Address || '-'
+    );
+    const notesRawOriginal = order.Notes != null ? String(order.Notes).trim() : '';
+    const hasNotesContent = !!notesRawOriginal;
+    const notesRaw = hasNotesContent ? prepareLabelFreeText(notesRawOriginal) : '';
 
     const footH = 42;
     const fy = h - M - footH;
