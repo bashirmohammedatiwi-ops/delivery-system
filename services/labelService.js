@@ -176,20 +176,16 @@ function normalizeDigitsForLabelPdf(str) {
 }
 
 /**
- * PDFKit + خط عربي + rev(كلمات) يعكس غالباً رقمين متجاورين (62 → 26). نعكس الأحرف في التخزين لتعويض ذلك.
- * لا نستخدم LRI/PDI — غالباً غير مدعومة في الخط فتظهر مربعات (tofu).
- * منزلتان فقط: لا نلمس 500 أو 2026 أو أرقام بفواصل (33,000).
+ * عزل مجموعات الأرقام اللاتينية ككتلة LTR داخل فقرة RTL (يعالج 62 التي تظهر 26 مع PDFKit).
+ * LRI/PDI قد تظهر كمربعات صغيرة إذا الخط لا يوفّر شكلاً لها؛ عندها جرّب خطاً أحدث (مثل Noto) أو حدّث Amiri.
  */
-function flipShortNumericTokensForPdfKitRtl(str) {
-    return String(str)
-        .split(/\s+/)
-        .map((tok) => (/^\d{2}$/.test(tok) ? tok.split('').reverse().join('') : tok))
-        .join(' ');
+function isolateLtrDigitSequences(str) {
+    return String(str).replace(/[0-9]+(?:[.,][0-9]+)*/g, (m) => '\u2066' + m + '\u2069');
 }
 
-/** للعنوان والملاحظات فقط — لا تُستخدم للمبالغ (قد تحتوي 500 بدون فاصلة آلاف) */
+/** للعنوان والملاحظات فقط — لا تُمرَّر المبالغ من هنا (فواصل آلاف وغيرها) */
 function prepareLabelFreeText(str) {
-    return flipShortNumericTokensForPdfKitRtl(normalizeDigitsForLabelPdf(str));
+    return isolateLtrDigitSequences(normalizeDigitsForLabelPdf(str));
 }
 
 function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
