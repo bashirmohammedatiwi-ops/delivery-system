@@ -43,7 +43,7 @@ function textRTL(doc, str, x, y, options) {
     const lineGap = options?.lineGap ?? 0.5;
     const fill = options?.fill ?? K;
     const lineH = doc.currentLineHeight();
-    const raw = String(str || '-').trim() || '-';
+    const raw = normalizeDigitsForLabelPdf(String(str || '-').trim() || '-');
     const lines = width < Infinity ? wrapRTL(doc, raw, width) : [raw];
     let dy = 0;
     lines.forEach((line) => {
@@ -60,7 +60,8 @@ function textRTL(doc, str, x, y, options) {
 
 function rtlBlockHeight(doc, str, width, fontSize) {
     doc.fontSize(fontSize);
-    const lines = wrapRTL(doc, String(str || '-').trim() || '-', width);
+    const raw = normalizeDigitsForLabelPdf(String(str || '-').trim() || '-');
+    const lines = wrapRTL(doc, raw, width);
     const lineH = doc.currentLineHeight();
     return Math.max(lineH, lines.length * lineH + Math.max(0, lines.length - 1) * 0.5);
 }
@@ -175,15 +176,20 @@ function normalizeDigitsForLabelPdf(str) {
 }
 
 /**
- * عزل مجموعات الأرقام اللاتينية ككتلة LTR داخل فقرة RTL (PDFKit لا يطبّق BiDi كالمتصفح).
- * بدون ذلك قد يظهر مثلاً ٦٢ أو 62 معكوساً (٢٦ / 26).
+ * PDFKit + خط عربي + rev(كلمات) يعكس غالباً رقمين متجاورين (62 → 26). نعكس الأحرف في التخزين لتعويض ذلك.
+ * لا نستخدم LRI/PDI — غالباً غير مدعومة في الخط فتظهر مربعات (tofu).
+ * منزلتان فقط: لا نلمس 500 أو 2026 أو أرقام بفواصل (33,000).
  */
-function isolateLtrDigitSequences(str) {
-    return String(str).replace(/[0-9]+(?:[.,][0-9]+)*/g, (m) => '\u2066' + m + '\u2069');
+function flipShortNumericTokensForPdfKitRtl(str) {
+    return String(str)
+        .split(/\s+/)
+        .map((tok) => (/^\d{2}$/.test(tok) ? tok.split('').reverse().join('') : tok))
+        .join(' ');
 }
 
+/** للعنوان والملاحظات فقط — لا تُستخدم للمبالغ (قد تحتوي 500 بدون فاصلة آلاف) */
 function prepareLabelFreeText(str) {
-    return isolateLtrDigitSequences(normalizeDigitsForLabelPdf(str));
+    return flipShortNumericTokensForPdfKitRtl(normalizeDigitsForLabelPdf(str));
 }
 
 function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
