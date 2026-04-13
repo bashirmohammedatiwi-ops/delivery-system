@@ -42,6 +42,16 @@ function measureMixedLineWidth(doc, segments, labelFonts, arabicBold) {
     return w;
 }
 
+/** يوحّد خط الأساس بين مقطع عربي ومقطع Helvetica (نفس منطق dy الافتراضي في PDFKit) */
+function arabicLatinBaselineYOffset(doc, arFontName, fontSize, latinBold) {
+    doc.font(arFontName);
+    const dyAr = (doc._font.ascender / 1000) * fontSize;
+    doc.font(latinBold ? 'Helvetica-Bold' : 'Helvetica');
+    const dyLat = (doc._font.ascender / 1000) * fontSize;
+    doc.font(arFontName);
+    return dyAr - dyLat;
+}
+
 function wrapRTL(doc, text, width) {
     const s = String(text || '').trim() || '-';
     const tokens = s.split(/\s+/).filter(Boolean);
@@ -107,15 +117,19 @@ function textRTL(doc, str, x, y, options) {
 
         doc.fillColor(fill);
         if (mixed) {
+            const arName = arabicBold ? labelFonts.bold : labelFonts.regular;
+            const fs = doc._fontSize;
+            const digitYAdjust = arabicLatinBaselineYOffset(doc, arName, fs, arabicBold);
             let cx = xx;
             for (const p of segments) {
                 if (!p.s) continue;
                 if (p.t === 'dig') doc.font(arabicBold ? 'Helvetica-Bold' : 'Helvetica');
-                else doc.font(arabicBold ? labelFonts.bold : labelFonts.regular);
-                doc.text(p.s, cx, y + dy, { align: 'left', lineBreak: false });
+                else doc.font(arName);
+                const segY = y + dy + (p.t === 'dig' ? digitYAdjust : 0);
+                doc.text(p.s, cx, segY, { align: 'left', lineBreak: false });
                 cx += doc.widthOfString(p.s);
             }
-            doc.font(arabicBold ? labelFonts.bold : labelFonts.regular);
+            doc.font(arName);
         } else {
             doc.text(displayLine, xx, y + dy, { align: 'left' });
         }
