@@ -13,6 +13,35 @@ function rev(str) {
     return str.split(/\s+/).reverse().join(' ');
 }
 
+/** تقسيم سطر بعد rev إلى مقاطع عربية ومقاطع أرقام لاتينية (0–9 وفواصل آلاف) */
+function splitDigitsAndText(s) {
+    const parts = [];
+    let last = 0;
+    const re = /[0-9]+(?:[.,][0-9]+)*/g;
+    let m;
+    while ((m = re.exec(s)) !== null) {
+        if (m.index > last) parts.push({ t: 'ar', s: s.slice(last, m.index) });
+        parts.push({ t: 'dig', s: m[0] });
+        last = m.index + m[0].length;
+    }
+    if (last < s.length) parts.push({ t: 'ar', s: s.slice(last) });
+    if (parts.length === 0) parts.push({ t: 'ar', s: s || '' });
+    return parts;
+}
+
+function measureMixedLineWidth(doc, segments, labelFonts, arabicBold) {
+    const arName = arabicBold ? labelFonts.bold : labelFonts.regular;
+    let w = 0;
+    for (const p of segments) {
+        if (!p.s) continue;
+        if (p.t === 'dig') doc.font(arabicBold ? 'Helvetica-Bold' : 'Helvetica');
+        else doc.font(arName);
+        w += doc.widthOfString(p.s);
+    }
+    doc.font(arName);
+    return w;
+}
+
 function wrapRTL(doc, text, width) {
     const s = String(text || '').trim() || '-';
     const tokens = s.split(/\s+/).filter(Boolean);
@@ -36,23 +65,60 @@ function wrapRTL(doc, text, width) {
     return lines;
 }
 
-/** نص عربي مع تفاف ومحاذاة يمين/وسط مناسبة لـ PDFKit */
+/**
+ * نص عربي مع تفاف ومحاذاة يمين/وسط مناسبة لـ PDFKit.
+ * helveticaLatinDigitRuns: رسم الأرقام اللاتينية بـ Helvetica لتفادي انعكاسها ولتفادي مربعات LRI/PDI في Amiri.
+ */
 function textRTL(doc, str, x, y, options) {
     const width = options?.width ?? Infinity;
     const align = options?.align ?? 'right';
     const lineGap = options?.lineGap ?? 0.5;
     const fill = options?.fill ?? K;
     const lineH = doc.currentLineHeight();
+    const useMix =
+        options?.helveticaLatinDigitRuns === true &&
+        options?.labelFonts?.regular &&
+        options?.labelFonts?.bold;
+    const arabicBold = options?.arabicUsesBoldFont === true;
+    const labelFonts = options?.labelFonts;
+
     const raw = normalizeDigitsForLabelPdf(String(str || '-').trim() || '-');
     const lines = width < Infinity ? wrapRTL(doc, raw, width) : [raw];
     let dy = 0;
     lines.forEach((line) => {
         const displayLine = rev(line);
-        const lw = doc.widthOfString(displayLine) || 0;
+        let lw;
+        let segments;
+        let mixed = false;
+        if (useMix && /[0-9]/.test(displayLine)) {
+            segments = splitDigitsAndText(displayLine);
+            if (segments.some((p) => p.t === 'dig')) {
+                lw = measureMixedLineWidth(doc, segments, labelFonts, arabicBold);
+                mixed = true;
+            }
+        }
+        if (!mixed) lw = doc.widthOfString(displayLine) || 0;
+
         let xx = x;
-        if (align === 'right') xx = x + width - lw;
-        else if (align === 'center') xx = x + (width - lw) / 2;
-        doc.fillColor(fill).text(displayLine, xx, y + dy, { align: 'left' });
+        if (width < Infinity) {
+            if (align === 'right') xx = x + width - lw;
+            else if (align === 'center') xx = x + (width - lw) / 2;
+        }
+
+        doc.fillColor(fill);
+        if (mixed) {
+            let cx = xx;
+            for (const p of segments) {
+                if (!p.s) continue;
+                if (p.t === 'dig') doc.font(arabicBold ? 'Helvetica-Bold' : 'Helvetica');
+                else doc.font(arabicBold ? labelFonts.bold : labelFonts.regular);
+                doc.text(p.s, cx, y + dy, { align: 'left', lineBreak: false });
+                cx += doc.widthOfString(p.s);
+            }
+            doc.font(arabicBold ? labelFonts.bold : labelFonts.regular);
+        } else {
+            doc.text(displayLine, xx, y + dy, { align: 'left' });
+        }
         dy += lineH + lineGap;
     });
     return dy;
@@ -175,17 +241,9 @@ function normalizeDigitsForLabelPdf(str) {
     return String(str).replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (c) => map[c] || c);
 }
 
-/**
- * عزل مجموعات الأرقام اللاتينية ككتلة LTR داخل فقرة RTL (يعالج 62 التي تظهر 26 مع PDFKit).
- * LRI/PDI قد تظهر كمربعات صغيرة إذا الخط لا يوفّر شكلاً لها؛ عندها جرّب خطاً أحدث (مثل Noto) أو حدّث Amiri.
- */
-function isolateLtrDigitSequences(str) {
-    return String(str).replace(/[0-9]+(?:[.,][0-9]+)*/g, (m) => '\u2066' + m + '\u2069');
-}
-
-/** للعنوان والملاحظات فقط — لا تُمرَّر المبالغ من هنا (فواصل آلاف وغيرها) */
+/** للعنوان والملاحظات — تحويل الأرقام الشرقية فقط (الأرقام اللاتينية تُرسم بـ Helvetica في textRTL) */
 function prepareLabelFreeText(str) {
-    return isolateLtrDigitSequences(normalizeDigitsForLabelPdf(str));
+    return normalizeDigitsForLabelPdf(str);
 }
 
 function hLine(doc, x1, x2, y, lineWidth = 0.85, dashed = false) {
@@ -216,6 +274,17 @@ async function createLabelPDF(order) {
     };
     const setArBold = () => {
         doc.font(fonts.bold).fillColor(K);
+    };
+
+    const labelDigitTextOpts = {
+        helveticaLatinDigitRuns: true,
+        labelFonts: fonts,
+        arabicUsesBoldFont: true
+    };
+    const labelNotesDigitOpts = {
+        helveticaLatinDigitRuns: true,
+        labelFonts: fonts,
+        arabicUsesBoldFont: false
     };
 
     const M = 7;
@@ -377,7 +446,7 @@ async function createLabelPDF(order) {
     doc.rect(innerL, y, innerW, addrH).fill(W).strokeColor(K).lineWidth(sepMid).stroke();
     setArBold();
     doc.fillColor(K).fontSize(addrFont);
-    textRTL(doc, fullAddr, innerL + 8, y + 8, { width: addrW, align: 'right', fill: K });
+    textRTL(doc, fullAddr, innerL + 8, y + 8, { width: addrW, align: 'right', fill: K, ...labelDigitTextOpts });
     y += addrH + 6;
 
     /* المبالغ — الخط الكامل تحت الأرقام وليس فوقها */
@@ -423,7 +492,7 @@ async function createLabelPDF(order) {
     setAr();
     doc.fillColor(K).fontSize(11.5);
     if (hasNotesContent) {
-        textRTL(doc, notesRaw, innerL + 8, y + 6, { width: addrW, align: 'right', fill: K });
+        textRTL(doc, notesRaw, innerL + 8, y + 6, { width: addrW, align: 'right', fill: K, ...labelNotesDigitOpts });
     } else {
         setArBold();
         doc.fontSize(13);
