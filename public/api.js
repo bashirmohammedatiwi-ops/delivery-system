@@ -114,6 +114,16 @@ window.api = {
             const blob = await apiPostBlob('/api/label/pdf', order);
             return URL.createObjectURL(blob);
         },
+        exportPDF: async (filters = {}) => {
+            const blob = await apiPostBlob('/api/orders/export-pdf', { filters });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const stamp = new Date().toISOString().slice(0, 10);
+            a.href = url;
+            a.download = `orders-${stamp}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+        },
         markLabelPrinted: (orderId) => apiPost('/api/orders/' + orderId + '/mark-label-printed', {}),
         markReturnedOrderReceived: (orderId) => apiPost('/api/orders/' + orderId + '/receive-returned', {})
     },

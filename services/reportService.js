@@ -487,6 +487,133 @@ async function generateDriverReportPDF(report) {
     return bufferPromise;
 }
 
+function buildOrdersFilterSubtitle(filters) {
+    const parts = [];
+    if (filters.search) parts.push('بحث: ' + filters.search);
+    if (filters.status) parts.push('الحالة: ' + (STATUS_LABELS[filters.status] || filters.status));
+    if (filters.driverName) parts.push('السائق: ' + filters.driverName);
+    else if (filters.driverId) parts.push('سائق #' + filters.driverId);
+    if (filters.dateFrom || filters.dateTo) {
+        parts.push('الفترة: ' + (filters.dateFrom || '…') + ' — ' + (filters.dateTo || '…'));
+    }
+    return parts.length ? parts.join(' | ') : 'جميع النتائج حسب الفلتر الحالي';
+}
+
+// ─── تصدير قائمة الطلبات (حسب الفلتر) ───
+async function generateOrdersExportPDF(payload) {
+    const orders = Array.isArray(payload?.orders) ? payload.orders : [];
+    const filters = payload?.filters || {};
+    const subtitle = buildOrdersFilterSubtitle(filters);
+
+    const doc = new PDFDocument({
+        size: [PAGE_WIDTH, PAGE_HEIGHT],
+        margin: 0,
+        autoFirstPage: false
+    });
+    doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
+
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    const bufferPromise = new Promise(resolve => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+    const font = getArabicFont(doc);
+    doc.font(font);
+
+    let y = 58;
+    drawHeader(doc, 'قائمة الطلبات', subtitle, font);
+
+    const statNew = orders.filter(o => o.Status === 'New').length;
+    const statAssigned = orders.filter(o => o.Status === 'AssignedToDriver').length;
+    const statDelivered = orders.filter(o => o.Status === 'Delivered').length;
+    const statReturned = orders.filter(o => isOrderReturned(o)).length;
+    const validOrders = orders.filter(o => !isOrderReturned(o));
+    const totalDue = validOrders.reduce((s, o) => s + getAmountDue(o), 0);
+
+    drawCards(doc, [
+        { label: 'عدد السجلات', value: orders.length.toString(), numeric: true },
+        { label: 'جديد', value: statNew.toString(), numeric: true },
+        { label: 'مع السائق', value: statAssigned.toString(), numeric: true },
+        { label: 'تم التوصيل', value: statDelivered.toString(), numeric: true },
+        { label: 'راجع', value: statReturned.toString(), numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع', numeric: true }
+    ], y, font);
+    y += 46;
+
+    if (orders.length === 0) {
+        doc.font(font).fillColor(COLORS.textMuted).fontSize(FONT_MD);
+        textRTL(doc, 'لا توجد طلبات مطابقة للفلتر المحدد.', MARGIN, y + 20, { width: TBL_W, align: 'center' });
+        drawFooter(doc, font);
+        doc.end();
+        return bufferPromise;
+    }
+
+    drawSectionTitle(doc, 'تفاصيل الطلبات', y, font);
+    y += 18;
+
+    const cols = [
+        { width: 36, label: 'الحالة' },
+        { width: 50, label: 'رقم الشحنة' },
+        { width: 40, label: 'رقم إداري' },
+        { width: 44, label: 'المتجر' },
+        { width: 44, label: 'المستلم' },
+        { width: 42, label: 'الهاتف' },
+        { width: 42, label: 'السائق' },
+        { width: 76, label: 'العنوان' },
+        { width: 16, label: 'قطع' },
+        { width: 44, label: 'فاتورة' },
+        { width: 40, label: 'توصيل' },
+        { width: 44, label: 'نهائي' },
+        { width: 44, label: 'مستحق' },
+        { width: 48, label: 'تاريخ' },
+        { width: 44, label: 'ملاحظات' }
+    ];
+    const wrap = (s, n) => (s || '-').toString().slice(0, n);
+    const BOTTOM_MARGIN = 85;
+    const numericCols = [1, 2, 7, 8, 9, 10, 11];
+
+    y += drawTableHead(doc, cols, y, font, true);
+
+    orders.forEach((o, i) => {
+        const statusTxt = STATUS_LABELS[o.Status || o.status] || (o.Status || o.status) || '-';
+        const driverAmt = getDriverDeliveryAmount(o);
+        const due = getAmountDue(o);
+        const dateStr = (o.CreatedDate || '').toString().slice(0, 16).replace('T', ' ');
+        const cells = [
+            statusTxt,
+            wrap(o.ShipmentNumber, 14),
+            wrap(o.AdminOrderNo, 10),
+            wrap(o.StoreName, 16),
+            wrap(o.CustomerName, 16),
+            wrap(o.CustomerPhone, 10),
+            wrap(o.DriverName, 14),
+            wrap(getFullAddress(o), 42),
+            (o.Pieces || 1).toString(),
+            formatIQD(o.AmountIQD),
+            o.FreeDelivery ? txt('مجاني') + ' ' + formatIQD(driverAmt) : formatIQD(driverAmt),
+            formatIQD(o.TotalIQD),
+            formatIQD(due),
+            wrap(dateStr, 16),
+            txt(o.Notes)
+        ];
+        const rowH = getTableRowHeight(doc, cols, cells, font, null, numericCols);
+        if (y + rowH > PAGE_HEIGHT - BOTTOM_MARGIN) {
+            drawFooter(doc, font);
+            doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
+            doc.font(font);
+            drawHeader(doc, 'قائمة الطلبات', subtitle, font);
+            y = 58;
+            y += drawTableHead(doc, cols, y, font, true);
+        }
+        const returned = isOrderReturned(o);
+        drawTableRow(doc, cols, cells, y, i % 2 === 1, font, null, returned, numericCols);
+        y += rowH;
+    });
+
+    drawFooter(doc, font);
+    doc.end();
+    return bufferPromise;
+}
+
 // ─── التقرير الملخص ───
 async function generateDailySummaryReportPDF(report) {
     const doc = new PDFDocument({
@@ -998,5 +1125,6 @@ module.exports = {
     getDailySummaryReport,
     generateDriverReportPDF,
     generateCompanyReportPDF,
-    generateDailySummaryReportPDF
+    generateDailySummaryReportPDF,
+    generateOrdersExportPDF
 };

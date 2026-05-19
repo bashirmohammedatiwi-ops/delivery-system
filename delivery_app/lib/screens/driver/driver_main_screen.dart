@@ -141,17 +141,22 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
           child: SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: List.generate(
-                  _tabs.length,
-                  (i) => _NavItem(
-                    icon: _tabs[i].icon,
-                    label: _tabs[i].label,
-                    isSelected: _index == i,
-                    onTap: () => setState(() => _index = i),
-                  ),
-                ),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final itemWidth = constraints.maxWidth / _tabs.length;
+                  return Row(
+                    children: List.generate(
+                      _tabs.length,
+                      (i) => _NavItem(
+                        width: itemWidth,
+                        icon: _tabs[i].icon,
+                        label: _tabs[i].label,
+                        isSelected: _index == i,
+                        onTap: () => setState(() => _index = i),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -162,43 +167,56 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
 }
 
 class _NavItem extends StatelessWidget {
+  final double width;
   final IconData icon;
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _NavItem({required this.icon, required this.label, required this.isSelected, required this.onTap});
+  const _NavItem({
+    required this.width,
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? DriverTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: isSelected ? DriverTheme.primary : DriverTheme.onSurfaceVariant,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: GoogleFonts.cairo(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+      child: SizedBox(
+        width: width,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? DriverTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 24,
                 color: isSelected ? DriverTheme.primary : DriverTheme.onSurfaceVariant,
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  style: GoogleFonts.cairo(
+                    fontSize: 11,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: isSelected ? DriverTheme.primary : DriverTheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

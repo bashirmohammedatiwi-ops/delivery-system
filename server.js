@@ -652,6 +652,44 @@ app.get('/api/orders', requireAppAuth, async (req, res) => {
     }
 });
 
+app.post('/api/orders/export-pdf', requireAppAuth, async (req, res) => {
+    try {
+        const body = req.body || {};
+        const filters = body.filters || body;
+        const driverId = filters.driverId ? parseInt(filters.driverId, 10) : undefined;
+        const orders = orderService.getOrders({
+            search: filters.search || '',
+            driverId: driverId && !isNaN(driverId) ? driverId : undefined,
+            status: filters.status || '',
+            dateFrom: filters.dateFrom || '',
+            dateTo: filters.dateTo || '',
+            limit: 2000
+        });
+        let driverName = filters.driverName || '';
+        if (!driverName && driverId) {
+            const d = driverService.getAllDrivers(false).find(x => x.DriverID === driverId);
+            driverName = d?.DriverName || '';
+        }
+        const buf = await reportService.generateOrdersExportPDF({
+            orders,
+            filters: {
+                search: filters.search || '',
+                driverId: driverId || '',
+                driverName,
+                status: filters.status || '',
+                dateFrom: filters.dateFrom || '',
+                dateTo: filters.dateTo || ''
+            }
+        });
+        const stamp = new Date().toISOString().slice(0, 10);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=orders-${stamp}.pdf`);
+        res.send(buf);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/orders/shipment/:num', requireAppAuth, async (req, res) => {
     try {
         const order = orderService.getOrderByShipmentNumber(req.params.num);

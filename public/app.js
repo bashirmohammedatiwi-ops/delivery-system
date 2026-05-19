@@ -394,7 +394,12 @@ async function renderOrdersScreen(container, opts = {}) {
                     <div class="orders-table-card">
                         <div class="orders-table-headbar">
                             <span class="orders-table-headbar-title">قائمة الطلبات</span>
-                            <span class="orders-table-headbar-meta">${list.length} سجل</span>
+                            <div class="orders-table-headbar-actions">
+                                <button type="button" class="btn btn-secondary btn-sm orders-btn-export-pdf" id="btnExportOrdersPDF" ${list.length === 0 ? 'disabled' : ''} title="تصدير الطلبات المعروضة حسب الفلتر">
+                                    <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> تصدير PDF
+                                </button>
+                                <span class="orders-table-headbar-meta">${list.length} سجل</span>
+                            </div>
                         </div>
                         ${list.length > 0 ? `<div class="orders-table-wrap">
                             <table class="orders-table">
@@ -506,6 +511,32 @@ async function renderOrdersScreen(container, opts = {}) {
             filters.dateFrom = '';
             filters.dateTo = '';
             renderOrders();
+        });
+
+        document.getElementById('btnExportOrdersPDF')?.addEventListener('click', async () => {
+            const btn = document.getElementById('btnExportOrdersPDF');
+            if (!btn || btn.disabled) return;
+            const driverSelect = document.getElementById('filterDriver');
+            const driverName = driverSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
+            const exportFilters = {
+                search: filters.search,
+                driverId: filters.driverId,
+                driverName: filters.driverId ? driverName : '',
+                status: filters.status,
+                dateFrom: filters.dateFrom,
+                dateTo: filters.dateTo
+            };
+            const prevHtml = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="btn-loading">جاري التصدير...</span>';
+            try {
+                await window.api.orders.exportPDF(exportFilters);
+            } catch (err) {
+                await showMsg('فشل التصدير: ' + (err?.message || err));
+            } finally {
+                btn.disabled = list.length === 0;
+                btn.innerHTML = prevHtml;
+            }
         });
 
         if (!statusClickAttached) {

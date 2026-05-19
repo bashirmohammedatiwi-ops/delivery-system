@@ -1270,6 +1270,18 @@ body {
     font-weight: 600;
     color: var(--text-muted);
 }
+.orders-table-headbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.orders-btn-export-pdf {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+}
 
 .orders-table-wrap {
     flex: 1;
