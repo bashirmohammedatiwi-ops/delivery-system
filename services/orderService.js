@@ -176,6 +176,46 @@ function getOrders(filters = {}) {
     return stmt.all(...params);
 }
 
+/** قائمة خفيفة لتطبيق الموظف — أعمدة أقل بدون joins غير ضرورية */
+function getOrdersList(filters = {}) {
+    const database = db.getDatabase();
+    let sql = `SELECT o.OrderID, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
+                      o.Address, o.Status, o.TotalIQD, o.AmountIQD, o.DeliveryFeeIQD, o.FreeDelivery,
+                      o.WaivedDeliveryIQD, o.LabelPrinted, o.CreatedDate, o.StoreName,
+                      r.RegionName
+               FROM Orders o
+               LEFT JOIN Regions r ON o.RegionID = r.RegionID
+               WHERE 1=1`;
+    const params = [];
+
+    if (filters.search) {
+        sql += ` AND (o.ShipmentNumber LIKE ? OR o.CustomerPhone LIKE ? OR o.CustomerName LIKE ? OR o.Address LIKE ? OR o.StoreName LIKE ? OR o.AdminOrderNo LIKE ?)`;
+        const s = `%${filters.search}%`;
+        params.push(s, s, s, s, s, s);
+    }
+    if (filters.driverId) {
+        sql += ` AND o.DriverID = ?`;
+        params.push(filters.driverId);
+    }
+    if (filters.status) {
+        sql += ` AND o.Status = ?`;
+        params.push(filters.status);
+    }
+    if (filters.dateFrom) {
+        sql += ` AND date(o.CreatedDate) >= date(?)`;
+        params.push(filters.dateFrom);
+    }
+    if (filters.dateTo) {
+        sql += ` AND date(o.CreatedDate) <= date(?)`;
+        params.push(filters.dateTo);
+    }
+
+    sql += ` ORDER BY o.OrderID DESC`;
+    if (filters.limit) sql += ` LIMIT ${Math.min(parseInt(filters.limit) || 1000, 5000)}`;
+
+    return database.prepare(sql).all(...params);
+}
+
 function updateOrderStatus(orderId, status, deliveredDate = null) {
     const database = db.getDatabase();
     const order = database.prepare('SELECT DriverID FROM Orders WHERE OrderID = ?').get(orderId);
@@ -498,6 +538,7 @@ module.exports = {
     assignOrderToDriver,
     returnOrderFromDriver,
     getOrders,
+    getOrdersList,
     updateOrderStatus,
     getOrderById,
     updateOrder,

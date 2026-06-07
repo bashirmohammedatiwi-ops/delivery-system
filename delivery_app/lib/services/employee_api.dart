@@ -48,6 +48,12 @@ class EmployeeApi {
     return res is List ? List<dynamic>.from(res) : <dynamic>[];
   }
 
+  /// قائمة خفيفة لصفحة الطلبات — أسرع في التحميل
+  static Future<List<dynamic>> getOrdersList({int limit = 200}) async {
+    final res = await ApiService.instance.get('/api/orders?listView=1&limit=$limit');
+    return res is List ? List<dynamic>.from(res) : <dynamic>[];
+  }
+
   static Future<Map<String, dynamic>> getOrderById(int id) async {
     final res = await ApiService.instance.get('/api/orders/$id');
     return res is Map<String, dynamic> ? res : <String, dynamic>{};

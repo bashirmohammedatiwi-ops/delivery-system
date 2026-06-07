@@ -17,10 +17,9 @@ class EmpSettingsTab extends StatelessWidget {
         final name = user?['DisplayName'] ?? user?['Username'] ?? 'موظف';
         final role = user?['Role'] == 'admin' ? 'مدير' : 'موظف';
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: Column(
             children: [
-              const SizedBox(height: 24),
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 32),
                 decoration: BoxDecoration(

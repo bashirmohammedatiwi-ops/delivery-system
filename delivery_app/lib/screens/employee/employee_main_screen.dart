@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../services/employee_api.dart';
 import 'employee_theme.dart';
 import 'tabs/emp_new_order_tab.dart';
 import 'tabs/emp_receive_tab.dart';
 import 'tabs/emp_orders_tab.dart';
+import 'tabs/emp_orders_cache.dart';
 import 'tabs/emp_settings_tab.dart';
+
+class _TabMeta {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  final String title;
+  final String subtitle;
+
+  const _TabMeta({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+    required this.title,
+    required this.subtitle,
+  });
+}
 
 class EmployeeMainScreen extends StatefulWidget {
   final VoidCallback onLogout;
@@ -18,37 +34,47 @@ class EmployeeMainScreen extends StatefulWidget {
 
 class _EmployeeMainScreenState extends State<EmployeeMainScreen> {
   int _index = 0;
-  Map<String, dynamic>? _user;
   int _ordersTabVersion = 0;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadUser();
-  }
-
-  Future<void> _loadUser() async {
-    try {
-      final u = await EmployeeApi.me();
-      setState(() => _user = u);
-    } catch (_) {}
-  }
-
   static const _tabs = [
-    (icon: Icons.add_circle_outline_rounded, label: 'طلب جديد'),
-    (icon: Icons.inventory_2_outlined, label: 'استلام'),
-    (icon: Icons.receipt_long_rounded, label: 'الطلبات'),
-    (icon: Icons.settings_rounded, label: 'إعدادات'),
+    _TabMeta(
+      icon: Icons.add_rounded,
+      activeIcon: Icons.add_circle_rounded,
+      label: 'جديد',
+      title: 'طلب جديد',
+      subtitle: 'إنشاء شحنة جديدة',
+    ),
+    _TabMeta(
+      icon: Icons.qr_code_scanner_outlined,
+      activeIcon: Icons.qr_code_scanner_rounded,
+      label: 'استلام',
+      title: 'استلام الطلبات',
+      subtitle: 'مسح واستلام الشحنات',
+    ),
+    _TabMeta(
+      icon: Icons.receipt_long_outlined,
+      activeIcon: Icons.receipt_long_rounded,
+      label: 'الطلبات',
+      title: 'الطلبات',
+      subtitle: 'عرض وإدارة الشحنات',
+    ),
+    _TabMeta(
+      icon: Icons.person_outline_rounded,
+      activeIcon: Icons.person_rounded,
+      label: 'حسابي',
+      title: 'الإعدادات',
+      subtitle: 'حسابك وتفضيلاتك',
+    ),
   ];
 
   Widget _buildTab() {
     switch (_index) {
       case 0:
         return EmpNewOrderTab(
-          onCreated: () => setState(() {
-            // تغيير نسخة التبويب يساعد على إعادة تحميل حالة الطلبات بعد الطباعة.
-            _ordersTabVersion++;
-          }),
+          onCreated: () {
+            EmpOrdersCache.clear();
+            setState(() => _ordersTabVersion++);
+          },
         );
       case 1:
         return const EmpReceiveTab();
@@ -58,162 +84,197 @@ class _EmployeeMainScreenState extends State<EmployeeMainScreen> {
         return EmpSettingsTab(onLogout: widget.onLogout);
       default:
         return EmpNewOrderTab(
-          onCreated: () => setState(() {
-            _ordersTabVersion++;
-          }),
+          onCreated: () {
+            EmpOrdersCache.clear();
+            setState(() => _ordersTabVersion++);
+          },
         );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final name = _user?['DisplayName'] ?? _user?['Username'] ?? 'موظف';
+    final tab = _tabs[_index];
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: EmployeeTheme.surface,
-        appBar: AppBar(
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: Colors.transparent,
-          titleSpacing: 0,
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: EmployeeTheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.description_rounded, color: EmployeeTheme.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  'تطبيق الموظفين',
-                  style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w800, color: EmployeeTheme.onSurface),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Center(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 14,
-                      backgroundColor: EmployeeTheme.primary.withValues(alpha: 0.3),
-                      child: Text(
-                        name.toString().substring(0, 1).toUpperCase(),
-                        style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w700, color: EmployeeTheme.primary),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        name,
-                        style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.w700, color: EmployeeTheme.onSurface),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                    ),
-                  ],
-                ),
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _EmployeePageHeader(
+              title: tab.title,
+              subtitle: tab.subtitle,
+              icon: tab.activeIcon,
+            ),
+            Expanded(
+              child: SizedBox.expand(
+                child: _buildTab(),
               ),
             ),
           ],
         ),
-        body: _buildTab(),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final itemWidth = constraints.maxWidth / _tabs.length;
-                  return Row(
-                    children: List.generate(
-                      _tabs.length,
-                      (i) => _NavItem(
-                        width: itemWidth,
-                        icon: _tabs[i].icon,
-                        label: _tabs[i].label,
-                        isSelected: _index == i,
-                        onTap: () => setState(() => _index = i),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+        bottomNavigationBar: _EmployeeBottomNav(
+          tabs: _tabs,
+          selectedIndex: _index,
+          onSelected: (i) => setState(() => _index = i),
         ),
       ),
     );
   }
 }
 
-class _NavItem extends StatelessWidget {
-  final double width;
+class _EmployeePageHeader extends StatelessWidget {
+  final String title;
+  final String subtitle;
   final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
 
-  const _NavItem({
-    required this.width,
+  const _EmployeePageHeader({
+    required this.title,
+    required this.subtitle,
     required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: width,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? EmployeeTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
+    final top = MediaQuery.of(context).padding.top;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: EmployeeTheme.primary.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 24, color: isSelected ? EmployeeTheme.primary : EmployeeTheme.onSurfaceVariant),
-              const SizedBox(height: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: GoogleFonts.cairo(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? EmployeeTheme.primary : EmployeeTheme.onSurfaceVariant,
-                  ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, top + 12, 20, 14),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topRight,
+                  end: Alignment.bottomLeft,
+                  colors: [EmployeeTheme.primary, EmployeeTheme.primaryDark],
                 ),
+                borderRadius: BorderRadius.circular(14),
               ),
-            ],
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.cairo(
+                      fontSize: 19,
+                      fontWeight: FontWeight.w800,
+                      color: EmployeeTheme.onSurface,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.cairo(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: EmployeeTheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmployeeBottomNav extends StatelessWidget {
+  final List<_TabMeta> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _EmployeeBottomNav({
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1625),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final itemW = constraints.maxWidth / tabs.length;
+              return Row(
+                children: List.generate(tabs.length, (i) {
+                  final t = tabs[i];
+                  final selected = i == selectedIndex;
+                  return SizedBox(
+                    width: itemW,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => onSelected(i),
+                        borderRadius: BorderRadius.circular(16),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          decoration: BoxDecoration(
+                            color: selected ? EmployeeTheme.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                selected ? t.activeIcon : t.icon,
+                                size: 22,
+                                color: selected ? Colors.white : Colors.white.withValues(alpha: 0.45),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                t.label,
+                                style: GoogleFonts.cairo(
+                                  fontSize: 10,
+                                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                  color: selected ? Colors.white : Colors.white.withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              );
+            },
           ),
         ),
       ),

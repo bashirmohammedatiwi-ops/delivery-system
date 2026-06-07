@@ -645,7 +645,9 @@ app.get('/api/orders', requireAppAuth, async (req, res) => {
             dateTo: req.query.dateTo,
             limit: req.query.limit
         };
-        const orders = orderService.getOrders(filters);
+        const orders = req.query.listView === '1'
+            ? orderService.getOrdersList(filters)
+            : orderService.getOrders(filters);
         res.json(orders);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -764,6 +766,14 @@ app.put('/api/orders/:id', requireAppAuth, async (req, res) => {
             if (/^\d{4}-\d{2}-\d{2}$/.test(cd)) cd = cd + ' 00:00:00';
             body.CreatedDate = cd;
         }
+
+        if (req.appUser?.Role === 'employee') {
+            const employeeCode = (body.EmployeeCode || '').trim();
+            if (!employeeCode) return res.status(400).json({ error: 'أدخل رمز الموظف' });
+            const emp = userAuthService.getUserBySecretCode(employeeCode);
+            if (!emp) return res.status(400).json({ error: 'رمز الموظف غير صحيح' });
+        }
+        delete body.EmployeeCode;
 
         const order = orderService.updateOrder(parseInt(req.params.id), body);
         const appUser = req.appUser;

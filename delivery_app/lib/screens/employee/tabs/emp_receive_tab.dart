@@ -95,30 +95,10 @@ class _EmpReceiveTabState extends State<EmpReceiveTab> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                colors: [EmployeeTheme.primary.withValues(alpha: 0.15), EmployeeTheme.primary.withValues(alpha: 0.05)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: EmployeeTheme.primary.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              children: [
-                Text('استلام للسائق', style: GoogleFonts.cairo(fontSize: 20, fontWeight: FontWeight.w800, color: EmployeeTheme.onSurface)),
-                const SizedBox(height: 6),
-                Text('تعيين الطلبات للسائقين', style: GoogleFonts.cairo(fontSize: 14, color: EmployeeTheme.onSurfaceVariant)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 28),
           if (_currentDriver == null) ...[
             TextField(
               controller: _driverCode,

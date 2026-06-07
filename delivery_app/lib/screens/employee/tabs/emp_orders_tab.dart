@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +9,9 @@ import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
 import '../../../utils/open_pdf_bytes/open_pdf_bytes.dart';
 import '../../../utils/order_label_printed.dart';
+import '../widgets/order_form_ui.dart';
+import '../widgets/new_order_ui.dart';
+import 'emp_orders_cache.dart';
 
 class EmpOrdersTab extends StatefulWidget {
   const EmpOrdersTab({super.key});
@@ -17,19 +21,46 @@ class EmpOrdersTab extends StatefulWidget {
 }
 
 class _EmpOrdersTabState extends State<EmpOrdersTab> {
-  List<dynamic> _allOrders = [];
-  List<dynamic> _filteredOrders = [];
+  static const _pageLimit = 200;
+
+  List<Map<String, dynamic>> _allOrders = [];
   final _search = TextEditingController();
+  String _searchQuery = '';
+  Timer? _searchDebounce;
   bool _loading = true;
+  bool _refreshing = false;
+  String? _loadError;
+
+  static Map<String, dynamic>? _asOrder(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    return null;
+  }
+
+  static double _numVal(dynamic v) {
+    if (v is num) return v.toDouble();
+    return double.tryParse('$v') ?? 0;
+  }
+
+  List<Map<String, dynamic>> _normalizeOrders(List<dynamic> list) {
+    return list.map(_asOrder).whereType<Map<String, dynamic>>().toList();
+  }
 
   @override
   void initState() {
     super.initState();
-    _load();
+    if (EmpOrdersCache.isFresh) {
+      _allOrders = List<Map<String, dynamic>>.from(EmpOrdersCache.orders!);
+      _loading = false;
+      _load(showSpinner: false);
+    } else {
+      _load();
+    }
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -41,60 +72,98 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
     'Returned': 'راجع',
   };
 
-  String _formatIQD(num? n) => '${NumberFormat('#,##0', 'ar_IQ').format(n ?? 0)} د.ع';
-
-  double _getAmountDue(dynamic o) {
-    final m = o as Map<String, dynamic>;
-    final total = (m['TotalIQD'] ?? m['totaliqd'] ?? 0) as num;
-    final free = m['FreeDelivery'] == true || m['FreeDelivery'] == 1 || m['FreeDelivery'] == '1';
-    final deliveryAmt = free ? ((m['WaivedDeliveryIQD'] ?? m['waiveddeliveryiqd'] ?? 0) as num) : ((m['DeliveryFeeIQD'] ?? m['deliveryfeeiqd'] ?? 0) as num);
-    return (total - deliveryAmt).toDouble();
+  String _formatIQD(num? n) {
+    try {
+      return '${NumberFormat('#,##0', 'ar_IQ').format(n ?? 0)} د.ع';
+    } catch (_) {
+      return '${n ?? 0} د.ع';
+    }
   }
 
-  void _filter(String q) {
+  bool _isFreeDelivery(Map<String, dynamic> m) =>
+      m['FreeDelivery'] == true || m['FreeDelivery'] == 1 || m['FreeDelivery'] == '1';
+
+  double _displayDeliveryFee(Map<String, dynamic> m) {
+    if (_isFreeDelivery(m)) return 0;
+    return _numVal(m['DeliveryFeeIQD'] ?? m['deliveryfeeiqd']);
+  }
+
+  Color _statusColor(String? status) {
+    switch (status) {
+      case 'Delivered':
+        return EmployeeTheme.success;
+      case 'Returned':
+        return EmployeeTheme.warning;
+      case 'AssignedToDriver':
+        return EmployeeTheme.primary;
+      default:
+        return EmployeeTheme.onSurfaceVariant;
+    }
+  }
+
+  List<Map<String, dynamic>> _applyFilter(String q, List<Map<String, dynamic>> source) {
     final s = q.trim().toLowerCase();
     final searchDigits = s.replaceAll(RegExp(r'\D'), '');
-    if (s.isEmpty) {
-      setState(() => _filteredOrders = List.from(_allOrders));
-      return;
-    }
-    setState(() {
-      _filteredOrders = _allOrders.where((o) {
-        final m = o as Map<String, dynamic>;
-        final sn = (m['ShipmentNumber'] ?? '').toString().toLowerCase();
-        final snDigits = (m['ShipmentNumber'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-        final cn = (m['CustomerName'] ?? '').toString().toLowerCase();
-        final cp = (m['CustomerPhone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
-        final addr = (m['Address'] ?? '').toString().toLowerCase();
-        final store = (m['StoreName'] ?? '').toString().toLowerCase();
-        final admin = (m['AdminOrderNo'] ?? '').toString().toLowerCase();
-        final matchShipment = sn.contains(s) || (searchDigits.isNotEmpty && (snDigits.contains(searchDigits) || snDigits.endsWith(searchDigits)));
-        return matchShipment ||
-            cn.contains(s) ||
-            addr.contains(s) ||
-            store.contains(s) ||
-            admin.contains(s) ||
-            (searchDigits.isNotEmpty && cp.contains(searchDigits));
-      }).toList();
+    if (s.isEmpty) return List<Map<String, dynamic>>.from(source);
+    return source.where((m) {
+      final sn = (m['ShipmentNumber'] ?? '').toString().toLowerCase();
+      final snDigits = (m['ShipmentNumber'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+      final cn = (m['CustomerName'] ?? '').toString().toLowerCase();
+      final cp = (m['CustomerPhone'] ?? '').toString().replaceAll(RegExp(r'\D'), '');
+      final addr = (m['Address'] ?? '').toString().toLowerCase();
+      final store = (m['StoreName'] ?? '').toString().toLowerCase();
+      final admin = (m['AdminOrderNo'] ?? '').toString().toLowerCase();
+      final matchShipment = sn.contains(s) || (searchDigits.isNotEmpty && (snDigits.contains(searchDigits) || snDigits.endsWith(searchDigits)));
+      return matchShipment ||
+          cn.contains(s) ||
+          addr.contains(s) ||
+          store.contains(s) ||
+          admin.contains(s) ||
+          (searchDigits.isNotEmpty && cp.contains(searchDigits));
+    }).toList();
+  }
+
+  List<Map<String, dynamic>> get _visibleOrders => _applyFilter(_searchQuery, _allOrders);
+
+  bool get _isSearching => _searchQuery.trim().isNotEmpty;
+
+  void _onSearchChanged(String value) {
+    setState(() {});
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = value);
     });
   }
 
   Future<void> _load({bool showSpinner = true}) async {
-    if (showSpinner) setState(() => _loading = true);
+    final showBlockingSpinner = showSpinner && _allOrders.isEmpty;
+    if (showBlockingSpinner && mounted) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    } else if (showSpinner && mounted) {
+      setState(() => _refreshing = true);
+    }
     try {
-      final list = await EmployeeApi.getOrders(limit: 500);
+      final list = await EmployeeApi.getOrdersList(limit: _pageLimit);
+      if (!mounted) return;
+      final normalized = _normalizeOrders(list);
+      setState(() {
+        _allOrders = normalized;
+        _loadError = null;
+        _loading = false;
+        _refreshing = false;
+      });
+      EmpOrdersCache.save(normalized);
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        _allOrders = list is List ? list : [];
-        if (showSpinner) _loading = false;
+        _loadError = _allOrders.isEmpty ? e.toString().replaceFirst('Exception: ', '') : null;
+        _loading = false;
+        _refreshing = false;
       });
-      _filter(_search.text);
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        if (showSpinner) _loading = false;
-      });
-      _filter(_search.text);
     }
   }
 
@@ -102,15 +171,13 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
     if (!mounted) return;
     setState(() {
       for (final item in _allOrders) {
-        final m = item as Map<String, dynamic>;
-        final oid = m['OrderID'];
+        final oid = item['OrderID'];
         final same = oid == orderId || (oid is num && oid.toInt() == orderId);
         if (same) {
-          m['LabelPrinted'] = 1;
+          item['LabelPrinted'] = 1;
           break;
         }
       }
-      _filter(_search.text);
     });
   }
 
@@ -155,126 +222,228 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
 
   @override
   Widget build(BuildContext context) {
+    final visible = _visibleOrders;
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: TextField(
             controller: _search,
             decoration: EmployeeTheme.inputDecoration(
               label: 'بحث',
               hint: 'رقم الشحنة، الاسم، الهاتف، العنوان...',
-              suffixIcon: IconButton(icon: const Icon(Icons.search_rounded), onPressed: () => _filter(_search.text)),
+              prefixIcon: const Icon(Icons.search_rounded),
+              suffixIcon: _search.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () {
+                        _search.clear();
+                        _searchQuery = '';
+                        setState(() {});
+                      },
+                    )
+                  : null,
             ),
-            onChanged: _filter,
+            onChanged: _onSearchChanged,
           ),
         ),
+        if (_refreshing)
+          LinearProgressIndicator(minHeight: 2, color: EmployeeTheme.primary),
         Expanded(
-          child: _loading
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(width: 48, height: 48, child: CircularProgressIndicator(strokeWidth: 3, color: EmployeeTheme.primary)),
-                      const SizedBox(height: 20),
-                      Text('جاري التحميل...', style: EmployeeTheme.bodyMedium),
-                    ],
-                  ),
-                )
-              : _filteredOrders.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(40),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.receipt_long_rounded, size: 64, color: EmployeeTheme.primary.withValues(alpha: 0.4)),
-                            const SizedBox(height: 20),
-                            Text('لا توجد طلبات', style: EmployeeTheme.titleMedium),
-                            if (_allOrders.isEmpty) Text('أو لا توجد نتائج للبحث', style: EmployeeTheme.bodyMedium),
-                          ],
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      color: EmployeeTheme.primary,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        itemCount: _filteredOrders.length,
-                        itemBuilder: (_, i) {
-                          final o = _filteredOrders[i] as Map<String, dynamic>;
-                          final status = _statusMap[o['Status']] ?? o['Status'];
-                          final labelPrinted = isOrderLabelPrinted(o);
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 14),
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: EmployeeTheme.outline.withValues(alpha: 0.5)),
-                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(colors: [EmployeeTheme.primary, EmployeeTheme.primaryDark]),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text('#${o['ShipmentNumber']}', style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 14)),
-                                    ),
-                                    const Spacer(),
-                                    Text(_formatIQD(o['TotalIQD'] ?? o['totaliqd']), style: GoogleFonts.cairo(fontWeight: FontWeight.w700, color: EmployeeTheme.success)),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Text(o['CustomerName'] ?? '—', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w600)),
-                                if (o['Address'] != null && (o['Address'] as String).isNotEmpty)
-                                  Text(o['Address'] ?? '', style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
-                                const SizedBox(height: 8),
-                                Text('$status · ${o['CreatedDate'] ?? ''}', style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
-                                Text('المستحق: ${_formatIQD(_getAmountDue(o))}', style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
-                                Container(
-                                  margin: const EdgeInsets.only(top: 8),
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                  decoration: BoxDecoration(
-                                    color: labelPrinted ? EmployeeTheme.success.withValues(alpha: 0.15) : EmployeeTheme.warning.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: labelPrinted ? EmployeeTheme.success.withValues(alpha: 0.3) : EmployeeTheme.warning.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Text(labelPrinted ? 'تم الطباعة' : 'لم يُطبع', style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w600, color: labelPrinted ? EmployeeTheme.success : EmployeeTheme.warning)),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    TextButton.icon(
-                                      onPressed: () => _showEditModal(o),
-                                      icon: const Icon(Icons.edit_rounded, size: 18),
-                                      label: const Text('تعديل'),
-                                      style: TextButton.styleFrom(foregroundColor: EmployeeTheme.primary),
-                                    ),
-                                    TextButton.icon(
-                                      onPressed: () => _printOrder(o),
-                                      icon: const Icon(Icons.print_rounded, size: 18),
-                                      label: const Text('طباعة'),
-                                      style: TextButton.styleFrom(foregroundColor: EmployeeTheme.primary),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+          child: _buildBody(visible),
         ),
       ],
+    );
+  }
+
+  Widget _buildBody(List<Map<String, dynamic>> visible) {
+    if (_loading) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: CircularProgressIndicator(strokeWidth: 3, color: EmployeeTheme.primary),
+            ),
+            const SizedBox(height: 20),
+            Text('جاري التحميل...', style: EmployeeTheme.bodyMedium),
+          ],
+        ),
+      );
+    }
+
+    if (_loadError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_rounded, size: 48, color: EmployeeTheme.danger.withValues(alpha: 0.7)),
+              const SizedBox(height: 16),
+              Text('تعذّر تحميل الطلبات', style: EmployeeTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(_loadError!, style: EmployeeTheme.bodyMedium, textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('إعادة المحاولة'),
+                style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (visible.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.receipt_long_rounded, size: 64, color: EmployeeTheme.primary.withValues(alpha: 0.4)),
+              const SizedBox(height: 20),
+              Text('لا توجد طلبات', style: EmployeeTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(
+                _isSearching ? 'جرّب كلمات بحث مختلفة' : 'ستظهر الطلبات هنا',
+                style: EmployeeTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _load,
+      color: EmployeeTheme.primary,
+      child: ListView.separated(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        cacheExtent: 400,
+        itemCount: visible.length,
+        separatorBuilder: (_, _) => const SizedBox(height: 12),
+        itemBuilder: (_, i) => _buildOrderCard(visible[i]),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(Map<String, dynamic> o) {
+    final status = _statusMap[o['Status']] ?? o['Status']?.toString() ?? '';
+    final statusColor = _statusColor(o['Status']?.toString());
+    final labelPrinted = isOrderLabelPrinted(o);
+    final free = _isFreeDelivery(o);
+    final deliveryFee = _displayDeliveryFee(o);
+    final total = _numVal(o['TotalIQD'] ?? o['totaliqd']);
+    final name = o['CustomerName']?.toString().trim();
+    final phone = o['CustomerPhone']?.toString() ?? '';
+    final address = o['Address']?.toString() ?? '';
+    final region = o['RegionName']?.toString().trim() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: EmployeeTheme.outline),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [EmployeeTheme.primary, EmployeeTheme.primaryDark]),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  '#${o['ShipmentNumber'] ?? ''}',
+                  style: GoogleFonts.roboto(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(status, style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
+              ),
+              const Spacer(),
+              Text(_formatIQD(total), style: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 15, color: EmployeeTheme.primary)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(name?.isNotEmpty == true ? name! : '—', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700)),
+          if (phone.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(phone, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
+          ],
+          if (region.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(region, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
+          ],
+          if (address.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(address, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
+          ],
+          const SizedBox(height: 8),
+          Text(
+            free ? 'توصيل مجاني' : 'أجرة التوصيل: ${_formatIQD(deliveryFee)}',
+            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600, color: free ? EmployeeTheme.success : EmployeeTheme.onSurfaceVariant),
+          ),
+          if (o['CreatedDate'] != null) ...[
+            const SizedBox(height: 4),
+            Text('${o['CreatedDate']}', style: GoogleFonts.cairo(fontSize: 11, color: EmployeeTheme.onSurfaceVariant)),
+          ],
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: labelPrinted ? EmployeeTheme.success.withValues(alpha: 0.1) : EmployeeTheme.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              labelPrinted ? '✓ تم الطباعة' : 'لم يُطبع',
+              style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w700, color: labelPrinted ? EmployeeTheme.success : EmployeeTheme.warning),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showEditModal(o),
+                  icon: const Icon(Icons.edit_rounded, size: 18),
+                  label: const Text('تعديل'),
+                  style: OutlinedButton.styleFrom(foregroundColor: EmployeeTheme.primary),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _printOrder(o),
+                  icon: const Icon(Icons.print_rounded, size: 18),
+                  label: const Text('طباعة'),
+                  style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -290,16 +459,22 @@ class _EditOrderSheet extends StatefulWidget {
 }
 
 class _EditOrderSheetState extends State<_EditOrderSheet> {
+  static const int _piecesMin = 1;
+  static const int _piecesMax = 99;
+
   final _formKey = GlobalKey<FormState>();
+  late TextEditingController _empCode;
   late TextEditingController _adminOrderNo;
   late TextEditingController _customerName;
   late TextEditingController _customerPhone;
   late TextEditingController _address;
   late TextEditingController _amount;
-  late TextEditingController _deliveryFee;
   late TextEditingController _notes;
   int? _regionId;
-  bool _freeDelivery = false;
+  String? _regionName;
+  int _piecesCount = 1;
+  final _freeDeliveryState = FreeDeliveryState();
+  double _deliveryFee = 0;
   List<dynamic> _regions = [];
   bool _loading = false;
   String? _error;
@@ -308,31 +483,48 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   @override
   void initState() {
     super.initState();
+    _order = Map<String, dynamic>.from(widget.order);
+    _empCode = TextEditingController();
+    _adminOrderNo = TextEditingController();
+    _customerName = TextEditingController();
+    _customerPhone = TextEditingController();
+    _address = TextEditingController();
+    _amount = TextEditingController();
+    _notes = TextEditingController();
+    _applyOrderToFields(_order);
     _loadOrder();
     _loadRegions();
   }
 
+  void _applyOrderToFields(Map<String, dynamic> o) {
+    _adminOrderNo.text = o['AdminOrderNo']?.toString() ?? '';
+    _customerName.text = o['CustomerName']?.toString() ?? '';
+    _customerPhone.text = o['CustomerPhone']?.toString() ?? '';
+    _address.text = o['Address']?.toString() ?? '';
+    final piecesRaw = (o['Pieces'] is num) ? (o['Pieces'] as num).toInt() : int.tryParse('${o['Pieces']}') ?? _piecesMin;
+    _piecesCount = piecesRaw.clamp(_piecesMin, _piecesMax);
+    _amount.text = OrderFormUi.formatAmountField((o['AmountIQD'] is num) ? (o['AmountIQD'] as num) : num.tryParse('${o['AmountIQD']}') ?? 0);
+    final fee = o['FreeDelivery'] == true || o['FreeDelivery'] == 1
+        ? (o['WaivedDeliveryIQD'] ?? 0)
+        : (o['DeliveryFeeIQD'] ?? o['deliveryfeeiqd'] ?? 0);
+    _deliveryFee = (fee as num).toDouble();
+    _notes.text = o['Notes']?.toString() ?? '';
+    _regionId = o['RegionID'] as int?;
+    _regionName = o['RegionName']?.toString();
+    final amt = (o['AmountIQD'] is num) ? (o['AmountIQD'] as num).toDouble() : double.tryParse('${o['AmountIQD']}') ?? 0;
+    final free = o['FreeDelivery'] == true || o['FreeDelivery'] == 1;
+    _freeDeliveryState.initFromExisting(amount: amt, free: free);
+  }
+
   Future<void> _loadOrder() async {
-    _order = Map<String, dynamic>.from(widget.order);
     if (_order['RegionName'] == null && _order['OrderID'] != null) {
       try {
-        _order = await EmployeeApi.getOrderById((_order['OrderID'] ?? 0) as int);
+        final full = await EmployeeApi.getOrderById((_order['OrderID'] ?? 0) as int);
+        if (full.isNotEmpty) _order = full;
       } catch (_) {}
     }
-    setState(() {
-      _adminOrderNo = TextEditingController(text: _order['AdminOrderNo']?.toString() ?? '');
-      _customerName = TextEditingController(text: _order['CustomerName']?.toString() ?? '');
-      _customerPhone = TextEditingController(text: _order['CustomerPhone']?.toString() ?? '');
-      _address = TextEditingController(text: _order['Address']?.toString() ?? '');
-      _amount = TextEditingController(text: (_order['AmountIQD'] ?? 0).toString());
-      final fee = _order['FreeDelivery'] == true || _order['FreeDelivery'] == 1
-          ? (_order['WaivedDeliveryIQD'] ?? 0)
-          : (_order['DeliveryFeeIQD'] ?? _order['deliveryfeeiqd'] ?? 0);
-      _deliveryFee = TextEditingController(text: (fee as num).toString());
-      _notes = TextEditingController(text: _order['Notes']?.toString() ?? '');
-      _regionId = _order['RegionID'] as int?;
-      _freeDelivery = _order['FreeDelivery'] == true || _order['FreeDelivery'] == 1;
-    });
+    if (!mounted) return;
+    setState(() => _applyOrderToFields(_order));
   }
 
   Future<void> _loadRegions() async {
@@ -344,70 +536,59 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
 
   @override
   void dispose() {
+    _empCode.dispose();
     _adminOrderNo.dispose();
     _customerName.dispose();
     _customerPhone.dispose();
     _address.dispose();
     _amount.dispose();
-    _deliveryFee.dispose();
     _notes.dispose();
     super.dispose();
   }
 
-  /// القيمة المعروضة في القائمة المنسدلة — تُستخدم فقط إذا وُجد عنصر واحد مطابق
-  int? get _safeRegionDropdownValue {
-    if (_regionId == null) return null;
-    final count = _regionDropdownItems.where((i) => i.value == _regionId).length;
-    return count == 1 ? _regionId : null;
+  Future<void> _openRegionPicker() async {
+    if (_regions.isEmpty) await _loadRegions();
+    if (!mounted || _regions.isEmpty) return;
+    final picked = await OrderFormUi.pickRegion(context, _regions, selectedId: _regionId);
+    if (picked == null || !mounted) return;
+    setState(() {
+      _regionId = picked['RegionID'] as int?;
+      _regionName = picked['RegionName']?.toString();
+      _deliveryFee = ((picked['DeliveryFeeIQD'] ?? picked['DeliveryFee'] ?? 0) as num).toDouble();
+    });
   }
 
-  /// عناصر القائمة المنسدلة للمناطق — بدون تكرار، مع إضافة المنطقة الحالية إن لم تكن في القائمة
-  List<DropdownMenuItem<int>> get _regionDropdownItems {
-    final items = <DropdownMenuItem<int>>[
-      const DropdownMenuItem(value: null, child: Text('—')),
-    ];
-    final seenIds = <int>{};
-    for (final r in _regions) {
-      final m = r as Map<String, dynamic>;
-      final id = m['RegionID'] as int?;
-      if (id != null && seenIds.add(id)) {
-        items.add(DropdownMenuItem(
-          value: id,
-          child: Text('${m['RegionName']} (${m['DeliveryFeeIQD'] ?? 0})'),
-        ));
-      }
-    }
-    if (_regionId != null && !seenIds.contains(_regionId)) {
-      items.add(DropdownMenuItem(
-        value: _regionId,
-        child: Text('${_order['RegionName'] ?? 'المنطقة $_regionId'} (من الطلب)'),
-      ));
-    }
-    return items;
+  double get _amountVal => OrderFormUi.parseAmount(_amount.text);
+
+  double get _total => _freeDeliveryState.value ? _amountVal : _amountVal + _deliveryFee;
+
+  double get _displayDeliveryFee => FreeDeliveryState.employeeDeliveryFee(_deliveryFee, _freeDeliveryState.value);
+
+  void _onAmountChanged(String _) {
+    _freeDeliveryState.syncFromAmount(_amountVal);
+    setState(() {});
   }
 
-  double get _total {
-    final amt = double.tryParse(_amount.text) ?? 0;
-    final fee = double.tryParse(_deliveryFee.text) ?? 0;
-    return _freeDelivery ? amt : amt + fee;
+  void _onFreeDeliveryChanged(bool v) {
+    setState(() => _freeDeliveryState.setManual(v));
   }
-
-  double get _due {
-    final amt = double.tryParse(_amount.text) ?? 0;
-    final fee = double.tryParse(_deliveryFee.text) ?? 0;
-    return _freeDelivery ? amt - fee : amt;
-  }
-
-  String _formatIQD(num n) => '${NumberFormat('#,##0', 'ar_IQ').format(n)} د.ع';
 
   Future<void> _save() async {
+    if (_empCode.text.trim().isEmpty) {
+      setState(() => _error = 'أدخل رمز الموظف');
+      return;
+    }
     final phone = _customerPhone.text.replaceAll(RegExp(r'\D'), '');
     if (phone.isNotEmpty && phone.length != 11) {
       setState(() => _error = 'هاتف المستلم يجب أن يكون 11 رقماً');
       return;
     }
-    final amt = double.tryParse(_amount.text);
-    if (amt != null && amt < 0) {
+    if (OrderFormUi.isAmountEmpty(_amount.text)) {
+      setState(() => _error = 'أدخل مبلغ الفاتورة');
+      return;
+    }
+    final amt = _amountVal;
+    if (amt < 0) {
       setState(() => _error = 'مبلغ الفاتورة لا يمكن أن يكون سالباً');
       return;
     }
@@ -419,6 +600,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       await EmployeeApi.updateOrder(
         (_order['OrderID'] ?? 0) as int,
         {
+          'EmployeeCode': _empCode.text.trim(),
           'AdminOrderNo': _adminOrderNo.text.trim(),
           'StoreName': _order['StoreName'],
           'StorePhone': _order['StorePhone'],
@@ -426,9 +608,10 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
           'CustomerPhone': _customerPhone.text.trim(),
           'RegionID': _regionId,
           'Address': _address.text.trim(),
-          'AmountIQD': double.tryParse(_amount.text) ?? 0,
-          'DeliveryFeeIQD': double.tryParse(_deliveryFee.text) ?? 0,
-          'FreeDelivery': _freeDelivery,
+          'Pieces': _piecesCount,
+          'AmountIQD': amt,
+          'DeliveryFeeIQD': _deliveryFee,
+          'FreeDelivery': _freeDeliveryState.value,
           'Notes': _notes.text.trim(),
         },
       );
@@ -444,120 +627,133 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   @override
   Widget build(BuildContext context) {
     return DraggableScrollableSheet(
-      initialChildSize: 0.85,
+      initialChildSize: 0.94,
       expand: false,
-        builder: (_, controller) => Directionality(
+      builder: (_, controller) => Directionality(
         textDirection: ui.TextDirection.rtl,
-        child: Form(
-          key: _formKey,
-          child: ListView(
-            controller: controller,
-            padding: const EdgeInsets.all(24),
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('تعديل الطلب ${_order['ShipmentNumber'] ?? ''}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _adminOrderNo,
-                decoration: const InputDecoration(labelText: 'رقم الطلب الإداري', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _customerName,
-                decoration: const InputDecoration(labelText: 'اسم المستلم', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _customerPhone,
-                decoration: const InputDecoration(labelText: 'هاتف المستلم', border: OutlineInputBorder()),
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<int>(
-                value: _safeRegionDropdownValue,
-                decoration: const InputDecoration(labelText: 'المنطقة', border: OutlineInputBorder()),
-                items: _regionDropdownItems,
-                onChanged: (v) {
-                  setState(() {
-                    _regionId = v;
-                    if (v != null) {
-                      final r = _regions.cast<Map<String, dynamic>>().firstWhere((x) => x['RegionID'] == v, orElse: () => {});
-                      _deliveryFee.text = ((r['DeliveryFeeIQD'] ?? 0) as num).toString();
-                    }
-                  });
-                },
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _address,
-                decoration: const InputDecoration(labelText: 'العنوان', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _amount,
-                decoration: const InputDecoration(labelText: 'مبلغ الفاتورة (د.ع)', border: OutlineInputBorder()),
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _deliveryFee,
-                readOnly: true,
-                decoration: const InputDecoration(labelText: 'أجرة التوصيل (ثابتة حسب المنطقة)', border: OutlineInputBorder()),
-              ),
-              CheckboxListTile(
-                title: const Text('توصيل مجاني'),
-                value: _freeDelivery,
-                onChanged: (v) => setState(() => _freeDelivery = v ?? false),
-              ),
-              Container(
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
-                child: Column(
-                  children: [
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('المبلغ النهائي:'), Text(_formatIQD(_total), style: const TextStyle(fontWeight: FontWeight.bold))]),
-                    Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Text('المبلغ المستحق:'), Text(_formatIQD(_due), style: const TextStyle(fontWeight: FontWeight.bold))]),
-                  ],
+        child: Material(
+          color: EmployeeTheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          child: Form(
+            key: _formKey,
+            child: ListView(
+              controller: controller,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              children: [
+                NewOrderUi.editSheetHeader(
+                  shipmentNumber: '${_order['ShipmentNumber'] ?? ''}',
+                  onClose: () => Navigator.pop(context),
                 ),
-              ),
-              TextFormField(
-                controller: _notes,
-                decoration: const InputDecoration(labelText: 'ملاحظات', border: OutlineInputBorder()),
-                maxLines: 2,
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Text(_error!, style: const TextStyle(color: Colors.red)),
-              ],
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _loading ? null : _save,
-                      child: _loading ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('حفظ'),
-                    ),
+                const SizedBox(height: 8),
+
+                NewOrderUi.adminHero(_adminOrderNo),
+
+                NewOrderUi.block(
+                  icon: Icons.lock_outline_rounded,
+                  title: 'رمز الموظف',
+                  badge: 'مطلوب',
+                  child: OrderFormUi.numField(
+                    controller: _empCode,
+                    label: 'الرمز *',
+                    hint: '••••••',
+                    obscure: true,
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('إلغاء'),
-                    ),
+                ),
+
+                NewOrderUi.block(
+                  icon: Icons.person_outline_rounded,
+                  title: 'المستلم',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      OrderFormUi.numField(
+                        controller: _customerPhone,
+                        label: 'هاتف المستلم *',
+                        hint: '07701234567',
+                      ),
+                      const SizedBox(height: 10),
+                      OrderFormUi.textField(controller: _customerName, label: 'اسم المستلم', hint: 'اختياري'),
+                    ],
                   ),
+                ),
+
+                NewOrderUi.block(
+                  icon: Icons.local_shipping_outlined,
+                  title: 'التوصيل',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      NewOrderUi.regionTile(
+                        regionName: _regionName,
+                        displayDeliveryFee: _displayDeliveryFee,
+                        freeDelivery: _freeDeliveryState.value,
+                        hasSelection: _regionId != null,
+                        onTap: _openRegionPicker,
+                      ),
+                      const SizedBox(height: 12),
+                      OrderFormUi.textField(controller: _address, label: 'العنوان *', hint: 'الشارع، المبنى...', maxLines: 2),
+                      const SizedBox(height: 10),
+                      OrderFormUi.textField(controller: _notes, label: 'ملاحظات', hint: 'اختياري', maxLines: 2),
+                      const SizedBox(height: 12),
+                      NewOrderUi.piecesRow(
+                        value: _piecesCount,
+                        min: _piecesMin,
+                        max: _piecesMax,
+                        onChanged: (v) => setState(() => _piecesCount = v),
+                      ),
+                    ],
+                  ),
+                ),
+
+                NewOrderUi.amountHero(controller: _amount, onChanged: _onAmountChanged),
+
+                NewOrderUi.block(
+                  icon: Icons.calculate_outlined,
+                  title: 'الإجمالي',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      NewOrderUi.freeDeliveryCard(
+                        value: _freeDeliveryState.value,
+                        state: _freeDeliveryState,
+                        onChanged: _onFreeDeliveryChanged,
+                      ),
+                      const SizedBox(height: 12),
+                      NewOrderUi.amountSummary(
+                        deliveryFee: _displayDeliveryFee,
+                        total: _total,
+                        freeDelivery: _freeDeliveryState.value,
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (_error != null) ...[
+                  const SizedBox(height: 4),
+                  OrderFormUi.errorBanner(_error!),
                 ],
-              ),
-            ],
+                const SizedBox(height: 16),
+                NewOrderUi.saveButton(
+                  loading: _loading,
+                  onSave: _save,
+                  label: 'حفظ التعديلات',
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton(
+                    onPressed: _loading ? null : () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      side: BorderSide(color: EmployeeTheme.outline),
+                    ),
+                    child: Text('إلغاء', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
