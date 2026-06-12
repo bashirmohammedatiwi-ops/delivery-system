@@ -139,7 +139,12 @@ class _LoginFormState extends State<_LoginForm> {
         setState(() => _error = 'فشل تسجيل الدخول');
       }
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      final friendly = (msg.contains('CERTIFICATE_VERIFY_FAILED') ||
+              msg.contains('Handshake error'))
+          ? 'شهادة أمان السيرفر منتهية أو غير صالحة. يجب تجديد HTTPS على السيرفر.'
+          : msg;
+      setState(() => _error = friendly);
     } finally {
       setState(() => _loading = false);
     }
