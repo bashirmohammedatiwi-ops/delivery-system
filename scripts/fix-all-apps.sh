@@ -129,37 +129,60 @@ has_ssl_cert() {
     && [ -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]
 }
 
-install_site "$DELIVERY_ROOT/nginx/sites/demaalhayaadelivery.online.conf" "$DELIVERY_DOMAIN"
-install_site "$DELIVERY_ROOT/nginx/sites/rybellairaq.com.conf" "$RYBELLA_DOMAIN"
-if has_ssl_cert "$RYBELLA_ADMIN_DOMAIN"; then
-  install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.conf" "$RYBELLA_ADMIN_DOMAIN"
-else
-  echo "    ⚠ لا توجد شهادة SSL لـ $RYBELLA_ADMIN_DOMAIN — HTTP فقط"
-  install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.http.conf" "$RYBELLA_ADMIN_DOMAIN"
-fi
+install_site_ssl_or_http() {
+  local ssl_src="$1" http_src="$2" name="$3" cert_domain="$4"
+  if has_ssl_cert "$cert_domain"; then
+    install_site "$ssl_src" "$name"
+  else
+    echo "    ⚠ لا توجد شهادة SSL لـ $cert_domain — HTTP فقط"
+    install_site "$http_src" "$name"
+  fi
+}
+
+install_site_ssl_or_http \
+  "$DELIVERY_ROOT/nginx/sites/demaalhayaadelivery.online.conf" \
+  "$DELIVERY_ROOT/nginx/sites/demaalhayaadelivery.online.http.conf" \
+  "$DELIVERY_DOMAIN" "$DELIVERY_DOMAIN"
+
+install_site_ssl_or_http \
+  "$DELIVERY_ROOT/nginx/sites/rybellairaq.com.conf" \
+  "$DELIVERY_ROOT/nginx/sites/rybellairaq.com.http.conf" \
+  "$RYBELLA_DOMAIN" "$RYBELLA_DOMAIN"
+
+install_site_ssl_or_http \
+  "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.conf" \
+  "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.http.conf" \
+  "$RYBELLA_ADMIN_DOMAIN" "$RYBELLA_ADMIN_DOMAIN"
 
 # ─── 6) nginx (HTTP) ثم SSL ───
 echo ""
 echo "==> [6/7] اختبار nginx..."
-if ! nginx -t; then
-  echo "    فشل nginx -t — إزالة admin مؤقتاً..."
-  rm -f "$NGINX_ENABLED/$RYBELLA_ADMIN_DOMAIN"
-  nginx -t
-fi
+nginx -t
 systemctl reload nginx 2>/dev/null || service nginx reload
 
 echo ""
 echo "==> [7/7] تجديد / إصدار SSL..."
 if command -v certbot >/dev/null 2>&1; then
   certbot renew --quiet 2>/dev/null || true
-  certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
-    -d "$DELIVERY_DOMAIN" -d "www.$DELIVERY_DOMAIN" 2>/dev/null || true
-  certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
-    -d "$RYBELLA_DOMAIN" -d "www.$RYBELLA_DOMAIN" 2>/dev/null || true
+  if ! has_ssl_cert "$DELIVERY_DOMAIN"; then
+    certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
+      -d "$DELIVERY_DOMAIN" -d "www.$DELIVERY_DOMAIN" || true
+  fi
+  if ! has_ssl_cert "$RYBELLA_DOMAIN"; then
+    certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
+      -d "$RYBELLA_DOMAIN" -d "www.$RYBELLA_DOMAIN" || true
+  fi
   if ! has_ssl_cert "$RYBELLA_ADMIN_DOMAIN"; then
     certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
       -d "$RYBELLA_ADMIN_DOMAIN" 2>/dev/null || \
-      echo "    تخطّي admin SSL — تأكد DNS لـ $RYBELLA_ADMIN_DOMAIN ثم: certbot --nginx -d $RYBELLA_ADMIN_DOMAIN"
+      echo "    تخطّي admin SSL — تأكد DNS لـ $RYBELLA_ADMIN_DOMAIN"
+  fi
+  # ترقية إلى HTTPS بعد إصدار الشهادات
+  if has_ssl_cert "$DELIVERY_DOMAIN"; then
+    install_site "$DELIVERY_ROOT/nginx/sites/demaalhayaadelivery.online.conf" "$DELIVERY_DOMAIN"
+  fi
+  if has_ssl_cert "$RYBELLA_DOMAIN"; then
+    install_site "$DELIVERY_ROOT/nginx/sites/rybellairaq.com.conf" "$RYBELLA_DOMAIN"
   fi
   if has_ssl_cert "$RYBELLA_ADMIN_DOMAIN"; then
     install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.conf" "$RYBELLA_ADMIN_DOMAIN"
