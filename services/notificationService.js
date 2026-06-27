@@ -6,20 +6,27 @@ const db = require('../database/init');
 
 const FREE_DELIVERY_THRESHOLD = 50000;
 
-function createNotification(orderId, performedByUserID, performedByName) {
+function pickOrderNotes(order) {
+    const raw = order?.Notes ?? order?.notes ?? '';
+    const trimmed = String(raw).trim();
+    return trimmed || null;
+}
+
+function createNotification(orderId, performedByUserID, performedByName, orderNotes) {
     const database = db.getDatabase();
     database.prepare(
-        `INSERT INTO FreeDeliveryOverrideNotifications (OrderID, PerformedByUserID, PerformedByName, Reviewed)
-         VALUES (?, ?, ?, 0)`
-    ).run(orderId, performedByUserID, performedByName || null);
+        `INSERT INTO FreeDeliveryOverrideNotifications (OrderID, PerformedByUserID, PerformedByName, OrderNotes, Reviewed)
+         VALUES (?, ?, ?, ?, 0)`
+    ).run(orderId, performedByUserID, performedByName || null, orderNotes || null);
 }
 
 function getUnreviewedNotifications() {
     const database = db.getDatabase();
     return database.prepare(
         `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
-                o.StoreName, o.Address, o.Notes, o.AmountIQD, o.WaivedDeliveryIQD,
-                o.TotalIQD, o.CreatedDate
+                o.StoreName, o.Address,
+                COALESCE(NULLIF(TRIM(n.OrderNotes), ''), o.Notes) AS Notes,
+                o.AmountIQD, o.WaivedDeliveryIQD, o.TotalIQD, o.CreatedDate
          FROM FreeDeliveryOverrideNotifications n
          JOIN Orders o ON n.OrderID = o.OrderID
          WHERE n.Reviewed = 0
@@ -31,8 +38,9 @@ function getAllNotifications(limit = 50) {
     const database = db.getDatabase();
     return database.prepare(
         `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
-                o.StoreName, o.Address, o.Notes, o.AmountIQD, o.WaivedDeliveryIQD,
-                o.TotalIQD, o.CreatedDate
+                o.StoreName, o.Address,
+                COALESCE(NULLIF(TRIM(n.OrderNotes), ''), o.Notes) AS Notes,
+                o.AmountIQD, o.WaivedDeliveryIQD, o.TotalIQD, o.CreatedDate
          FROM FreeDeliveryOverrideNotifications n
          JOIN Orders o ON n.OrderID = o.OrderID
          ORDER BY n.CreatedAt DESC
@@ -68,7 +76,7 @@ function maybeCreateNotification(order, performedByUserID, performedByName, isEm
         'SELECT NotificationID FROM FreeDeliveryOverrideNotifications WHERE OrderID = ? AND Reviewed = 0'
     ).get(orderId);
     if (existing) return;
-    createNotification(orderId, performedByUserID, performedByName);
+    createNotification(orderId, performedByUserID, performedByName, pickOrderNotes(order));
 }
 
 module.exports = {

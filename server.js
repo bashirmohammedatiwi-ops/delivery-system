@@ -51,6 +51,13 @@ app.get('/privacy', (req, res) => {
     });
 });
 
+app.use((req, res, next) => {
+    if (/\.(js|css|html)$/.test(req.path)) {
+        res.set('Cache-Control', 'no-cache, must-revalidate');
+    }
+    next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // تطبيق السائق على /driver/ (يُقدّم من السيرفر الرئيسي - يعمل على الدومين والبورت)

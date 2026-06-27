@@ -1627,8 +1627,30 @@ body {
 
 /* إشعارات التوصيل المجاني اليدوي */
 .override-notif-card {
-    border-right: 4px solid var(--warning);
-    background: linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 42%);
+    border: 1px solid #FDE68A;
+    border-right: 5px solid #F59E0B;
+    background: linear-gradient(135deg, #FFFBEB 0%, #FFFFFF 55%);
+    box-shadow: 0 10px 28px rgba(245, 158, 11, 0.1);
+    overflow: hidden;
+}
+.override-notif-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 18px;
+}
+.override-notif-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+    color: #fff;
+    font-size: 1.35rem;
+    flex-shrink: 0;
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.28);
 }
 .override-notif-card .card-title {
     display: flex;
@@ -1637,40 +1659,52 @@ body {
     margin-bottom: 6px;
 }
 .override-notif-badge {
-    background: var(--danger);
+    background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);
     color: #fff;
-    padding: 4px 10px;
-    border-radius: 20px;
+    padding: 4px 11px;
+    border-radius: 999px;
     font-size: 0.85rem;
-    font-weight: 700;
+    font-weight: 800;
+    box-shadow: 0 4px 10px rgba(239, 68, 68, 0.25);
 }
 .override-notif-desc {
     color: var(--text-muted);
     font-size: 0.9rem;
-    margin-bottom: 16px;
+    margin-bottom: 0;
+    line-height: 1.6;
 }
 .override-notif-list {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
 }
 .override-notif-item {
+    position: relative;
     display: flex;
     align-items: stretch;
     justify-content: space-between;
-    gap: 14px;
-    padding: 16px;
+    gap: 16px;
+    padding: 18px 18px 18px 22px;
     background: #fff;
     border: 1px solid #FDE68A;
-    border-radius: 16px;
-    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08);
+    border-radius: 18px;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+}
+.override-notif-accent {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 5px;
+    height: 100%;
+    background: linear-gradient(180deg, #F59E0B 0%, #F97316 100%);
 }
 .override-notif-main {
     flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 .override-notif-head {
     display: flex;
@@ -1708,12 +1742,14 @@ body {
 .override-notif-tag {
     display: inline-flex;
     align-items: center;
-    padding: 4px 10px;
+    gap: 6px;
+    padding: 5px 12px;
     border-radius: 999px;
-    background: var(--accent-amber-soft);
-    color: #B45309;
+    background: #FEF3C7;
+    color: #92400E;
     font-size: 0.78rem;
-    font-weight: 700;
+    font-weight: 800;
+    border: 1px solid #FCD34D;
 }
 .override-notif-party {
     display: grid;
@@ -1747,10 +1783,14 @@ body {
 }
 .override-notif-metric {
     flex: 1 1 140px;
-    padding: 10px 12px;
-    border-radius: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
     background: #F8FAFC;
     border: 1px solid var(--border-light);
+}
+.override-notif-metric-waived {
+    background: #FFFBEB;
+    border-color: #FDE68A;
 }
 .override-notif-metric-label {
     display: block;
@@ -1759,39 +1799,60 @@ body {
     margin-bottom: 4px;
 }
 .override-notif-metric-value {
-    font-size: 1rem;
+    font-size: 1.05rem;
     color: var(--text);
 }
-.override-notif-waived {
+.override-notif-metric-waived .override-notif-metric-value {
     color: #B45309;
 }
 .override-notif-notes {
-    padding: 12px 14px;
-    border-radius: 12px;
-    background: #FFFBEB;
-    border: 1px dashed #FCD34D;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid transparent;
+}
+.override-notif-notes-filled {
+    background: linear-gradient(180deg, #FFFBEB 0%, #FFF7ED 100%);
+    border-color: #FCD34D;
+    box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.15);
 }
 .override-notif-notes-empty {
     background: #F8FAFC;
     border-color: var(--border);
 }
+.override-notif-notes-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.override-notif-notes-head i {
+    color: #D97706;
+    font-size: 1rem;
+}
+.override-notif-notes-empty .override-notif-notes-head i {
+    color: var(--text-muted);
+}
 .override-notif-notes-label {
     display: block;
-    font-size: 0.78rem;
-    font-weight: 700;
+    font-size: 0.82rem;
+    font-weight: 800;
     color: #92400E;
-    margin-bottom: 6px;
 }
 .override-notif-notes-empty .override-notif-notes-label {
     color: var(--text-muted);
 }
 .override-notif-notes-text {
     margin: 0;
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: var(--text);
+    font-size: 0.95rem;
+    line-height: 1.75;
+    color: #1E293B;
     white-space: pre-wrap;
     word-break: break-word;
+    font-weight: 600;
+}
+.override-notif-notes-empty .override-notif-notes-text {
+    color: var(--text-muted);
+    font-weight: 500;
 }
 .override-notif-foot {
     display: flex;
@@ -1813,25 +1874,26 @@ body {
     align-items: center;
     justify-content: center;
     gap: 6px;
-    min-width: 92px;
-    padding: 12px 10px;
-    background: var(--success);
+    min-width: 104px;
+    padding: 14px 12px;
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
     color: #fff;
     border: none;
-    border-radius: 14px;
+    border-radius: 16px;
     cursor: pointer;
-    font-weight: 700;
+    font-weight: 800;
     font-size: 0.82rem;
     flex-shrink: 0;
-    transition: background 0.2s ease, transform 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.2s ease;
+    box-shadow: 0 8px 18px rgba(16, 185, 129, 0.25);
 }
 .btn-override-seen i {
-    font-size: 1.25rem;
+    font-size: 1.45rem;
     line-height: 1;
 }
 .btn-override-seen:hover {
-    background: #059669;
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(16, 185, 129, 0.32);
 }
 .override-notif-empty {
     color: var(--text-muted);

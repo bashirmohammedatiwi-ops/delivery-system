@@ -140,6 +140,7 @@ async function initSchema() {
             OrderID INTEGER NOT NULL,
             PerformedByUserID INTEGER,
             PerformedByName TEXT,
+            OrderNotes TEXT,
             CreatedAt TEXT DEFAULT (datetime('now', 'localtime')),
             Reviewed INTEGER DEFAULT 0,
             ReviewedAt TEXT,
@@ -147,6 +148,7 @@ async function initSchema() {
         )`);
         saveDb();
     } catch (e) {}
+    try { nativeDb.run('ALTER TABLE FreeDeliveryOverrideNotifications ADD COLUMN OrderNotes TEXT'); saveDb(); } catch (e) {}
 
     try {
         nativeDb.run(`CREATE TABLE IF NOT EXISTS AppSettings (
