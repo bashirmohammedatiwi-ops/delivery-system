@@ -1,12 +1,18 @@
-# ─── سيرفر يستضيف أكثر من دومين (nginx على النظام) ───
-# يمنع Docker من حجز 80/443 لجميع الدومينات.
-# شغّل:
-#   docker compose -f docker-compose.yml -f docker-compose.override-domain.yml \
-#     -f docker-compose.override-multisite.yml --profile https up -d --build
-# ثم أضف vhost على nginx النظام (انظر nginx/host-vhost.conf.example)
+# ─── سيرفر متعدد المواقع (nginx على Ubuntu) ───
+# لا يشغّل delivery-nginx — nginx النظام يتولى SSL والتوجيه.
+# التطبيق على 127.0.0.1:3000
+#
+#   docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml up -d --build
 
 services:
-  nginx:
+  app:
     ports:
-      - "127.0.0.1:8080:80"
-      - "127.0.0.1:8443:443"
+      - "127.0.0.1:3000:3000"
+
+  employee-web:
+    ports:
+      - "127.0.0.1:3002:3002"
+
+  driver-web:
+    ports:
+      - "127.0.0.1:3001:3001"

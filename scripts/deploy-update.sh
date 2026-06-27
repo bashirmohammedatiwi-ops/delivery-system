@@ -1,30 +1,42 @@
 #!/bin/bash
-# تحديث السيرفر بعد git push — يشغّل من مجلد المشروع على VPS
+# تحديث السيرفر بعد git push
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-COMPOSE_FILES="-f docker-compose.yml"
-if [ -f docker-compose.override-domain.yml ]; then
-  COMPOSE_FILES="$COMPOSE_FILES -f docker-compose.override-domain.yml"
+MULTISITE=true
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source .env
+  set +a
+fi
+MULTISITE="${MULTISITE:-true}"
+
+COMPOSE="-f docker-compose.yml"
+if [ "$MULTISITE" = "true" ]; then
+  COMPOSE="$COMPOSE -f docker-compose.override-multisite.yml"
+else
+  COMPOSE="$COMPOSE -f docker-compose.override-domain.yml --profile https"
 fi
 
-echo "==> جلب آخر التحديثات من GitHub..."
+echo "==> جلب آخر التحديثات..."
 git pull origin main
 
-echo "==> إيقاف الحاويات..."
-docker compose $COMPOSE_FILES --profile https down || true
+echo "==> إيقاف delivery-nginx القديم (80/443)..."
+docker stop delivery-nginx 2>/dev/null || true
 
-echo "==> إزالة شبكة Docker القديمة (إن وُجدت)..."
+echo "==> إعادة بناء وتشغيل..."
+docker compose $COMPOSE down 2>/dev/null || true
 docker network rm alhayat-delivery-net 2>/dev/null || true
+docker compose $COMPOSE up -d --build
 
-echo "==> إعادة بناء وتشغيل Docker..."
-docker compose $COMPOSE_FILES --profile https up -d --build
+if [ "$MULTISITE" = "true" ]; then
+  echo "==> إعادة تحميل nginx النظام..."
+  nginx -t && systemctl reload nginx
+fi
 
 echo ""
-echo "==> تم التحديث. الإصدار:"
 git log -1 --oneline
-echo ""
-echo "تحقق: curl -s https://demaalhayaadelivery.online/health"
-echo "ثم حدّث المتصفح: Cmd+Shift+R أو Ctrl+Shift+R"
+curl -sf http://127.0.0.1:3000/health && echo "" || echo "تحذير: التطبيق لم يرد على :3000"
