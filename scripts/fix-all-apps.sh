@@ -123,28 +123,53 @@ install_site() {
   fi
 }
 
+has_ssl_cert() {
+  local domain="$1"
+  [ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ] \
+    && [ -f "/etc/letsencrypt/live/${domain}/privkey.pem" ]
+}
+
 install_site "$DELIVERY_ROOT/nginx/sites/demaalhayaadelivery.online.conf" "$DELIVERY_DOMAIN"
 install_site "$DELIVERY_ROOT/nginx/sites/rybellairaq.com.conf" "$RYBELLA_DOMAIN"
-install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.conf" "$RYBELLA_ADMIN_DOMAIN"
+if has_ssl_cert "$RYBELLA_ADMIN_DOMAIN"; then
+  install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.conf" "$RYBELLA_ADMIN_DOMAIN"
+else
+  echo "    ⚠ لا توجد شهادة SSL لـ $RYBELLA_ADMIN_DOMAIN — HTTP فقط"
+  install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.http.conf" "$RYBELLA_ADMIN_DOMAIN"
+fi
 
-# ─── 6) SSL ───
+# ─── 6) nginx (HTTP) ثم SSL ───
 echo ""
-echo "==> [6/7] تجديد SSL..."
+echo "==> [6/7] اختبار nginx..."
+if ! nginx -t; then
+  echo "    فشل nginx -t — إزالة admin مؤقتاً..."
+  rm -f "$NGINX_ENABLED/$RYBELLA_ADMIN_DOMAIN"
+  nginx -t
+fi
+systemctl reload nginx 2>/dev/null || service nginx reload
+
+echo ""
+echo "==> [7/7] تجديد / إصدار SSL..."
 if command -v certbot >/dev/null 2>&1; then
   certbot renew --quiet 2>/dev/null || true
   certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
     -d "$DELIVERY_DOMAIN" -d "www.$DELIVERY_DOMAIN" 2>/dev/null || true
   certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
     -d "$RYBELLA_DOMAIN" -d "www.$RYBELLA_DOMAIN" 2>/dev/null || true
-  certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
-    -d "$RYBELLA_ADMIN_DOMAIN" 2>/dev/null || true
+  if ! has_ssl_cert "$RYBELLA_ADMIN_DOMAIN"; then
+    certbot certonly --nginx --non-interactive --agree-tos -m "$SSL_EMAIL" \
+      -d "$RYBELLA_ADMIN_DOMAIN" 2>/dev/null || \
+      echo "    تخطّي admin SSL — تأكد DNS لـ $RYBELLA_ADMIN_DOMAIN ثم: certbot --nginx -d $RYBELLA_ADMIN_DOMAIN"
+  fi
+  if has_ssl_cert "$RYBELLA_ADMIN_DOMAIN"; then
+    install_site "$DELIVERY_ROOT/nginx/sites/admin.rybellairaq.com.conf" "$RYBELLA_ADMIN_DOMAIN"
+  fi
 else
   echo "    ثبّت certbot: apt install -y certbot python3-certbot-nginx"
 fi
 
-# ─── 7) reload nginx ───
 echo ""
-echo "==> [7/7] إعادة تحميل nginx..."
+echo "==> إعادة تحميل nginx..."
 nginx -t
 systemctl reload nginx
 systemctl restart nginx 2>/dev/null || service nginx restart
