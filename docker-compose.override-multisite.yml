@@ -1,0 +1,12 @@
+# ─── سيرفر يستضيف أكثر من دومين (nginx على النظام) ───
+# يمنع Docker من حجز 80/443 لجميع الدومينات.
+# شغّل:
+#   docker compose -f docker-compose.yml -f docker-compose.override-domain.yml \
+#     -f docker-compose.override-multisite.yml --profile https up -d --build
+# ثم أضف vhost على nginx النظام (انظر nginx/host-vhost.conf.example)
+
+services:
+  nginx:
+    ports:
+      - "127.0.0.1:8080:80"
+      - "127.0.0.1:8443:443"
