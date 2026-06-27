@@ -23,6 +23,18 @@ DELIVERY_DOMAIN="${DELIVERY_DOMAIN:-demaalhayaadelivery.online}"
 RYBELLA_DOMAIN="${RYBELLA_DOMAIN:-rybellairaq.com}"
 RYBELLA_ADMIN_DOMAIN="${RYBELLA_ADMIN_DOMAIN:-admin.rybellairaq.com}"
 SSL_EMAIL="${SSL_EMAIL:-admin@$DELIVERY_DOMAIN}"
+PUBLIC_DELIVERY_PORT="${PUBLIC_DELIVERY_PORT:-false}"
+
+delivery_compose() {
+  local files="-f docker-compose.yml"
+  if [ "$PUBLIC_DELIVERY_PORT" = "true" ]; then
+    files="$files -f docker-compose.override-multisite-public.yml"
+    echo "    المنفذ 3000 مكشوف على IP السيرفر (PUBLIC_DELIVERY_PORT=true)"
+  else
+    files="$files -f docker-compose.override-multisite.yml"
+  fi
+  echo "$files"
+}
 
 free_local_port() {
   local port="$1"
@@ -57,9 +69,10 @@ git pull origin main 2>/dev/null || true
 free_local_port 3000
 free_local_port 3001
 free_local_port 3002
-docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml down 2>/dev/null || true
+DELIVERY_COMPOSE=$(delivery_compose)
+docker compose $DELIVERY_COMPOSE down 2>/dev/null || true
 docker network rm alhayat-delivery-net 2>/dev/null || true
-docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml up -d --build
+docker compose $DELIVERY_COMPOSE up -d --build
 
 wait_url() {
   local url="$1" label="$2" max="${3:-30}"

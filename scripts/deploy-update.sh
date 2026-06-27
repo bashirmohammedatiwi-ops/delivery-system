@@ -6,17 +6,29 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 MULTISITE=true
-if [ -f .env ]; then
+PUBLIC_DELIVERY_PORT=false
+if [ -f "$ROOT/scripts/server-apps.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/scripts/server-apps.env"
+  set +a
+elif [ -f .env ]; then
   set -a
   # shellcheck disable=SC1091
   source .env
   set +a
 fi
 MULTISITE="${MULTISITE:-true}"
+PUBLIC_DELIVERY_PORT="${PUBLIC_DELIVERY_PORT:-false}"
 
 COMPOSE="-f docker-compose.yml"
 if [ "$MULTISITE" = "true" ]; then
-  COMPOSE="$COMPOSE -f docker-compose.override-multisite.yml"
+  if [ "$PUBLIC_DELIVERY_PORT" = "true" ]; then
+    COMPOSE="$COMPOSE -f docker-compose.override-multisite-public.yml"
+    echo "==> المنفذ 3000 مكشوف على IP السيرفر"
+  else
+    COMPOSE="$COMPOSE -f docker-compose.override-multisite.yml"
+  fi
 else
   COMPOSE="$COMPOSE -f docker-compose.override-domain.yml --profile https"
 fi
