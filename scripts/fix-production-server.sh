@@ -1,6 +1,7 @@
 #!/bin/bash
-# إصلاح شامل لسيرفر الإنتاج (متعدد المواقع + SSL + تحديث التطبيق)
-# شغّل على VPS: bash scripts/fix-production-server.sh
+# ⚠️ للسيرفر متعدد المشاريع استخدم بدلاً منه:
+#   bash scripts/fix-all-apps.sh
+# (انظر FIX-ALL-APPS.md)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
