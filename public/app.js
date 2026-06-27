@@ -815,17 +815,56 @@ const screens = {
             const notifList = overrideNotifications.list || [];
             const notifCount = notifList.length; // العداد من القائمة الفعلية لضمان التطابق
             const notifHtml = notifList.length > 0
-                ? notifList.map(n => `
-                    <div class="override-notif-item" data-id="${n.NotificationID}">
-                        <div class="override-notif-info">
-                            <strong>طلب #${n.ShipmentNumber}</strong>
-                            ${n.AdminOrderNo ? ` (${n.AdminOrderNo})` : ''}
-                            <br><span class="override-notif-detail">${n.CustomerName || '-'} · مبلغ الفاتورة: ${formatIQD(n.AmountIQD)} · أجرة معفاة: ${formatIQD(n.WaivedDeliveryIQD)}</span>
-                            <br><span class="override-notif-by">نفّذ الموظف: ${(n.PerformedByName || 'موظف').replace(/</g, '&lt;')} · ${n.CreatedAt || ''}</span>
+                ? notifList.map(n => {
+                    const notesRaw = (n.Notes || '').toString().trim();
+                    const notesHtml = notesRaw
+                        ? `<div class="override-notif-notes"><span class="override-notif-notes-label">ملاحظات الطلب</span><p class="override-notif-notes-text">${escapeHtml(notesRaw)}</p></div>`
+                        : `<div class="override-notif-notes override-notif-notes-empty"><span class="override-notif-notes-label">ملاحظات الطلب</span><p class="override-notif-notes-text">— لا توجد ملاحظات —</p></div>`;
+                    const customer = escapeHtml(n.CustomerName || '—');
+                    const store = escapeHtml(n.StoreName || '—');
+                    const phone = escapeHtml(n.CustomerPhone || '—');
+                    const address = escapeHtml((n.Address || '—').toString());
+                    const performer = escapeHtml(n.PerformedByName || 'موظف');
+                    const when = escapeHtml((n.CreatedAt || '').slice(0, 16));
+                    return `
+                    <article class="override-notif-item" data-id="${n.NotificationID}">
+                        <div class="override-notif-main">
+                            <div class="override-notif-head">
+                                <div class="override-notif-ids">
+                                    <span class="override-notif-shipment">#${escapeHtml(String(n.ShipmentNumber || ''))}</span>
+                                    ${n.AdminOrderNo ? `<span class="override-notif-admin">${escapeHtml(String(n.AdminOrderNo))}</span>` : ''}
+                                </div>
+                                <span class="override-notif-tag">توصيل مجاني يدوي</span>
+                            </div>
+                            <div class="override-notif-party">
+                                <div class="override-notif-party-line"><i class="bi bi-person" aria-hidden="true"></i><span>${customer}</span></div>
+                                <div class="override-notif-party-line"><i class="bi bi-telephone" aria-hidden="true"></i><span>${phone}</span></div>
+                                <div class="override-notif-party-line"><i class="bi bi-shop" aria-hidden="true"></i><span>${store}</span></div>
+                                <div class="override-notif-party-line override-notif-address"><i class="bi bi-geo-alt" aria-hidden="true"></i><span>${address}</span></div>
+                            </div>
+                            <div class="override-notif-metrics">
+                                <div class="override-notif-metric">
+                                    <span class="override-notif-metric-label">مبلغ الفاتورة</span>
+                                    <strong class="override-notif-metric-value iqd">${formatIQD(n.AmountIQD)}</strong>
+                                </div>
+                                <div class="override-notif-metric">
+                                    <span class="override-notif-metric-label">أجرة معفاة</span>
+                                    <strong class="override-notif-metric-value iqd override-notif-waived">${formatIQD(n.WaivedDeliveryIQD)}</strong>
+                                </div>
+                            </div>
+                            ${notesHtml}
+                            <div class="override-notif-foot">
+                                <span><i class="bi bi-person-badge" aria-hidden="true"></i> نفّذ: <strong>${performer}</strong></span>
+                                <span><i class="bi bi-clock" aria-hidden="true"></i> ${when}</span>
+                            </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-override-seen" data-id="${n.NotificationID}" title="تمت المراجعة">✓</button>
-                    </div>
-                `).join('')
+                        <button type="button" class="btn-override-seen" data-id="${n.NotificationID}" title="تمت المراجعة">
+                            <i class="bi bi-check2" aria-hidden="true"></i>
+                            <span>تمت المراجعة</span>
+                        </button>
+                    </article>
+                `;
+                }).join('')
                 : '<p class="override-notif-empty">لا توجد إشعارات جديدة</p>';
 
             container.innerHTML = `

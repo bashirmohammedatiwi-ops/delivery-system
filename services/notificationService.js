@@ -17,7 +17,9 @@ function createNotification(orderId, performedByUserID, performedByName) {
 function getUnreviewedNotifications() {
     const database = db.getDatabase();
     return database.prepare(
-        `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.AmountIQD, o.WaivedDeliveryIQD, o.TotalIQD, o.CreatedDate
+        `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
+                o.StoreName, o.Address, o.Notes, o.AmountIQD, o.WaivedDeliveryIQD,
+                o.TotalIQD, o.CreatedDate
          FROM FreeDeliveryOverrideNotifications n
          JOIN Orders o ON n.OrderID = o.OrderID
          WHERE n.Reviewed = 0
@@ -28,7 +30,9 @@ function getUnreviewedNotifications() {
 function getAllNotifications(limit = 50) {
     const database = db.getDatabase();
     return database.prepare(
-        `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.AmountIQD, o.WaivedDeliveryIQD, o.TotalIQD, o.CreatedDate
+        `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
+                o.StoreName, o.Address, o.Notes, o.AmountIQD, o.WaivedDeliveryIQD,
+                o.TotalIQD, o.CreatedDate
          FROM FreeDeliveryOverrideNotifications n
          JOIN Orders o ON n.OrderID = o.OrderID
          ORDER BY n.CreatedAt DESC

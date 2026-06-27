@@ -1626,42 +1626,233 @@ body {
 .stat-card:nth-child(6) .value { color: #0891B2; }
 
 /* إشعارات التوصيل المجاني اليدوي */
-.override-notif-card { border-right: 4px solid var(--warning); }
-.override-notif-card .card-title { display: flex; align-items: center; gap: 12px; }
+.override-notif-card {
+    border-right: 4px solid var(--warning);
+    background: linear-gradient(180deg, #FFFBEB 0%, #FFFFFF 42%);
+}
+.override-notif-card .card-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
 .override-notif-badge {
     background: var(--danger);
     color: #fff;
     padding: 4px 10px;
     border-radius: 20px;
     font-size: 0.85rem;
+    font-weight: 700;
 }
-.override-notif-desc { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 14px; }
-.override-notif-list { display: flex; flex-direction: column; gap: 10px; }
+.override-notif-desc {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    margin-bottom: 16px;
+}
+.override-notif-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
 .override-notif-item {
     display: flex;
-    align-items: flex-start;
+    align-items: stretch;
     justify-content: space-between;
-    gap: 12px;
-    padding: 14px;
-    background: var(--accent-amber-soft);
-    border: 1px solid var(--accent-amber);
-    border-radius: var(--radius);
+    gap: 14px;
+    padding: 16px;
+    background: #fff;
+    border: 1px solid #FDE68A;
+    border-radius: 16px;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, 0.08);
 }
-.override-notif-info { flex: 1; }
-.override-notif-detail { font-size: 0.88rem; color: var(--text-muted); }
-.override-notif-by { font-size: 0.82rem; color: var(--text-muted); margin-top: 4px; display: block; }
+.override-notif-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.override-notif-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.override-notif-ids {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.override-notif-shipment {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-weight: 800;
+    font-size: 0.92rem;
+}
+.override-notif-admin {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #F1F5F9;
+    color: #475569;
+    font-weight: 700;
+    font-size: 0.85rem;
+}
+.override-notif-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--accent-amber-soft);
+    color: #B45309;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+.override-notif-party {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px 14px;
+}
+.override-notif-party-line {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.88rem;
+    color: var(--text);
+    min-width: 0;
+}
+.override-notif-party-line i {
+    color: var(--primary);
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+.override-notif-party-line span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.override-notif-address {
+    grid-column: 1 / -1;
+}
+.override-notif-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.override-notif-metric {
+    flex: 1 1 140px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: #F8FAFC;
+    border: 1px solid var(--border-light);
+}
+.override-notif-metric-label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+.override-notif-metric-value {
+    font-size: 1rem;
+    color: var(--text);
+}
+.override-notif-waived {
+    color: #B45309;
+}
+.override-notif-notes {
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #FFFBEB;
+    border: 1px dashed #FCD34D;
+}
+.override-notif-notes-empty {
+    background: #F8FAFC;
+    border-color: var(--border);
+}
+.override-notif-notes-label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #92400E;
+    margin-bottom: 6px;
+}
+.override-notif-notes-empty .override-notif-notes-label {
+    color: var(--text-muted);
+}
+.override-notif-notes-text {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.override-notif-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+.override-notif-foot strong {
+    color: var(--text);
+}
+.override-notif-foot i {
+    margin-left: 4px;
+    color: var(--primary);
+}
 .btn-override-seen {
-    padding: 8px 16px;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 92px;
+    padding: 12px 10px;
     background: var(--success);
     color: #fff;
     border: none;
-    border-radius: 8px;
+    border-radius: 14px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 0.82rem;
     flex-shrink: 0;
+    transition: background 0.2s ease, transform 0.15s ease;
 }
-.btn-override-seen:hover { background: #059669; }
-.override-notif-empty { color: var(--text-muted); text-align: center; padding: 20px; }
+.btn-override-seen i {
+    font-size: 1.25rem;
+    line-height: 1;
+}
+.btn-override-seen:hover {
+    background: #059669;
+    transform: translateY(-1px);
+}
+.override-notif-empty {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 24px;
+    background: #F8FAFC;
+    border-radius: 12px;
+    border: 1px dashed var(--border);
+}
+@media (max-width: 768px) {
+    .override-notif-item {
+        flex-direction: column;
+    }
+    .override-notif-party {
+        grid-template-columns: 1fr;
+    }
+    .btn-override-seen {
+        width: 100%;
+        flex-direction: row;
+    }
+}
 
 /* ─── الجداول ─── */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
