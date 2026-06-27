@@ -41,5 +41,5 @@ app.get('/', (req, res) => {
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`تطبيق الموظفين (ويب) يعمل على: http://0.0.0.0:${PORT}`);
-    console.log(`يرجى تشغيل السيرفر الرئيسي على البورت 3000`);
+    console.log(`API → ${MAIN_HOST}:${MAIN_PORT}`);
 });
