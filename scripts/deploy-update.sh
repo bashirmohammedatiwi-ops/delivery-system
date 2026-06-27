@@ -27,6 +27,11 @@ git pull origin main
 echo "==> إيقاف delivery-nginx القديم (80/443)..."
 docker stop delivery-nginx 2>/dev/null || true
 
+echo "==> تحرير المنافذ وإيقاف حاويات قديمة..."
+for name in delivery-system delivery-driver-web delivery-employee-web; do
+  docker rm -f "$name" 2>/dev/null || true
+done
+
 echo "==> إعادة بناء وتشغيل..."
 docker compose $COMPOSE down 2>/dev/null || true
 docker network rm alhayat-delivery-net 2>/dev/null || true

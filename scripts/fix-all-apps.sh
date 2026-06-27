@@ -24,6 +24,21 @@ RYBELLA_DOMAIN="${RYBELLA_DOMAIN:-rybellairaq.com}"
 RYBELLA_ADMIN_DOMAIN="${RYBELLA_ADMIN_DOMAIN:-admin.rybellairaq.com}"
 SSL_EMAIL="${SSL_EMAIL:-admin@$DELIVERY_DOMAIN}"
 
+free_local_port() {
+  local port="$1"
+  echo "    تحرير المنفذ $port..."
+  docker ps -q --filter "publish=127.0.0.1:${port}" 2>/dev/null | xargs -r docker stop 2>/dev/null || true
+  docker ps -q --filter "publish=${port}" 2>/dev/null | xargs -r docker stop 2>/dev/null || true
+  for name in delivery-system delivery-driver-web delivery-employee-web; do
+    docker rm -f "$name" 2>/dev/null || true
+  done
+  if command -v ss >/dev/null 2>&1 && ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+    echo "    تحذير: المنفذ $port ما زال مستخدماً:"
+    ss -tlnp | grep ":${port} " || true
+    echo "    نفّذ: ss -tlnp | grep :${port}"
+  fi
+}
+
 echo "══════════════════════════════════════════"
 echo " إصلاح جميع التطبيقات على السيرفر"
 echo "══════════════════════════════════════════"
@@ -39,6 +54,9 @@ echo ""
 echo "==> [2/7] نظام التوصيل: $DELIVERY_ROOT"
 cd "$DELIVERY_ROOT"
 git pull origin main 2>/dev/null || true
+free_local_port 3000
+free_local_port 3001
+free_local_port 3002
 docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml down 2>/dev/null || true
 docker network rm alhayat-delivery-net 2>/dev/null || true
 docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml up -d --build
