@@ -100,7 +100,3 @@ volumes:
     driver: local
   letsencrypt:
     driver: local
-
-networks:
-  default:
-    name: alhayat-delivery-net

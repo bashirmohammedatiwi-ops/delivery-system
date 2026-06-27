@@ -1,3 +1,5 @@
+const APP_UI_VERSION = '2026-06-27-notifications';
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -38,7 +40,7 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // نقطة فحص الصحة لـ Docker (قبل أي مسار آخر)
-app.get('/health', (_req, res) => res.status(200).send('OK'));
+app.get('/health', (_req, res) => res.status(200).json({ ok: true, version: APP_UI_VERSION }));
 
 // سياسة الخصوصية — قبل static حتى لا يُعاد index.html
 app.get('/privacy', (req, res) => {
