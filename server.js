@@ -785,6 +785,7 @@ app.put('/api/orders/:id', requireAppAuth, async (req, res) => {
         const order = orderService.updateOrder(parseInt(req.params.id), body);
         const appUser = req.appUser;
         const isEmployee = appUser && appUser.Role === 'employee';
+        notificationService.syncOrderNotesForOrder(order?.OrderID, notificationService.pickOrderNotes(order));
         notificationService.maybeCreateNotification(order, appUser?.UserID, appUser?.DisplayName || appUser?.Username, isEmployee);
         res.json(order);
     } catch (err) {

@@ -23,9 +23,11 @@ function createNotification(orderId, performedByUserID, performedByName, orderNo
 function getUnreviewedNotifications() {
     const database = db.getDatabase();
     return database.prepare(
-        `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
+        `SELECT n.NotificationID, n.OrderID, n.PerformedByUserID, n.PerformedByName,
+                n.OrderNotes, n.CreatedAt, n.Reviewed, n.ReviewedAt,
+                o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
                 o.StoreName, o.Address,
-                COALESCE(NULLIF(TRIM(n.OrderNotes), ''), o.Notes) AS Notes,
+                COALESCE(NULLIF(TRIM(o.Notes), ''), NULLIF(TRIM(n.OrderNotes), '')) AS Notes,
                 o.AmountIQD, o.WaivedDeliveryIQD, o.TotalIQD, o.CreatedDate
          FROM FreeDeliveryOverrideNotifications n
          JOIN Orders o ON n.OrderID = o.OrderID
@@ -37,15 +39,28 @@ function getUnreviewedNotifications() {
 function getAllNotifications(limit = 50) {
     const database = db.getDatabase();
     return database.prepare(
-        `SELECT n.*, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
+        `SELECT n.NotificationID, n.OrderID, n.PerformedByUserID, n.PerformedByName,
+                n.OrderNotes, n.CreatedAt, n.Reviewed, n.ReviewedAt,
+                o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
                 o.StoreName, o.Address,
-                COALESCE(NULLIF(TRIM(n.OrderNotes), ''), o.Notes) AS Notes,
+                COALESCE(NULLIF(TRIM(o.Notes), ''), NULLIF(TRIM(n.OrderNotes), '')) AS Notes,
                 o.AmountIQD, o.WaivedDeliveryIQD, o.TotalIQD, o.CreatedDate
          FROM FreeDeliveryOverrideNotifications n
          JOIN Orders o ON n.OrderID = o.OrderID
          ORDER BY n.CreatedAt DESC
          LIMIT ?`
     ).all(limit);
+}
+
+function syncOrderNotesForOrder(orderId, orderNotes) {
+    const notes = orderNotes != null ? String(orderNotes).trim() : '';
+    if (!orderId) return;
+    const database = db.getDatabase();
+    database.prepare(
+        `UPDATE FreeDeliveryOverrideNotifications
+         SET OrderNotes = ?
+         WHERE OrderID = ? AND Reviewed = 0`
+    ).run(notes || null, orderId);
 }
 
 function markAsReviewed(notificationId) {
@@ -75,8 +90,12 @@ function maybeCreateNotification(order, performedByUserID, performedByName, isEm
     const existing = database.prepare(
         'SELECT NotificationID FROM FreeDeliveryOverrideNotifications WHERE OrderID = ? AND Reviewed = 0'
     ).get(orderId);
-    if (existing) return;
-    createNotification(orderId, performedByUserID, performedByName, pickOrderNotes(order));
+    const notes = pickOrderNotes(order);
+    if (existing) {
+        syncOrderNotesForOrder(orderId, notes || '');
+        return;
+    }
+    createNotification(orderId, performedByUserID, performedByName, notes);
 }
 
 module.exports = {
@@ -86,5 +105,7 @@ module.exports = {
     markAsReviewed,
     getUnreviewedCount,
     maybeCreateNotification,
+    syncOrderNotesForOrder,
+    pickOrderNotes,
     FREE_DELIVERY_THRESHOLD
 };
