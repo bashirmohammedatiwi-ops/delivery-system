@@ -11,8 +11,6 @@ services:
     image: alhayat-delivery:latest
     container_name: delivery-system
     restart: unless-stopped
-    ports:
-      - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -31,8 +29,6 @@ services:
     container_name: delivery-employee-web
     restart: unless-stopped
     command: ["node", "server-employee.js"]
-    ports:
-      - "3002:3002"
     environment:
       - NODE_ENV=production
       - EMPLOYEE_PORT=3002
@@ -46,8 +42,6 @@ services:
     container_name: delivery-driver-web
     restart: unless-stopped
     command: ["node", "server-driver.js"]
-    ports:
-      - "3001:3001"
     environment:
       - NODE_ENV=production
       - DRIVER_PORT=3001

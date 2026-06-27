@@ -1,0 +1,15 @@
+# منافذ عامة للتطوير المحلي أو سيرفر بدون nginx نظام
+# docker compose -f docker-compose.yml -f docker-compose.override-ports-public.yml up -d --build
+
+services:
+  app:
+    ports: !override
+      - "3000:3000"
+
+  employee-web:
+    ports: !override
+      - "3002:3002"
+
+  driver-web:
+    ports: !override
+      - "3001:3001"

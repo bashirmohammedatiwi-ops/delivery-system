@@ -1,18 +1,17 @@
 # ─── سيرفر متعدد المواقع (nginx على Ubuntu) ───
-# لا يشغّل delivery-nginx — nginx النظام يتولى SSL والتوجيه.
-# التطبيق على 127.0.0.1:3000
+# !override يمنع دمج المنافذ مع docker-compose.yml (كان يسبب: address already in use)
 #
 #   docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml up -d --build
 
 services:
   app:
-    ports:
+    ports: !override
       - "127.0.0.1:3000:3000"
 
   employee-web:
-    ports:
+    ports: !override
       - "127.0.0.1:3002:3002"
 
   driver-web:
-    ports:
+    ports: !override
       - "127.0.0.1:3001:3001"
