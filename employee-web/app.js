@@ -611,7 +611,7 @@ async function renderOrders(container) {
                 const id = parseInt(btn.dataset.orderId);
                 const order = list.find(o => o.OrderID === id);
                 if (!order) return;
-                const fullOrder = order.RegionName ? order : await window.api.orders.getById(id).catch(() => order);
+                const fullOrder = await window.api.orders.getById(id).catch(() => order);
                 printOrder(fullOrder || order, () => { order.LabelPrinted = 1; renderOrdersList(filterOrders(document.getElementById('ordersSearchInput')?.value || '')); });
             };
         });
