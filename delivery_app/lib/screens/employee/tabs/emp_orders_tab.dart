@@ -113,12 +113,14 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
       final addr = (m['Address'] ?? '').toString().toLowerCase();
       final store = (m['StoreName'] ?? '').toString().toLowerCase();
       final admin = (m['AdminOrderNo'] ?? '').toString().toLowerCase();
+      final notes = (m['Notes'] ?? '').toString().toLowerCase();
       final matchShipment = sn.contains(s) || (searchDigits.isNotEmpty && (snDigits.contains(searchDigits) || snDigits.endsWith(searchDigits)));
       return matchShipment ||
           cn.contains(s) ||
           addr.contains(s) ||
           store.contains(s) ||
           admin.contains(s) ||
+          notes.contains(s) ||
           (searchDigits.isNotEmpty && cp.contains(searchDigits));
     }).toList();
   }
@@ -183,14 +185,16 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
 
   Future<void> _printOrder(Map<String, dynamic> order) async {
     try {
-      dynamic fullOrder = order;
-      if (order['RegionName'] == null && order['OrderID'] != null) {
-        fullOrder = await EmployeeApi.getOrderById((order['OrderID'] ?? 0) as int);
-      }
-      final orderMap = fullOrder is Map<String, dynamic> ? fullOrder : order;
-      final bytes = await EmployeeApi.getLabelPdf(orderMap);
       final id = int.tryParse('${order['OrderID']}') ?? 0;
       if (id < 1) throw Exception('معرّف الطلب غير صالح');
+
+      Map<String, dynamic> orderMap = Map<String, dynamic>.from(order);
+      try {
+        final full = await EmployeeApi.getOrderById(id);
+        if (full.isNotEmpty) orderMap = full;
+      } catch (_) {}
+
+      final bytes = await EmployeeApi.getLabelPdf(orderMap);
       // تسجيل الطباعة على الخادم بعد نجاح توليد الـ PDF وقبل فتح الملف، حتى لا يبقى "لم يُطبع" إذا فشل فتح النافذة أو تأخر التحديث.
       await EmployeeApi.markLabelPrinted(id);
       if (mounted) _patchLabelPrintedLocal(id);
@@ -347,6 +351,7 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
     final phone = o['CustomerPhone']?.toString() ?? '';
     final address = o['Address']?.toString() ?? '';
     final region = o['RegionName']?.toString().trim() ?? '';
+    final notesText = o['Notes']?.toString().trim() ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -398,6 +403,31 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
           if (address.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(address, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
+          ],
+          if (notesText.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: EmployeeTheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: EmployeeTheme.primary.withValues(alpha: 0.15)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.notes_rounded, size: 16, color: EmployeeTheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      notesText,
+                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600, color: EmployeeTheme.onSurface),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
           const SizedBox(height: 8),
           Text(
@@ -517,9 +547,10 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   }
 
   Future<void> _loadOrder() async {
-    if (_order['RegionName'] == null && _order['OrderID'] != null) {
+    final orderId = _order['OrderID'];
+    if (orderId != null) {
       try {
-        final full = await EmployeeApi.getOrderById((_order['OrderID'] ?? 0) as int);
+        final full = await EmployeeApi.getOrderById((orderId ?? 0) as int);
         if (full.isNotEmpty) _order = full;
       } catch (_) {}
     }

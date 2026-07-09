@@ -956,7 +956,17 @@ app.post('/api/reports/company-pdf', requireAppAuth, requireAdmin, async (req, r
 // ─── API: الملصق ───
 app.post('/api/label/pdf', requireAppAuth, async (req, res) => {
     try {
-        const buf = await labelService.createLabelPDF(req.body);
+        let order = req.body || {};
+        const orderId = order.OrderID != null ? parseInt(order.OrderID, 10) : NaN;
+        if (!isNaN(orderId) && orderId > 0) {
+            const dbOrder = orderService.getOrderById(orderId);
+            if (dbOrder) {
+                const bodyNotes = order.Notes != null ? String(order.Notes).trim() : '';
+                order = { ...dbOrder, ...order };
+                order.Notes = bodyNotes || (dbOrder.Notes != null ? String(dbOrder.Notes).trim() : '');
+            }
+        }
+        const buf = await labelService.createLabelPDF(order);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename=label.pdf');
         res.send(buf);

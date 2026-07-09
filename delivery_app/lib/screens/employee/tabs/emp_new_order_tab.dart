@@ -217,7 +217,14 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
       setState(() => _loading = true);
       final orderId = int.tryParse('${_lastOrder!['OrderID']}') ?? 0;
       if (orderId < 1) throw Exception('معرّف الطلب غير صالح');
-      final bytes = await EmployeeApi.getLabelPdf(_lastOrder!);
+
+      Map<String, dynamic> orderMap = Map<String, dynamic>.from(_lastOrder!);
+      try {
+        final full = await EmployeeApi.getOrderById(orderId);
+        if (full.isNotEmpty) orderMap = full;
+      } catch (_) {}
+
+      final bytes = await EmployeeApi.getLabelPdf(orderMap);
       await EmployeeApi.markLabelPrinted(orderId);
       widget.onCreated?.call();
       await openPdfBytes(Uint8List.fromList(bytes), filename: 'label_$orderId.pdf');
