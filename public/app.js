@@ -14,6 +14,7 @@ async function checkAuth() {
 }
 
 function showApp() {
+    document.body.classList.remove('is-login-screen');
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-main').style.display = 'flex';
     const appMain = document.getElementById('app-main');
@@ -58,6 +59,7 @@ function showApp() {
 }
 
 function showLogin() {
+    document.body.classList.add('is-login-screen');
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app-main').style.display = 'none';
     currentUser = null;
@@ -3011,11 +3013,13 @@ document.getElementById('btnLogout')?.addEventListener('click', async () => {
 });
 
 document.getElementById('btnAdminLogin')?.addEventListener('click', () => {
+    document.body.classList.add('is-login-screen');
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app-main').style.display = 'none';
 });
 
 document.getElementById('btnLoginCancel')?.addEventListener('click', () => {
+    document.body.classList.remove('is-login-screen');
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-main').style.display = 'flex';
 });
