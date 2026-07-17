@@ -45,6 +45,9 @@ function showApp() {
         document.querySelectorAll('.nav-admin').forEach(el => {
             el.style.display = currentUser.Role === 'admin' ? '' : 'none';
         });
+        document.querySelectorAll('.mobile-bottom-nav .nav-admin').forEach(el => {
+            el.style.display = currentUser.Role === 'admin' ? '' : 'none';
+        });
         const btnAdmin = document.getElementById('btnAdminLogin');
         if (btnAdmin) btnAdmin.style.display = currentUser.Role === 'admin' ? 'none' : '';
         initSidebarNav();
@@ -88,6 +91,62 @@ function getFullAddress(o) {
     const addr = (o.Address || '').trim();
     if (region && addr) return region + ' - ' + addr;
     return region || addr || '-';
+}
+
+function orderStatusBadgeClass(status) {
+    return 'badge-' + String(status || 'new').toLowerCase()
+        .replace('assignedtodriver', 'assigned')
+        .replace('delivered', 'delivered')
+        .replace('returned', 'returned');
+}
+
+function renderOrderActionsHtml(o) {
+    return `
+        <div class="order-actions order-actions--stack">
+            <button type="button" class="btn btn-sm btn-print-order" data-order-id="${o.OrderID}" title="طباعة الملصق"><i class="bi bi-printer"></i><span class="order-action-label">طباعة</span></button>
+            <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل الطلب"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="order-action-label">تعديل</span></button>
+            ${currentUser?.Role === 'admin' ? `
+            <div class="status-quick-btns" title="تغيير سريع للحالة">
+                <button type="button" class="btn-status-sm btn-status-sm--ok" data-order-id="${o.OrderID}" data-status="Delivered" title="تم التوصيل">✓</button>
+                <button type="button" class="btn-status-sm btn-status-sm--ret" data-order-id="${o.OrderID}" data-status="Returned" title="راجع">↩</button>
+            </div>
+            <button type="button" class="btn btn-sm btn-delete" data-order-id="${o.OrderID}" title="حذف الطلب"><i class="bi bi-trash" aria-hidden="true"></i></button>
+            ` : ''}
+        </div>`;
+}
+
+function renderOrderCardHtml(o) {
+    const notesRaw = (o.Notes || '').trim();
+    const loc = (o.CustomerLocationLink || '').replace(/"/g, '&quot;');
+    const returned = isOrderReturned(o);
+    return `
+        <article class="order-mobile-card ${returned ? 'order-mobile-card--returned' : ''}" data-order-id="${o.OrderID}">
+            <div class="order-mobile-card__head">
+                <div class="order-mobile-card__shipment">${escapeHtml(o.ShipmentNumber)}</div>
+                <span class="badge ${orderStatusBadgeClass(o.Status)}">${STATUS_MAP[o.Status] || escapeHtml(o.Status || '') || '—'}</span>
+            </div>
+            <div class="order-mobile-card__meta">#${o.OrderID} · ${escapeHtml(o.AdminOrderNo || '—')} · ${o.Pieces || 1} قطعة</div>
+            <div class="order-mobile-card__party">
+                <div class="order-mobile-card__name">${escapeHtml(o.CustomerName || '—')}</div>
+                <a class="order-mobile-card__phone" href="tel:${escapeHtml((o.CustomerPhone || '').replace(/\s/g, ''))}">${escapeHtml(o.CustomerPhone || '—')}</a>
+                <div class="order-mobile-card__store"><i class="bi bi-shop" aria-hidden="true"></i> ${escapeHtml(o.StoreName || '—')}</div>
+            </div>
+            <div class="order-mobile-card__address">${escapeHtml(getFullAddress(o))}</div>
+            ${notesRaw ? `<div class="order-mobile-card__notes"><i class="bi bi-chat-square-text" aria-hidden="true"></i><span>${escapeHtml(notesRaw)}</span></div>` : ''}
+            ${returned && (o.ReturnReason || '').trim() ? `<div class="order-mobile-card__return">${escapeHtml((o.ReturnReason || '').trim())}</div>` : ''}
+            <div class="order-mobile-card__amounts">
+                <div class="order-mobile-amount"><span>فاتورة</span><strong class="iqd">${formatIQD(o.AmountIQD)}</strong></div>
+                <div class="order-mobile-amount"><span>توصيل</span><strong class="iqd">${o.FreeDelivery ? 'مجاني' : formatIQD(o.DeliveryFeeIQD)}</strong></div>
+                <div class="order-mobile-amount order-mobile-amount--total"><span>نهائي</span><strong class="iqd">${formatIQD(o.TotalIQD)}</strong></div>
+                <div class="order-mobile-amount"><span>مستحق</span><strong class="iqd">${formatIQD(getAmountDue(o))}</strong></div>
+            </div>
+            <div class="order-mobile-card__ops">
+                <span><b>سائق:</b> ${escapeHtml(o.DriverName || '—')}</span>
+                <span><b>ملصق:</b> ${o.LabelPrinted ? 'مطبوع' : 'لم يُطبع'}</span>
+            </div>
+            ${o.CustomerLocationLink ? `<a href="${loc}" target="_blank" rel="noopener noreferrer" class="order-mobile-loc"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> فتح موقع الزبون</a>` : ''}
+            <div class="order-mobile-card__actions">${renderOrderActionsHtml(o)}</div>
+        </article>`;
 }
 
 function escapeHtml(str) {
@@ -531,22 +590,15 @@ async function renderOrdersScreen(container, opts = {}) {
                                                 <div class="orders-ops-line"><span class="orders-ops-k">ملصق</span><span class="orders-ops-v"><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'} orders-badge-tiny">${o.LabelPrinted ? 'مطبوع' : 'لم يُطبع'}</span></span></div>
                                             </td>
                                             <td class="orders-cell-actions">
-                                                <div class="order-actions order-actions--stack">
-                                                    <button type="button" class="btn btn-sm btn-print-order" data-order-id="${o.OrderID}" title="طباعة الملصق"><i class="bi bi-printer"></i><span class="order-action-label">طباعة</span></button>
-                                                    <button type="button" class="btn btn-sm btn-edit" data-order-id="${o.OrderID}" title="تعديل الطلب"><i class="bi bi-pencil-square" aria-hidden="true"></i><span class="order-action-label">تعديل</span></button>
-                                                    ${currentUser?.Role === 'admin' ? `
-                                                    <div class="status-quick-btns" title="تغيير سريع للحالة">
-                                                        <button type="button" class="btn-status-sm btn-status-sm--ok" data-order-id="${o.OrderID}" data-status="Delivered" title="تم التوصيل">✓</button>
-                                                        <button type="button" class="btn-status-sm btn-status-sm--ret" data-order-id="${o.OrderID}" data-status="Returned" title="راجع">↩</button>
-                                                    </div>
-                                                    <button type="button" class="btn btn-sm btn-delete" data-order-id="${o.OrderID}" title="حذف الطلب"><i class="bi bi-trash" aria-hidden="true"></i></button>
-                                                    ` : ''}
-                                                </div>
+                                                ${renderOrderActionsHtml(o)}
                                             </td>
                                         </tr>`;
                                     }).join('')}
                                 </tbody>
                             </table>
+                        </div>
+                        <div class="orders-mobile-list" id="ordersMobileList">
+                            ${list.map(o => renderOrderCardHtml(o)).join('')}
                         </div>` : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p class="orders-empty-title">لا توجد طلبات</p><p class="orders-empty-hint">جرّب تغيير البحث، التاريخ، أو حالة الطلب</p></div>'}
                     </div>
                 </div>
@@ -615,7 +667,7 @@ async function renderOrdersScreen(container, opts = {}) {
             container.addEventListener('click', async (e) => {
                 const btn = e.target.closest('.btn-status-sm');
                 if (!btn) return;
-                const id = parseInt(btn.dataset.orderId || btn.closest('tr')?.dataset?.orderId, 10);
+                const id = parseInt(btn.dataset.orderId || btn.closest('[data-order-id]')?.dataset?.orderId, 10);
                 const status = (btn.dataset.status || '').trim();
                 if (!id || isNaN(id)) {
                     await showMsg('خطأ: رقم الطلب غير صالح');
@@ -856,6 +908,7 @@ function initSidebarNav() {
 
 function showScreen(screenId, subTab) {
     setNavActive(screenId, subTab);
+    updateMobileChrome(screenId);
     const container = document.getElementById('screen-container');
     container.innerHTML = '';
     container.dataset.currentScreen = screenId || '';
@@ -2768,6 +2821,39 @@ document.getElementById('mainNav')?.addEventListener('click', (e) => {
 
 MOBILE_NAV_MQ.addEventListener('change', applySidebarForViewport);
 applySidebarForViewport();
+
+const MOBILE_SCREEN_TITLES = {
+    dashboard: 'لوحة التحكم',
+    orders: 'الطلبات',
+    'new-order': 'طلب جديد',
+    drivers: 'السائقين',
+    'driver-receive': 'استلام الطلبات',
+    'support-sections': 'أقسام سانده',
+    'receive-returned': 'استلام الراجع',
+    reports: 'التقارير',
+    users: 'المستخدمين',
+    settings: 'الإعدادات'
+};
+
+function updateMobileChrome(screenId) {
+    const titleEl = document.getElementById('mobileTopbarTitle');
+    if (titleEl) titleEl.textContent = MOBILE_SCREEN_TITLES[screenId] || 'ديما الحياة';
+    document.querySelectorAll('.mobile-bottom-nav__item[data-screen]').forEach(el => {
+        el.classList.toggle('active', el.dataset.screen === screenId);
+    });
+}
+
+document.getElementById('mobileBottomNav')?.addEventListener('click', (e) => {
+    if (e.target.closest('#mobileBottomMenu')) {
+        e.preventDefault();
+        setMobileNavOpen(true);
+        return;
+    }
+    const link = e.target.closest('.mobile-bottom-nav__item[data-screen]');
+    if (!link) return;
+    e.preventDefault();
+    showScreen(link.dataset.screen);
+});
 
 document.getElementById('btnLogout')?.addEventListener('click', async () => {
     try {

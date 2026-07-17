@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>شركة ديما الحياة - نظام إدارة التوصيل</title>
-    <link rel="stylesheet" href="styles.css?v=20260717">
+    <link rel="stylesheet" href="styles.css?v=20260718">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
@@ -35,6 +35,14 @@
 
     <!-- التطبيق الرئيسي -->
     <div id="app-main" class="app" style="display:none">
+        <header class="mobile-topbar" id="mobileTopbar" aria-hidden="true">
+            <div class="mobile-topbar__inner">
+                <div class="mobile-topbar__titles">
+                    <div class="mobile-topbar__title" id="mobileTopbarTitle">ديما الحياة</div>
+                    <div class="mobile-topbar__subtitle" id="mobileTopbarSubtitle">نظام التوصيل</div>
+                </div>
+            </div>
+        </header>
         <div class="app-body" id="appBody">
             <button type="button" class="sidebar-toggle" id="sidebarToggle" title="القائمة" aria-label="فتح وإغلاق القائمة">
                 <span class="sidebar-toggle-icon" aria-hidden="true">☰</span>
@@ -100,8 +108,15 @@
                 <span class="app-footer-tel">07832593306</span>
             </div>
         </footer>
+        <nav class="mobile-bottom-nav" id="mobileBottomNav" aria-label="تنقل سريع">
+            <a href="#" class="mobile-bottom-nav__item nav-admin" data-screen="dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>الرئيسية</span></a>
+            <a href="#" class="mobile-bottom-nav__item" data-screen="orders"><i class="bi bi-box-seam" aria-hidden="true"></i><span>الطلبات</span></a>
+            <a href="#" class="mobile-bottom-nav__item" data-screen="new-order"><i class="bi bi-plus-circle" aria-hidden="true"></i><span>جديد</span></a>
+            <a href="#" class="mobile-bottom-nav__item" data-screen="driver-receive"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span>استلام</span></a>
+            <button type="button" class="mobile-bottom-nav__item" id="mobileBottomMenu" aria-label="فتح القائمة الكاملة"><i class="bi bi-list" aria-hidden="true"></i><span>المزيد</span></button>
+        </nav>
     </div>
-    <script src="api.js?v=20260717"></script>
-    <script src="app.js?v=20260717"></script>
+    <script src="api.js?v=20260718"></script>
+    <script src="app.js?v=20260718"></script>
 </body>
 </html>

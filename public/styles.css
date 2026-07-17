@@ -3284,19 +3284,21 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     border-color: rgba(5, 150, 105, 0.4) !important;
 }
 
+/* بطاقات الطلبات للجوال — مخفية على الشاشات الكبيرة */
+.orders-mobile-list { display: none; }
+
+.mobile-topbar,
+.mobile-bottom-nav { display: none; }
+
 @media (max-width: 768px) {
-    .content { padding: 20px 16px; margin-right: 260px; }
     .orders-hero { padding: 20px 18px 14px; }
     .orders-stats-scroll { padding: 0 18px 16px; }
     .orders-toolbar { padding: 16px 18px; }
     .orders-panel { padding: 14px 14px; }
-    .stat-cards { grid-template-columns: 1fr 1fr; }
-    .sidebar { width: 260px; }
-    .sidebar-toggle { right: 258px; }
 }
 
 /* ═══════════════════════════════════════════════════════════
-   جوال — لوحة المدير (خط واضح، أرقام غامقة، تجربة ممتازة)
+   جوال — لوحة المدير (بطاقات، شريط علوي/سفلي، خط غامق)
    ═══════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
     html {
@@ -3312,10 +3314,96 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 
     .content {
         margin-right: 0 !important;
-        padding: calc(64px + env(safe-area-inset-top, 0px)) 14px calc(20px + env(safe-area-inset-bottom, 0px));
+        padding: calc(58px + env(safe-area-inset-top, 0px)) 12px calc(88px + env(safe-area-inset-bottom, 0px));
     }
 
-    /* القائمة — درج منزلق فوق المحتوى */
+    .mobile-topbar {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1001;
+        padding: calc(10px + env(safe-area-inset-top, 0px)) 72px 10px 14px;
+        background: linear-gradient(180deg, #FFFFFF 0%, rgba(255, 255, 255, 0.96) 100%);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    .mobile-topbar__title {
+        font-size: 1.12rem;
+        font-weight: 800;
+        color: var(--text);
+        line-height: 1.25;
+    }
+
+    .mobile-topbar__subtitle {
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--primary-dark);
+        margin-top: 2px;
+    }
+
+    .mobile-bottom-nav {
+        display: flex;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1001;
+        padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
+        background: rgba(255, 255, 255, 0.97);
+        border-top: 1px solid var(--border);
+        box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.08);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        justify-content: space-around;
+        gap: 4px;
+    }
+
+    .mobile-bottom-nav__item {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        padding: 8px 4px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        text-decoration: none;
+        border-radius: 12px;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.15s, color 0.15s;
+    }
+
+    .mobile-bottom-nav__item i {
+        font-size: 1.2rem;
+        font-weight: 700;
+    }
+
+    .mobile-bottom-nav__item span {
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .mobile-bottom-nav__item.active {
+        color: var(--primary-dark);
+        background: var(--primary-soft);
+    }
+
+  .page-title {
+        display: none;
+        font-size: 1.45rem;
+        font-weight: 800;
+        margin-bottom: 18px;
+    }
     .sidebar {
         width: min(300px, 88vw);
         transform: translateX(100%);
@@ -3345,13 +3433,13 @@ tbody tr:hover { background: var(--primary-soft) !important; }
 
     .sidebar-toggle {
         position: fixed;
-        top: calc(12px + env(safe-area-inset-top, 0px));
-        right: 14px;
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        right: 12px;
         left: auto;
         transform: none;
-        width: 50px;
-        height: 50px;
-        border-radius: 14px;
+        width: 46px;
+        height: 46px;
+        border-radius: 13px;
         z-index: 1002;
         font-size: 1.15rem;
         background: linear-gradient(135deg, #059669 0%, #047857 100%);
@@ -3389,11 +3477,6 @@ tbody tr:hover { background: var(--primary-soft) !important; }
         font-weight: 800;
     }
 
-  .page-title {
-        font-size: 1.45rem;
-        font-weight: 800;
-        margin-bottom: 18px;
-    }
 
     .card {
         padding: 18px 16px;
@@ -3528,90 +3611,245 @@ tbody tr:hover { background: var(--primary-soft) !important; }
         font-weight: 700;
     }
 
-    /* جدول الطلبات — نص أوضح عند التمرير الأفقي */
+    /* جدول الطلبات — بطاقات على الجوال */
     .orders-table-wrap {
-        border-radius: 12px;
-        box-shadow: inset 0 0 0 1px var(--border);
+        display: none !important;
     }
 
-    .orders-table {
+    .orders-mobile-list {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 12px;
+    }
+
+    .order-mobile-card {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 16px;
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
+    }
+
+    .order-mobile-card--returned {
+        background: #FEF2F2;
+        border-color: #FECACA;
+    }
+
+    .order-mobile-card__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+    }
+
+    .order-mobile-card__shipment {
+        font-size: 1.22rem;
+        font-weight: 800;
+        color: var(--primary-dark);
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+    }
+
+    .order-mobile-card__meta {
+        font-size: 0.84rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        margin-bottom: 12px;
+    }
+
+    .order-mobile-card__name {
+        font-size: 1.08rem;
+        font-weight: 800;
+        color: var(--text);
+        margin-bottom: 4px;
+    }
+
+    .order-mobile-card__phone {
+        display: inline-block;
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--accent-blue);
+        text-decoration: none;
+        margin-bottom: 6px;
+        font-variant-numeric: tabular-nums;
+        direction: ltr;
+        text-align: right;
+        unicode-bidi: embed;
+    }
+
+    .order-mobile-card__store {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #475569;
+        margin-bottom: 10px;
+    }
+
+    .order-mobile-card__address {
         font-size: 0.95rem;
-        min-width: 920px;
-    }
-
-    .orders-table thead th {
-        font-size: 0.88rem;
-        font-weight: 800;
-        padding: 16px 12px;
-    }
-
-    .orders-table tbody td {
-        padding: 14px 12px;
-    }
-
-    .orders-shipment-num {
-        font-size: 1.15rem;
-        font-weight: 800;
-    }
-
-    .orders-order-meta {
-        font-size: 0.85rem;
         font-weight: 600;
+        line-height: 1.5;
+        color: var(--text);
+        padding: 10px 12px;
+        background: #F8FAFC;
+        border-radius: 12px;
+        margin-bottom: 10px;
     }
 
-    .orders-party-name {
-        font-size: 1rem;
-        font-weight: 800;
-    }
-
-    .orders-party-phone {
+    .order-mobile-card__notes {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        padding: 10px 12px;
+        margin-bottom: 10px;
+        background: #ECFDF5;
+        border: 1px solid #A7F3D0;
+        border-radius: 12px;
         font-size: 0.95rem;
         font-weight: 700;
-    }
-
-    .orders-address-text {
-        font-size: 0.92rem;
-        font-weight: 600;
+        color: #065F46;
         line-height: 1.45;
     }
 
-    .orders-money-list li span {
-        font-weight: 700;
-        font-size: 0.82rem;
+    .order-mobile-card__notes i {
+        margin-top: 2px;
+        flex-shrink: 0;
     }
 
-    .orders-money-list .iqd,
-    .orders-money-list strong,
-    .iqd {
-        font-size: 1.02rem;
+    .order-mobile-card__return {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #991B1B;
+        background: #FEE2E2;
+        border-radius: 10px;
+        padding: 8px 10px;
+        margin-bottom: 10px;
+    }
+
+    .order-mobile-card__amounts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+
+    .order-mobile-amount {
+        background: #F8FAFC;
+        border: 1px solid var(--border-light);
+        border-radius: 12px;
+        padding: 10px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .order-mobile-amount span {
+        font-size: 0.75rem;
+        font-weight: 800;
+        color: var(--text-muted);
+    }
+
+    .order-mobile-amount strong {
+        font-size: 1.08rem;
         font-weight: 800;
         font-variant-numeric: tabular-nums;
-        letter-spacing: -0.01em;
+        color: var(--text);
     }
 
-    .orders-money-list .iqd-total {
-        font-size: 1.1rem;
-        font-weight: 800;
+    .order-mobile-amount--total {
+        background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
+        border-color: #A7F3D0;
+    }
+
+    .order-mobile-amount--total strong {
+        font-size: 1.18rem;
         color: var(--primary-dark);
     }
 
-    .badge {
-        font-size: 0.85rem;
+    .order-mobile-card__ops {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+        font-size: 0.86rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        margin-bottom: 10px;
+    }
+
+    .order-mobile-card__ops b {
         font-weight: 800;
-        padding: 7px 12px;
+        color: var(--text);
     }
 
-    .orders-ops-k {
+    .order-mobile-loc {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-radius: 12px;
+        background: #EFF6FF;
+        color: #1D4ED8;
         font-weight: 800;
+        text-decoration: none;
     }
 
-    .orders-ops-v {
-        font-weight: 700;
+    .order-mobile-card__actions .order-actions--stack {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
     }
 
-    .order-actions--stack .btn-sm {
+    .order-mobile-card__actions .btn-print-order,
+    .order-mobile-card__actions .btn-edit {
+        width: 100%;
+        min-height: 50px;
+        font-size: 0.95rem !important;
+        font-weight: 800 !important;
+    }
+
+    .order-mobile-card__actions .status-quick-btns {
+        grid-column: 1 / -1;
+        justify-content: center;
+    }
+
+    .order-mobile-card__actions .btn-delete {
+        grid-column: 1 / -1;
         min-height: 44px;
         font-weight: 700;
+    }
+
+    .orders-table-headbar {
+        position: sticky;
+        top: calc(52px + env(safe-area-inset-top, 0px));
+        z-index: 5;
+    }
+
+    /* نوافذ منبثقة — ملء الشاشة من الأسفل */
+    .modal-overlay {
+        align-items: flex-end;
+        padding: 0;
+    }
+
+    .modal-card {
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
+        border-radius: 20px 20px 0 0;
+        max-height: 92vh;
+        overflow-y: auto;
+        padding: 22px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .modal-card h3 {
+        font-size: 1.2rem;
+        font-weight: 800;
+    }
+
+    .app-footer {
+        display: none;
     }
 
     /* إشعارات التوصيل المجاني */
