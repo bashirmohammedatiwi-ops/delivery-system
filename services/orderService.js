@@ -181,7 +181,8 @@ function getOrdersList(filters = {}) {
     const database = db.getDatabase();
     let sql = `SELECT o.OrderID, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
                       o.Address, o.Status, o.TotalIQD, o.AmountIQD, o.DeliveryFeeIQD, o.FreeDelivery,
-                      o.WaivedDeliveryIQD, o.LabelPrinted, o.CreatedDate, o.StoreName,
+                      o.WaivedDeliveryIQD, o.LabelPrinted, o.CreatedDate, o.StoreName, o.StorePhone,
+                      o.RegionID, o.Pieces, o.Notes,
                       r.RegionName
                FROM Orders o
                LEFT JOIN Regions r ON o.RegionID = r.RegionID

@@ -170,6 +170,8 @@ window.api = {
             apiGet(`/api/reports/driver?driverId=${driverId}&dateFrom=${dateFrom}&dateTo=${dateTo || dateFrom}`),
         companyByRange: (dateFrom, dateTo) =>
             apiGet(`/api/reports/company?dateFrom=${dateFrom}&dateTo=${dateTo || dateFrom}`),
+        employeeByRange: (employeeId, dateFrom, dateTo) =>
+            apiGet(`/api/reports/employee?employeeId=${employeeId}&dateFrom=${dateFrom}&dateTo=${dateTo || dateFrom}`),
         dailySummary: (dateFrom, dateTo, driverIds) => {
             const q = new URLSearchParams({ dateFrom, dateTo: dateTo || dateFrom });
             if (driverIds && driverIds.length) q.set('driverIds', driverIds.join(','));
@@ -182,6 +184,16 @@ window.api = {
             const a = document.createElement('a');
             a.href = url;
             a.download = `تقرير-سائق-${report.driver?.DriverName || 'driver'}-${report.date || 'report'}.pdf`;
+            a.click();
+            URL.revokeObjectURL(url);
+            return null;
+        },
+        employeeReportPDF: async (report) => {
+            const blob = await apiPostBlob('/api/reports/employee-pdf', report);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `تقرير-موظف-${report.employeeName || report.employee?.DisplayName || 'employee'}-${report.date || 'report'}.pdf`;
             a.click();
             URL.revokeObjectURL(url);
             return null;

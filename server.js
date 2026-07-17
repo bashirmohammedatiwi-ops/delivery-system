@@ -915,11 +915,32 @@ app.get('/api/reports/company', requireAppAuth, requireAdmin, async (req, res) =
     }
 });
 
+app.get('/api/reports/employee', requireAppAuth, requireAdmin, async (req, res) => {
+    try {
+        const { employeeId, dateFrom, dateTo } = req.query;
+        const report = reportService.getEmployeeReportByRange(parseInt(employeeId, 10), dateFrom, dateTo || dateFrom);
+        res.json(report);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/reports/driver-pdf', requireAppAuth, requireAdmin, async (req, res) => {
     try {
         const buf = await reportService.generateDriverReportPDF(req.body);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', 'attachment; filename=driver-report.pdf');
+        res.send(buf);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/reports/employee-pdf', requireAppAuth, requireAdmin, async (req, res) => {
+    try {
+        const buf = await reportService.generateEmployeeReportPDF(req.body);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'attachment; filename=employee-report.pdf');
         res.send(buf);
     } catch (err) {
         res.status(500).json({ error: err.message });

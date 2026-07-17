@@ -1877,6 +1877,11 @@ const screens = {
     reports: {
         async render(container) {
             const drivers = await window.api.drivers.getActive();
+            let employees = [];
+            try {
+                const users = await window.api.users.getAll();
+                employees = (users || []).filter(u => u.Role === 'employee' && u.Active !== 0);
+            } catch (_) {}
             let today = new Date().toISOString().split('T')[0];
             try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
 
@@ -1946,6 +1951,28 @@ const screens = {
                                 </div>
                                 <div id="driverReportContent"></div>
                                 <div id="driverReportActions" class="report-actions" style="display:none"><button class="btn btn-primary" id="btnPrintDriverReport">طباعة</button><button class="btn btn-secondary" id="btnExportDriverPDF">تصدير PDF</button></div>
+                            </section>
+                            <section class="report-pane" id="pane-employee">
+                                <h3 class="report-pane-head">تقرير الموظف</h3>
+                                <p class="report-pane-desc">طلبات أنشأها موظف محدد في الفترة المحددة — فلترة حسب من أدخل الطلب</p>
+                                <div class="report-form-row">
+                                    <div class="report-field">
+                                        <label>الموظف</label>
+                                        <select id="reportEmployee">
+                                            ${employees.length
+                                                ? employees.map(e => `<option value="${e.UserID}">${(e.DisplayName || e.Username || 'موظف').replace(/</g, '&lt;')}</option>`).join('')
+                                                : '<option value="">لا يوجد موظفون</option>'}
+                                        </select>
+                                    </div>
+                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="employeeDateFrom" value="${today}"></div>
+                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="employeeDateTo" value="${today}"></div>
+                                    <button class="btn btn-primary" id="btnEmployeeReport" ${employees.length ? '' : 'disabled'}>عرض التقرير</button>
+                                </div>
+                                <div id="employeeReportContent"></div>
+                                <div id="employeeReportActions" class="report-actions" style="display:none">
+                                    <button class="btn btn-primary" id="btnPrintEmployeeReport">طباعة</button>
+                                    <button class="btn btn-secondary" id="btnExportEmployeePDF">تصدير PDF</button>
+                                </div>
                             </section>
                             <section class="report-pane" id="pane-company">
                                 <h3 class="report-pane-head">التقرير العام</h3>
@@ -2255,6 +2282,119 @@ const screens = {
                     </div>
                 `;
                 actions.style.display = 'flex';
+            });
+
+            let currentEmployeeReport = null;
+            document.getElementById('btnEmployeeReport')?.addEventListener('click', async () => {
+                const employeeId = document.getElementById('reportEmployee').value;
+                const dateFrom = document.getElementById('employeeDateFrom').value;
+                let dateTo = document.getElementById('employeeDateTo').value;
+                if (!employeeId) {
+                    await showMsg('اختر موظفاً');
+                    return;
+                }
+                if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
+                const report = await window.api.reports.employeeByRange(parseInt(employeeId, 10), dateFrom, dateTo);
+                currentEmployeeReport = report;
+
+                const content = document.getElementById('employeeReportContent');
+                const actions = document.getElementById('employeeReportActions');
+                const driverAmt = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
+
+                if (!report || report.orders.length === 0) {
+                    content.innerHTML = '<div class="report-empty">لا توجد طلبات لهذا الموظف في الفترة المحددة</div>';
+                    actions.style.display = 'none';
+                    return;
+                }
+
+                content.innerHTML = `
+                    <div class="report-view">
+                        <div class="report-view-title">تقرير الموظف - ${escapeHtml(report.employeeName || report.employee?.DisplayName || '')}</div>
+                        <div class="report-summary-cards">
+                            <div class="report-summary-card"><div class="label">التاريخ</div><div class="value">${report.date}</div></div>
+                            <div class="report-summary-card"><div class="label">عدد الطلبات</div><div class="value">${report.count}</div></div>
+                            <div class="report-summary-card"><div class="label">عدد المرتجعات</div><div class="value">${report.countReturned || 0}</div></div>
+                            <div class="report-summary-card"><div class="label">إجمالي الفواتير</div><div class="value">${formatIQD(report.totalAmount)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--system">
+                                <div class="label">سعر النظام</div>
+                                <div class="value">${formatIQD(report.systemInvoiceTotal || 0)}</div>
+                            </div>
+                            <div class="report-summary-card"><div class="label">أجور التوصيل</div><div class="value">${formatIQD(report.totalDelivery)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(report.net)} د.ع</div></div>
+                            <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ المستحق</div><div class="value">${formatIQD(report.totalDue)} د.ع</div></div>
+                        </div>
+                        <div class="report-section-title">إحصائيات أجور التوصيل</div>
+                        <div class="report-summary-cards report-fee-cards">
+                            <div class="report-summary-card"><div class="label">مجاني</div><div class="value">${report.countFreeDelivery || 0}</div></div>
+                            <div class="report-summary-card"><div class="label">غير مجاني</div><div class="value">${report.countPaidDelivery || 0}</div></div>
+                            ${Object.entries(report.freeDeliveryBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([amt,c]) => `<div class="report-summary-card"><div class="label">مجاني أجر ${formatIQD(amt)} د.ع</div><div class="value">${c}</div></div>`).join('')}
+                            ${Object.entries(report.deliveryFeeBreakdown || {}).sort((a,b)=>parseFloat(a[0])-parseFloat(b[0])).map(([fee,c]) => `<div class="report-summary-card"><div class="label">أجر ${formatIQD(fee)} د.ع</div><div class="value">${c}</div></div>`).join('')}
+                        </div>
+                        <div class="report-section-title">تفاصيل الطلبات <span class="report-count-badge">${report.orders.length} طلب</span></div>
+                        <div class="report-table-wrap report-table-wrap--scrollable report-table-wrap--orders">
+                            <table class="report-table report-table--orders">
+                                <thead><tr><th>الحالة</th><th>رقم</th><th>الشحنة</th><th>السائق</th><th>المتجر</th><th>المستلم</th><th>هاتف</th><th class="col-address">العنوان</th><th>قطع</th><th>فاتورة</th><th>توصيل</th><th>نهائي</th><th>مستحق</th><th>طبع</th><th class="col-notes">ملاحظات</th></tr></thead>
+                                <tbody>
+                                    ${report.orders.map(o => {
+                                        const returned = isOrderReturned(o);
+                                        const statusTxt = STATUS_MAP[o.Status || o.status] || (o.Status || o.status) || '-';
+                                        const labelPrinted = o.LabelPrinted ? 'تم' : 'لم يُطبع';
+                                        return `<tr class="${returned ? 'order-returned' : ''}">
+                                            <td>${statusTxt}</td>
+                                            <td>${o.AdminOrderNo || '-'}</td>
+                                            <td>${o.ShipmentNumber}</td>
+                                            <td>${escapeHtml(o.DriverName || '—')}</td>
+                                            <td>${o.StoreName || '-'}</td>
+                                            <td>${o.CustomerName || '-'}</td>
+                                            <td>${o.CustomerPhone || '-'}</td>
+                                            <td class="col-address"><span class="report-cell-multiline">${escapeHtml(getFullAddress(o))}</span></td>
+                                            <td>${o.Pieces || 1}</td>
+                                            <td class="iqd">${formatIQD(o.AmountIQD)}</td>
+                                            <td class="iqd">${o.FreeDelivery ? 'مجاني ' + formatIQD(driverAmt(o)) : formatIQD(driverAmt(o))}</td>
+                                            <td class="iqd iqd-total">${formatIQD(o.TotalIQD)}</td>
+                                            <td class="iqd">${formatIQD(getAmountDue(o))}</td>
+                                            <td><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'}">${labelPrinted}</span></td>
+                                            <td class="col-notes" title="${escapeHtml((o.Notes || '').toString())}"><span class="report-cell-multiline">${(o.Notes && String(o.Notes).trim()) ? escapeHtml(o.Notes) : '-'}</span></td>
+                                        </tr>`;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                actions.style.display = 'flex';
+            });
+
+            document.getElementById('btnPrintEmployeeReport')?.addEventListener('click', () => {
+                if (!currentEmployeeReport) return;
+                const w = window.open('', 'printEmployeeReport', 'width=800,height=700,scrollbars=yes,resizable=yes');
+                if (!w) return;
+                const da = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
+                w.document.write(`
+                    <html dir="rtl"><head><title>تقرير الموظف</title>
+                    <style>body{font-family:Tahoma,Arial,sans-serif;padding:16px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:6px;font-size:12px}th{background:#eee}</style>
+                    </head><body>
+                    <h2>تقرير الموظف - ${(currentEmployeeReport.employeeName || '').replace(/</g, '&lt;')}</h2>
+                    <p>التاريخ: ${currentEmployeeReport.date} | الطلبات: ${currentEmployeeReport.count} | المستحق: ${formatIQD(currentEmployeeReport.totalDue)} د.ع</p>
+                    <table>
+                    <tr><th>رقم الطلب</th><th>رقم الشحنة</th><th>السائق</th><th>اسم المستلم</th><th>مبلغ التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th><th>الطباعة</th><th>ملاحظات</th></tr>
+                    ${currentEmployeeReport.orders.map(o => {
+                        return `<tr><td>${o.AdminOrderNo || '-'}</td><td>${o.ShipmentNumber}</td><td>${o.DriverName || '-'}</td><td>${o.CustomerName}</td><td>${o.FreeDelivery ? 'مجاني ' + formatIQD(da(o)) : formatIQD(da(o))}</td><td>${formatIQD(o.TotalIQD)}</td><td>${formatIQD(getAmountDue(o))}</td><td>${o.LabelPrinted ? 'تم' : 'لم يُطبع'}</td><td>${(o.Notes || '-').toString().replace(/</g, '&lt;')}</td></tr>`;
+                    }).join('')}
+                    </table></body></html>
+                `);
+                w.document.close();
+                w.print();
+            });
+
+            document.getElementById('btnExportEmployeePDF')?.addEventListener('click', async () => {
+                if (!currentEmployeeReport) return;
+                try {
+                    await window.api.reports.employeeReportPDF(currentEmployeeReport);
+                    await showMsg('تم تصدير التقرير بنجاح');
+                } catch (err) {
+                    await showMsg('فشل التصدير: ' + (err?.message || err), 'خطأ');
+                }
             });
 
             let currentCompanyReport = null;

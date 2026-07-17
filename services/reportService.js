@@ -703,6 +703,124 @@ async function generateDailySummaryReportPDF(report) {
     return bufferPromise;
 }
 
+// ─── تقرير الموظف (حسب من أنشأ الطلب) ───
+async function generateEmployeeReportPDF(report) {
+    const doc = new PDFDocument({
+        size: [PAGE_WIDTH, PAGE_HEIGHT],
+        margin: 0,
+        autoFirstPage: false
+    });
+    doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
+
+    const chunks = [];
+    doc.on('data', c => chunks.push(c));
+    const bufferPromise = new Promise(resolve => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+    const font = getArabicFont(doc);
+    doc.font(font);
+
+    let y = 58;
+    drawHeader(doc, 'تقرير الموظف', 'شركة ديما الحياة', font);
+
+    const validOrders = (report.orders || []).filter(o => !isOrderReturned(o));
+    const totalInvoice = validOrders.reduce((s, o) => s + (o.AmountIQD || 0), 0);
+    const totalDelivery = validOrders.reduce((s, o) => s + getDriverDeliveryAmount(o), 0);
+    const totalNet = validOrders.reduce((s, o) => s + (o.TotalIQD || 0), 0);
+    const totalDue = validOrders.reduce((s, o) => s + getAmountDue(o), 0);
+
+    drawCards(doc, [
+        { label: 'الموظف', value: report.employeeName || report.employee?.DisplayName || '-' },
+        { label: 'التاريخ', value: report.date },
+        { label: 'عدد الطلبات', value: report.count.toString(), numeric: true },
+        { label: 'عدد المرتجعات', value: (report.countReturned || 0).toString(), numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع', numeric: true }
+    ], y, font);
+    y += 46;
+
+    drawSectionTitle(doc, 'تفاصيل الطلبات', y, font);
+    y += 18;
+
+    const cols = [
+        { width: 38, label: 'الحالة' },
+        { width: 44, label: 'رقم الطلب' },
+        { width: 54, label: 'رقم الشحنة' },
+        { width: 48, label: 'المتجر' },
+        { width: 48, label: 'المستلم' },
+        { width: 46, label: 'الهاتف' },
+        { width: 72, label: 'العنوان' },
+        { width: 42, label: 'السائق' },
+        { width: 18, label: 'قطع' },
+        { width: 48, label: 'فاتورة' },
+        { width: 48, label: 'توصيل' },
+        { width: 48, label: 'النهائي' },
+        { width: 48, label: 'المستحق' },
+        { width: 34, label: 'طباعة' },
+        { width: 52, label: 'ملاحظات' }
+    ];
+    const wrap = (s, n) => (s || '-').toString().slice(0, n);
+    const BOTTOM_MARGIN = 85;
+    const numericCols = [1, 2, 5, 8, 9, 10, 11, 12];
+
+    y += drawTableHead(doc, cols, y, font, true);
+
+    report.orders.forEach((o, i) => {
+        const statusTxt = STATUS_LABELS[o.Status || o.status] || (o.Status || o.status) || '-';
+        const driverAmt = getDriverDeliveryAmount(o);
+        const due = getAmountDue(o);
+        const cells = [
+            statusTxt,
+            wrap(o.AdminOrderNo, 10),
+            wrap(o.ShipmentNumber, 14),
+            wrap(o.StoreName, 18),
+            wrap(o.CustomerName, 16),
+            wrap(o.CustomerPhone, 10),
+            wrap(getFullAddress(o), 40),
+            wrap(o.DriverName, 16),
+            (o.Pieces || 1).toString(),
+            formatIQD(o.AmountIQD),
+            o.FreeDelivery ? txt('مجاني') + ' ' + formatIQD(driverAmt) : formatIQD(driverAmt),
+            formatIQD(o.TotalIQD),
+            formatIQD(due),
+            o.LabelPrinted ? 'تم' : '-',
+            txt(o.Notes)
+        ];
+        const rowH = getTableRowHeight(doc, cols, cells, font, null, numericCols);
+        if (y + rowH > PAGE_HEIGHT - BOTTOM_MARGIN) {
+            drawFooter(doc, font);
+            doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
+            doc.font(font);
+            drawHeader(doc, 'تقرير الموظف', 'شركة ديما الحياة', font);
+            y = 58;
+            y += drawTableHead(doc, cols, y, font, true);
+        }
+        const returned = isOrderReturned(o);
+        drawTableRow(doc, cols, cells, y, i % 2 === 1, font, null, returned, numericCols);
+        y += rowH;
+    });
+
+    y += 12;
+    if (y + 120 > PAGE_HEIGHT - 25) {
+        drawFooter(doc, font);
+        doc.addPage({ size: [PAGE_WIDTH, PAGE_HEIGHT], margin: 0 });
+        doc.font(font);
+        drawHeader(doc, 'تقرير الموظف', 'شركة ديما الحياة', font);
+        y = 58;
+    }
+    y = drawDeliveryFeeStats(doc, report, y, font);
+    drawSummary(doc, [
+        { label: 'عدد الطلبات', value: report.count.toString(), numeric: true },
+        { label: 'عدد المرتجعات', value: (report.countReturned || 0).toString(), numeric: true },
+        { label: 'إجمالي الفواتير', value: formatIQD(totalInvoice) + ' د.ع', numeric: true },
+        { label: 'أجور التوصيل', value: formatIQD(totalDelivery) + ' د.ع', numeric: true },
+        { label: 'المبلغ النهائي', value: formatIQD(totalNet) + ' د.ع', numeric: true },
+        { label: 'المبلغ المستحق', value: formatIQD(totalDue) + ' د.ع', numeric: true }
+    ], y, font);
+
+    drawFooter(doc, font);
+    doc.end();
+    return bufferPromise;
+}
+
 // ─── تقرير الشركة اليومي ───
 async function generateCompanyReportPDF(report) {
     const doc = new PDFDocument({
@@ -942,6 +1060,80 @@ function getDriverReportByRange(driverId, dateFrom, dateTo) {
     };
 }
 
+function getEmployeeReportByRange(employeeUserId, dateFrom, dateTo) {
+    const db_ = db.getDatabase();
+    const employee = db_.prepare(
+        'SELECT UserID, Username, DisplayName, Role, Active FROM AppUsers WHERE UserID = ?'
+    ).get(employeeUserId);
+    if (!employee) return null;
+    const dTo = dateTo || dateFrom;
+    const orders = db_.prepare(`
+        SELECT o.OrderID, o.AdminOrderNo, o.ShipmentNumber, o.StoreName, o.StorePhone,
+               o.CustomerName, o.CustomerPhone, o.Address, o.RegionID, r.RegionName, r.RegionArea,
+               o.Pieces, o.AmountIQD,
+               o.DeliveryFeeIQD, o.FreeDelivery, o.WaivedDeliveryIQD, o.TotalIQD,
+               o.Notes, o.DriverID, o.CreatedDate, o.DeliveredDate, COALESCE(o.LabelPrinted, 0) AS LabelPrinted,
+               COALESCE(o.ReturnedOrderReceived, 0) AS ReturnedOrderReceived,
+               COALESCE(d.DriverName, rd.DriverName) AS DriverName,
+               u.DisplayName AS CreatedByName,
+               CASE WHEN LOWER(TRIM(o.Status)) IN ('canceled','returned') OR o.Status LIKE '%ملغي%' OR o.Status LIKE '%راجع%'
+                    OR o.Status IN ('RejectedByCustomer','Returned','ملغي','Canceled') THEN 'Returned'
+                    ELSE COALESCE(o.Status, 'New') END AS Status
+        FROM Orders o
+        LEFT JOIN AppUsers u ON o.CreatedByUserID = u.UserID
+        LEFT JOIN Drivers d ON o.DriverID = d.DriverID
+        LEFT JOIN Drivers rd ON o.ReturnedByDriverID = rd.DriverID
+        LEFT JOIN Regions r ON o.RegionID = r.RegionID
+        WHERE o.CreatedByUserID = ? AND date(o.CreatedDate) >= date(?) AND date(o.CreatedDate) <= date(?)
+        ORDER BY o.OrderID
+    `).all(employeeUserId, dateFrom, dTo);
+    feeCollectionService.markOrdersWithFeesCollected(orders);
+    const systemInvoiceTotal = orders.reduce((sum, o) => sum + (Number(o.AmountIQD) || 0), 0);
+    const validOrders = orders.filter(o => !isOrderReturned(o));
+    const countReturned = orders.filter(o => isOrderReturned(o)).length;
+    const totalAmount = validOrders.reduce((s, o) => s + (o.AmountIQD || 0), 0);
+    const totalDelivery = validOrders.reduce((s, o) => s + getDriverDeliveryAmount(o), 0);
+    const net = validOrders.reduce((s, o) => s + (o.TotalIQD || 0), 0);
+    const totalDue = validOrders.reduce((s, o) => s + getAmountDue(o), 0);
+    const countFreeDelivery = validOrders.filter(o => o.FreeDelivery).length;
+    const countPaidDelivery = validOrders.filter(o => !o.FreeDelivery).length;
+    const deliveryFeeBreakdown = {};
+    validOrders.filter(o => !o.FreeDelivery).forEach(o => {
+        const fee = Math.round(o.DeliveryFeeIQD || 0);
+        deliveryFeeBreakdown[fee] = (deliveryFeeBreakdown[fee] || 0) + 1;
+    });
+    const freeDeliveryBreakdown = {};
+    validOrders.filter(o => o.FreeDelivery).forEach(o => {
+        const waived = Math.round(o.WaivedDeliveryIQD || 0);
+        freeDeliveryBreakdown[waived] = (freeDeliveryBreakdown[waived] || 0) + 1;
+    });
+    const dateStr = dateFrom === dTo ? dateFrom : dateFrom + ' إلى ' + dTo;
+    const countKarkh = validOrders.filter(o => (o.RegionArea || '') === 'الكرخ').length;
+    const countRusafa = validOrders.filter(o => (o.RegionArea || '') === 'الرصافة').length;
+    const employeeName = employee.DisplayName || employee.Username || 'موظف';
+    return {
+        employee,
+        employeeName,
+        date: dateStr,
+        dateFrom,
+        dateTo: dTo,
+        orders,
+        count: validOrders.length,
+        countReturned,
+        countKarkh,
+        countRusafa,
+        totalAmount,
+        totalDelivery,
+        systemInvoiceTotal,
+        net,
+        totalDue,
+        countFreeDelivery,
+        countPaidDelivery,
+        deliveryFeeBreakdown,
+        freeDeliveryBreakdown
+    };
+}
+
 function getCompanyDailyReport(date) {
     return getCompanyReportByRange(date, date);
 }
@@ -1120,10 +1312,12 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
 module.exports = {
     getDriverDailyReport,
     getDriverReportByRange,
+    getEmployeeReportByRange,
     getCompanyDailyReport,
     getCompanyReportByRange,
     getDailySummaryReport,
     generateDriverReportPDF,
+    generateEmployeeReportPDF,
     generateCompanyReportPDF,
     generateDailySummaryReportPDF,
     generateOrdersExportPDF
