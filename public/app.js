@@ -2706,18 +2706,68 @@ const screens = {
 };
 
 const SIDEBAR_STORAGE = 'appSidebarCollapsed';
+const MOBILE_NAV_MQ = window.matchMedia('(max-width: 900px)');
+
+function isMobileNav() {
+    return MOBILE_NAV_MQ.matches;
+}
+
+function setMobileNavOpen(open) {
+    const appBody = document.getElementById('appBody');
+    if (!appBody) return;
+    if (open) {
+        appBody.classList.remove('sidebar-collapsed');
+        appBody.classList.add('mobile-nav-open');
+    } else {
+        appBody.classList.add('sidebar-collapsed');
+        appBody.classList.remove('mobile-nav-open');
+        if (!isMobileNav()) {
+            localStorage.setItem(SIDEBAR_STORAGE, '1');
+        }
+    }
+}
+
+function applySidebarForViewport() {
+    const appBody = document.getElementById('appBody');
+    if (!appBody) return;
+    if (isMobileNav()) {
+        appBody.classList.add('sidebar-collapsed');
+        appBody.classList.remove('mobile-nav-open');
+    } else {
+        appBody.classList.remove('mobile-nav-open');
+        const saved = localStorage.getItem(SIDEBAR_STORAGE);
+        if (saved === '1') appBody.classList.add('sidebar-collapsed');
+        else appBody.classList.remove('sidebar-collapsed');
+    }
+}
+
 document.getElementById('sidebarToggle')?.addEventListener('click', () => {
     const appBody = document.getElementById('appBody');
     if (!appBody) return;
+    if (isMobileNav()) {
+        const willOpen = appBody.classList.contains('sidebar-collapsed');
+        setMobileNavOpen(willOpen);
+        return;
+    }
     const collapsed = appBody.classList.toggle('sidebar-collapsed');
     localStorage.setItem(SIDEBAR_STORAGE, collapsed ? '1' : '0');
 });
 
-(function applySidebarState() {
-    const saved = localStorage.getItem(SIDEBAR_STORAGE);
+document.getElementById('appBody')?.addEventListener('click', (e) => {
     const appBody = document.getElementById('appBody');
-    if (appBody && saved === '1') appBody.classList.add('sidebar-collapsed');
-})();
+    if (!appBody || !isMobileNav() || !appBody.classList.contains('mobile-nav-open')) return;
+    if (e.target.closest('.sidebar') || e.target.closest('.sidebar-toggle')) return;
+    setMobileNavOpen(false);
+});
+
+document.getElementById('mainNav')?.addEventListener('click', (e) => {
+    if (!isMobileNav()) return;
+    const link = e.target.closest('a.nav-item');
+    if (link) setMobileNavOpen(false);
+});
+
+MOBILE_NAV_MQ.addEventListener('change', applySidebarForViewport);
+applySidebarForViewport();
 
 document.getElementById('btnLogout')?.addEventListener('click', async () => {
     try {

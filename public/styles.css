@@ -111,10 +111,16 @@ body {
 
 .sidebar-toggle-icon {
     transition: transform 0.2s;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.app-body:not(.sidebar-collapsed) .sidebar-toggle-icon {
+    transform: rotate(0deg);
 }
 
 .app-body.sidebar-collapsed .sidebar-toggle-icon {
-    transform: rotate(180deg);
+    transform: rotate(0deg);
 }
 
 /* ─── القائمة الجانبية ─── */
@@ -3287,4 +3293,409 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     .stat-cards { grid-template-columns: 1fr 1fr; }
     .sidebar { width: 260px; }
     .sidebar-toggle { right: 258px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   جوال — لوحة المدير (خط واضح، أرقام غامقة، تجربة ممتازة)
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+    html {
+        -webkit-text-size-adjust: 100%;
+        text-size-adjust: 100%;
+    }
+
+    body {
+        font-size: 16px;
+        font-weight: 500;
+        line-height: 1.55;
+    }
+
+    .content {
+        margin-right: 0 !important;
+        padding: calc(64px + env(safe-area-inset-top, 0px)) 14px calc(20px + env(safe-area-inset-bottom, 0px));
+    }
+
+    /* القائمة — درج منزلق فوق المحتوى */
+    .sidebar {
+        width: min(300px, 88vw);
+        transform: translateX(100%);
+        transition: transform 0.32s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.32s;
+        z-index: 1001;
+    }
+
+    .app-body:not(.sidebar-collapsed) .sidebar {
+        transform: translateX(0);
+        box-shadow: -16px 0 48px rgba(15, 23, 42, 0.22);
+    }
+
+    .app-body.sidebar-collapsed .sidebar {
+        width: min(300px, 88vw);
+        min-width: unset;
+    }
+
+    .app-body.mobile-nav-open::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.48);
+        z-index: 1000;
+        backdrop-filter: blur(2px);
+        -webkit-backdrop-filter: blur(2px);
+    }
+
+    .sidebar-toggle {
+        position: fixed;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        right: 14px;
+        left: auto;
+        transform: none;
+        width: 50px;
+        height: 50px;
+        border-radius: 14px;
+        z-index: 1002;
+        font-size: 1.15rem;
+        background: linear-gradient(135deg, #059669 0%, #047857 100%);
+        color: #fff;
+        box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+    }
+
+    .app-body.sidebar-collapsed .sidebar-toggle {
+        right: 14px;
+    }
+
+    .sidebar-toggle:hover {
+        color: #fff;
+        background: linear-gradient(135deg, #047857 0%, #065F46 100%);
+    }
+
+    .sidebar-toggle-icon {
+        font-size: 0.85rem;
+        font-weight: 800;
+    }
+
+    .logo {
+        padding: 22px 16px;
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+    .nav-item span {
+        font-size: 1rem;
+        font-weight: 600;
+    }
+
+    .nav-item.active:not(.nav-child) span,
+    .nav-item.nav-child.active span {
+        font-weight: 800;
+    }
+
+  .page-title {
+        font-size: 1.45rem;
+        font-weight: 800;
+        margin-bottom: 18px;
+    }
+
+    .card {
+        padding: 18px 16px;
+        border-radius: 16px;
+    }
+
+    /* أزرار وحقول — كبيرة وواضحة */
+    input, select, textarea, .btn {
+        font-size: 16px !important;
+        font-weight: 600;
+    }
+
+    .btn {
+        min-height: 48px;
+        padding: 12px 18px;
+        font-weight: 700;
+        border-radius: 12px;
+    }
+
+    .btn-sm {
+        min-height: 42px;
+        padding: 10px 14px;
+        font-size: 0.92rem !important;
+        font-weight: 700;
+    }
+
+    .form-group label {
+        font-size: 0.92rem;
+        font-weight: 800;
+        color: var(--text);
+        margin-bottom: 8px;
+    }
+
+    /* لوحة التحكم — أرقام كبيرة وغامقة */
+    .stat-cards {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .stat-card {
+        padding: 18px 14px;
+        border-radius: 16px;
+    }
+
+    .stat-card .value {
+        font-size: 2rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+    }
+
+    .stat-card .label {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: var(--text);
+        opacity: 0.75;
+    }
+
+    /* شاشة الطلبات */
+    .orders-hero {
+        padding: 18px 14px 12px;
+    }
+
+    .orders-title {
+        font-size: 1.35rem;
+        font-weight: 800;
+    }
+
+    .orders-subtitle {
+        font-size: 0.92rem;
+        font-weight: 600;
+    }
+
+    .orders-count-pill {
+        font-size: 0.88rem;
+        font-weight: 800;
+        padding: 8px 14px;
+    }
+
+    .orders-stats-bar {
+        gap: 10px;
+        padding: 4px 2px 8px;
+    }
+
+    .orders-stat {
+        min-width: 108px;
+        padding: 14px 12px;
+        border-radius: 14px;
+    }
+
+    .orders-stat-value {
+        font-size: 1.55rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .orders-stat-label {
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: var(--text);
+        opacity: 0.7;
+    }
+
+    .orders-panel-heading,
+    .orders-field-label,
+    .orders-chips-label {
+        font-size: 0.88rem;
+        font-weight: 800;
+    }
+
+    .orders-search-input {
+        padding: 16px 48px 16px 16px;
+        font-size: 16px !important;
+        font-weight: 600;
+        border-radius: 14px;
+    }
+
+    .orders-chip {
+        padding: 11px 18px;
+        font-size: 0.92rem;
+        font-weight: 700;
+    }
+
+    .orders-table-headbar-title {
+        font-size: 1.05rem;
+        font-weight: 800;
+    }
+
+    .orders-table-headbar-meta {
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    /* جدول الطلبات — نص أوضح عند التمرير الأفقي */
+    .orders-table-wrap {
+        border-radius: 12px;
+        box-shadow: inset 0 0 0 1px var(--border);
+    }
+
+    .orders-table {
+        font-size: 0.95rem;
+        min-width: 920px;
+    }
+
+    .orders-table thead th {
+        font-size: 0.88rem;
+        font-weight: 800;
+        padding: 16px 12px;
+    }
+
+    .orders-table tbody td {
+        padding: 14px 12px;
+    }
+
+    .orders-shipment-num {
+        font-size: 1.15rem;
+        font-weight: 800;
+    }
+
+    .orders-order-meta {
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .orders-party-name {
+        font-size: 1rem;
+        font-weight: 800;
+    }
+
+    .orders-party-phone {
+        font-size: 0.95rem;
+        font-weight: 700;
+    }
+
+    .orders-address-text {
+        font-size: 0.92rem;
+        font-weight: 600;
+        line-height: 1.45;
+    }
+
+    .orders-money-list li span {
+        font-weight: 700;
+        font-size: 0.82rem;
+    }
+
+    .orders-money-list .iqd,
+    .orders-money-list strong,
+    .iqd {
+        font-size: 1.02rem;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: -0.01em;
+    }
+
+    .orders-money-list .iqd-total {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: var(--primary-dark);
+    }
+
+    .badge {
+        font-size: 0.85rem;
+        font-weight: 800;
+        padding: 7px 12px;
+    }
+
+    .orders-ops-k {
+        font-weight: 800;
+    }
+
+    .orders-ops-v {
+        font-weight: 700;
+    }
+
+    .order-actions--stack .btn-sm {
+        min-height: 44px;
+        font-weight: 700;
+    }
+
+    /* إشعارات التوصيل المجاني */
+    .ovn-panel { padding: 14px; }
+    .ovn-shipment { font-size: 1.1rem; font-weight: 800; }
+    .ovn-notes-quote { font-size: 1.02rem; font-weight: 700; line-height: 1.55; }
+    .ovn-detail-value { font-weight: 700; }
+    .ovn-amount strong { font-size: 1.05rem; font-weight: 800; }
+
+    /* طلب جديد */
+    .new-order-card-header {
+        font-size: 1.05rem;
+        font-weight: 800;
+        padding: 16px 18px;
+    }
+
+    .new-order-card-body {
+        padding: 18px 16px;
+    }
+
+    .new-order-field label {
+        font-weight: 800;
+    }
+
+    .new-order-total-value {
+        font-size: 1.35rem;
+        font-weight: 800;
+    }
+
+    /* جداول عامة */
+    th, td {
+        padding: 14px 12px;
+        font-size: 0.92rem;
+    }
+
+    th {
+        font-weight: 800;
+        font-size: 0.88rem;
+    }
+
+    /* تسجيل الدخول */
+    .login-screen { padding: 20px 16px; }
+    .login-card { padding: 32px 22px; border-radius: 20px; }
+    .login-logo { font-size: 1.45rem; font-weight: 800; }
+
+    /* تذييل */
+    .app-footer {
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .app-footer-content {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px 10px;
+        text-align: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-card .value {
+        font-size: 2.15rem;
+    }
+
+    .orders-stat {
+        min-width: 0;
+        flex: 1 1 calc(50% - 8px);
+    }
+
+    .orders-stats-bar {
+        flex-wrap: wrap;
+    }
+
+    .orders-toolbar-btns {
+        width: 100%;
+    }
+
+    .orders-toolbar-btns .btn {
+        flex: 1;
+        min-width: 0;
+    }
 }
