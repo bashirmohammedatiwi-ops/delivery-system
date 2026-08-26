@@ -118,119 +118,154 @@ function formatDateShortAr(iso) {
     }).format(d);
 }
 
-function getDateRangePreset(preset, refDateStr) {
-    const ref = parseISODate(refDateStr) || new Date();
-    const from = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
-    const to = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
-    switch (preset) {
-        case 'yesterday':
-            from.setDate(from.getDate() - 1);
-            to.setDate(to.getDate() - 1);
-            break;
-        case 'week':
-            from.setDate(from.getDate() - 6);
-            break;
-        case 'month':
-            from.setDate(1);
-            break;
-        case 'today':
-        default:
-            break;
+function getDaysInMonth(year, month) {
+    return new Date(year, month, 0).getDate();
+}
+
+function splitISODate(iso) {
+    const d = parseISODate(iso) || new Date();
+    return { y: d.getFullYear(), m: d.getMonth() + 1, day: d.getDate() };
+}
+
+function buildDateSelectOptions(y, m, day) {
+    const currentYear = new Date().getFullYear();
+    let years = '';
+    for (let yr = currentYear + 1; yr >= currentYear - 6; yr--) {
+        years += `<option value="${yr}"${yr === y ? ' selected' : ''}>${yr}</option>`;
     }
-    return { from: toISODate(from), to: toISODate(to) };
+    let months = '';
+    for (let mo = 1; mo <= 12; mo++) {
+        const v = String(mo).padStart(2, '0');
+        months += `<option value="${v}"${mo === m ? ' selected' : ''}>${v}</option>`;
+    }
+    const maxDay = getDaysInMonth(y, m);
+    const safeDay = Math.min(day, maxDay);
+    let days = '';
+    for (let da = 1; da <= maxDay; da++) {
+        const v = String(da).padStart(2, '0');
+        days += `<option value="${v}"${da === safeDay ? ' selected' : ''}>${v}</option>`;
+    }
+    return { years, months, days, safeDay };
 }
 
 function dateRangePickerHtml(prefix, today, opts = {}) {
     const fromId = opts.fromId || `${prefix}DateFrom`;
     const toId = opts.toId || `${prefix}DateTo`;
-    const singleDay = opts.singleDayDefault !== false;
+    const parts = splitISODate(today);
+    const fromOpts = buildDateSelectOptions(parts.y, parts.m, parts.day);
     return `
         <div class="date-range-picker" data-prefix="${prefix}" data-today="${today}">
-            <div class="date-range-presets" role="group" aria-label="فترات سريعة">
-                <button type="button" class="date-preset-btn active" data-preset="today">اليوم</button>
-                <button type="button" class="date-preset-btn" data-preset="yesterday">أمس</button>
-                <button type="button" class="date-preset-btn" data-preset="week">7 أيام</button>
-                <button type="button" class="date-preset-btn" data-preset="month">هذا الشهر</button>
-            </div>
-            <label class="date-single-toggle">
-                <input type="checkbox" class="date-single-check" ${singleDay ? 'checked' : ''}>
-                <span>يوم واحد فقط</span>
-            </label>
-            <div class="date-range-fields">
-                <div class="date-range-field">
+            <input type="hidden" id="${fromId}" class="date-hidden-from" value="${today}">
+            <input type="hidden" id="${toId}" class="date-hidden-to" value="${today}">
+            <div class="date-range-row">
+                <div class="date-range-block" data-side="from">
                     <label class="date-range-label">من تاريخ</label>
-                    <input type="date" id="${fromId}" class="date-range-input date-from" value="${today}" lang="en-GB" dir="ltr" inputmode="numeric">
-                    <span class="date-range-hint date-from-hint">${formatDateAr(today)}</span>
+                    <div class="date-triple" data-side="from">
+                        <select class="date-part date-y" aria-label="سنة من">${fromOpts.years}</select>
+                        <span class="date-sep" aria-hidden="true">/</span>
+                        <select class="date-part date-m" aria-label="شهر من">${fromOpts.months}</select>
+                        <span class="date-sep" aria-hidden="true">/</span>
+                        <select class="date-part date-d" aria-label="يوم من">${fromOpts.days}</select>
+                    </div>
                 </div>
-                <div class="date-range-field date-range-field--to">
+                <div class="date-range-block" data-side="to">
                     <label class="date-range-label">إلى تاريخ</label>
-                    <input type="date" id="${toId}" class="date-range-input date-to" value="${today}" lang="en-GB" dir="ltr" inputmode="numeric">
-                    <span class="date-range-hint date-to-hint">${formatDateAr(today)}</span>
+                    <div class="date-triple" data-side="to">
+                        <select class="date-part date-y" aria-label="سنة إلى">${fromOpts.years}</select>
+                        <span class="date-sep" aria-hidden="true">/</span>
+                        <select class="date-part date-m" aria-label="شهر إلى">${fromOpts.months}</select>
+                        <span class="date-sep" aria-hidden="true">/</span>
+                        <select class="date-part date-d" aria-label="يوم إلى">${fromOpts.days}</select>
+                    </div>
                 </div>
             </div>
-            <div class="date-range-summary">${singleDay ? `الفترة: يوم ${formatDateShortAr(today)}` : `الفترة: من ${formatDateShortAr(today)} إلى ${formatDateShortAr(today)}`}</div>
+            <div class="date-range-summary">من ${parts.y}/${String(parts.m).padStart(2, '0')}/${String(fromOpts.safeDay).padStart(2, '0')} — إلى ${parts.y}/${String(parts.m).padStart(2, '0')}/${String(fromOpts.safeDay).padStart(2, '0')}</div>
         </div>`;
+}
+
+function readDateTriple(triple) {
+    const y = parseInt(triple.querySelector('.date-y')?.value, 10);
+    const m = parseInt(triple.querySelector('.date-m')?.value, 10);
+    let d = parseInt(triple.querySelector('.date-d')?.value, 10);
+    if (!y || !m || !d) return '';
+    const max = getDaysInMonth(y, m);
+    if (d > max) d = max;
+    return toISODate(new Date(y, m - 1, d));
+}
+
+function setDateTriple(triple, iso) {
+    const { y, m, day } = splitISODate(iso);
+    const opts = buildDateSelectOptions(y, m, day);
+    const yEl = triple.querySelector('.date-y');
+    const mEl = triple.querySelector('.date-m');
+    const dEl = triple.querySelector('.date-d');
+    if (yEl) yEl.innerHTML = opts.years;
+    if (mEl) mEl.innerHTML = opts.months;
+    if (dEl) dEl.innerHTML = opts.days;
+    if (yEl) yEl.value = String(y);
+    if (mEl) mEl.value = String(m).padStart(2, '0');
+    if (dEl) dEl.value = String(opts.safeDay).padStart(2, '0');
+}
+
+function refreshDateTripleDays(triple) {
+    const y = parseInt(triple.querySelector('.date-y')?.value, 10);
+    const m = parseInt(triple.querySelector('.date-m')?.value, 10);
+    const dEl = triple.querySelector('.date-d');
+    if (!y || !m || !dEl) return;
+    const cur = parseInt(dEl.value, 10) || 1;
+    const max = getDaysInMonth(y, m);
+    const safe = Math.min(cur, max);
+    let days = '';
+    for (let da = 1; da <= max; da++) {
+        const v = String(da).padStart(2, '0');
+        days += `<option value="${v}"${da === safe ? ' selected' : ''}>${v}</option>`;
+    }
+    dEl.innerHTML = days;
+}
+
+function formatDateSlash(iso) {
+    if (!iso) return '—';
+    const { y, m, day } = splitISODate(iso);
+    return `${y}/${String(m).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
 }
 
 function initDateRangePicker(root) {
     if (!root || root.dataset.initialized === '1') return;
     root.dataset.initialized = '1';
-    const today = root.dataset.today || toISODate(new Date());
-    const fromEl = root.querySelector('.date-from');
-    const toEl = root.querySelector('.date-to');
-    const fromHint = root.querySelector('.date-from-hint');
-    const toHint = root.querySelector('.date-to-hint');
+    const fromHidden = root.querySelector('.date-hidden-from');
+    const toHidden = root.querySelector('.date-hidden-to');
+    const fromTriple = root.querySelector('.date-triple[data-side="from"]');
+    const toTriple = root.querySelector('.date-triple[data-side="to"]');
     const summary = root.querySelector('.date-range-summary');
-    const singleCheck = root.querySelector('.date-single-check');
-    const toField = root.querySelector('.date-range-field--to');
-    const presetBtns = root.querySelectorAll('.date-preset-btn');
+    const today = root.dataset.today || toISODate(new Date());
 
-    const updateHints = () => {
-        const f = fromEl?.value || '';
-        let t = toEl?.value || f;
-        if (singleCheck?.checked) t = f;
-        if (fromHint) fromHint.textContent = formatDateAr(f);
-        if (toHint) toHint.textContent = formatDateAr(t);
-        if (summary) {
-            summary.textContent = !f
-                ? 'اختر التاريخ'
-                : (f === t ? `الفترة: يوم ${formatDateShortAr(f)}` : `الفترة: من ${formatDateShortAr(f)} إلى ${formatDateShortAr(t)}`);
+    if (fromTriple && fromHidden) setDateTriple(fromTriple, fromHidden.value || today);
+    if (toTriple && toHidden) setDateTriple(toTriple, toHidden.value || today);
+
+    const sync = () => {
+        let fromIso = readDateTriple(fromTriple);
+        let toIso = readDateTriple(toTriple);
+        if (fromIso && toIso && toIso < fromIso) {
+            setDateTriple(toTriple, fromIso);
+            toIso = fromIso;
         }
+        if (fromHidden) fromHidden.value = fromIso;
+        if (toHidden) toHidden.value = toIso;
+        if (summary) summary.textContent = `من ${formatDateSlash(fromIso)} — إلى ${formatDateSlash(toIso)}`;
     };
 
-    const applySingleDay = () => {
-        const on = !!singleCheck?.checked;
-        if (toField) toField.classList.toggle('is-hidden', on);
-        if (on && fromEl && toEl) toEl.value = fromEl.value;
-        updateHints();
-    };
-
-    singleCheck?.addEventListener('change', applySingleDay);
-    fromEl?.addEventListener('change', () => {
-        if (singleCheck?.checked && toEl) toEl.value = fromEl.value;
-        presetBtns.forEach(b => b.classList.remove('active'));
-        updateHints();
-    });
-    toEl?.addEventListener('change', () => {
-        presetBtns.forEach(b => b.classList.remove('active'));
-        if (toEl.value && fromEl?.value && toEl.value < fromEl.value) fromEl.value = toEl.value;
-        updateHints();
-    });
-
-    presetBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            presetBtns.forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            const preset = btn.dataset.preset || 'today';
-            if (singleCheck) singleCheck.checked = preset === 'today' || preset === 'yesterday';
-            const range = getDateRangePreset(preset, today);
-            if (fromEl) fromEl.value = range.from;
-            if (toEl) toEl.value = range.to;
-            applySingleDay();
+    const bindTriple = (triple) => {
+        triple?.querySelectorAll('.date-part').forEach(el => {
+            el.addEventListener('change', () => {
+                refreshDateTripleDays(triple);
+                sync();
+            });
         });
-    });
+    };
 
-    applySingleDay();
+    bindTriple(fromTriple);
+    bindTriple(toTriple);
+    sync();
 }
 
 function initAllDateRangePickers(scope) {
@@ -1102,100 +1137,110 @@ const screens = {
                 : '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
 
             const userName = (currentUser?.DisplayName || currentUser?.Username || 'مدير').replace(/</g, '&lt;');
+            const deliveredCount = orders.filter(o => o.Status === 'Delivered').length;
+            const areaTotal = Math.max(todayKarkh + todayRusafa, 1);
+            const karkhPct = Math.round((todayKarkh / areaTotal) * 100);
+            const rusafaPct = 100 - karkhPct;
 
             container.innerHTML = `
                 <div class="screen active dashboard-screen">
-                    <header class="dash-hero">
-                        <div class="dash-hero__row">
-                            <div class="dash-hero__text">
-                                <p class="dash-hero__eyebrow">لوحة التحكم</p>
-                                <h1 class="dash-hero__title">مرحباً، ${userName}</h1>
-                                <p class="dash-hero__date"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
-                            </div>
-                            <div class="dash-hero__badge">
-                                <span class="dash-hero__badge-value">${todayOrders.length}</span>
-                                <span class="dash-hero__badge-label">طلب اليوم</span>
-                            </div>
+                    <header class="dash-hero dash-hero--mobile">
+                        <div class="dash-hero__brand">
+                            <i class="bi bi-truck" aria-hidden="true"></i>
+                            <span>ديما الحياة</span>
+                        </div>
+                        <p class="dash-hero__welcome">مرحباً، ${userName}</p>
+                        <p class="dash-hero__date"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
+                        <div class="dash-hero__mega">
+                            <div class="dash-hero__mega-value">${todayOrders.length}</div>
+                            <div class="dash-hero__mega-label">طلبات اليوم</div>
                         </div>
                     </header>
 
+                    <div class="dash-status-strip" aria-label="حالة الطلبات">
+                        <div class="dash-status-pill dash-status-pill--new">
+                            <span class="dash-status-pill__value">${newCount}</span>
+                            <span class="dash-status-pill__label">جديد</span>
+                        </div>
+                        <div class="dash-status-pill dash-status-pill--driver">
+                            <span class="dash-status-pill__value">${assignedCount}</span>
+                            <span class="dash-status-pill__label">مع السائق</span>
+                        </div>
+                        <div class="dash-status-pill dash-status-pill--done">
+                            <span class="dash-status-pill__value">${deliveredCount}</span>
+                            <span class="dash-status-pill__label">تم التوصيل</span>
+                        </div>
+                        <div class="dash-status-pill dash-status-pill--all">
+                            <span class="dash-status-pill__value">${orders.length}</span>
+                            <span class="dash-status-pill__label">الكل</span>
+                        </div>
+                    </div>
+
+                    <section class="dash-areas-card">
+                        <div class="dash-areas-card__head">
+                            <h2 class="dash-areas-card__title">توزيع اليوم</h2>
+                            <span class="dash-areas-card__total">${todayOrders.length} طلب</span>
+                        </div>
+                        <div class="dash-area-bar">
+                            <div class="dash-area-bar__label"><span>الكرخ</span><strong>${todayKarkh}</strong></div>
+                            <div class="dash-area-bar__track"><div class="dash-area-bar__fill dash-area-bar__fill--karkh" style="width:${karkhPct}%"></div></div>
+                        </div>
+                        <div class="dash-area-bar">
+                            <div class="dash-area-bar__label"><span>الرصافة</span><strong>${todayRusafa}</strong></div>
+                            <div class="dash-area-bar__track"><div class="dash-area-bar__fill dash-area-bar__fill--rusafa" style="width:${rusafaPct}%"></div></div>
+                        </div>
+                    </section>
+
                     <nav class="dash-quick-nav" aria-label="اختصارات سريعة">
-                        <button type="button" class="dash-quick-btn dash-quick-btn--primary" data-screen="new-order">
+                        <button type="button" class="dash-quick-btn dash-quick-btn--primary dash-quick-btn--wide" data-screen="new-order">
                             <i class="bi bi-plus-circle" aria-hidden="true"></i>
-                            <span>طلب جديد</span>
+                            <span>إدخال طلب جديد</span>
                         </button>
                         <button type="button" class="dash-quick-btn" data-screen="orders">
                             <i class="bi bi-box-seam" aria-hidden="true"></i>
                             <span>الطلبات</span>
                         </button>
+                        <button type="button" class="dash-quick-btn" data-screen="driver-receive">
+                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+                            <span>استلام</span>
+                        </button>
                         <button type="button" class="dash-quick-btn nav-admin" data-screen="reports" data-tab="employee">
                             <i class="bi bi-person-badge" aria-hidden="true"></i>
                             <span>تقرير موظف</span>
                         </button>
-                        <button type="button" class="dash-quick-btn nav-admin" data-screen="driver-receive">
-                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
-                            <span>استلام</span>
+                        <button type="button" class="dash-quick-btn nav-admin" data-screen="reports" data-tab="driver">
+                            <i class="bi bi-graph-up" aria-hidden="true"></i>
+                            <span>التقارير</span>
                         </button>
                     </nav>
 
-                    <div class="dash-highlight">
-                        <div class="dash-highlight__main">
-                            <div class="dash-highlight__value">${todayOrders.length}</div>
-                            <div class="dash-highlight__label">إجمالي طلبات اليوم</div>
-                        </div>
-                        <div class="dash-highlight__areas">
-                            <div class="dash-area-chip">
-                                <span class="dash-area-chip__label">الكرخ</span>
-                                <strong class="dash-area-chip__value">${todayKarkh}</strong>
-                            </div>
-                            <div class="dash-area-chip">
-                                <span class="dash-area-chip__label">الرصافة</span>
-                                <strong class="dash-area-chip__value">${todayRusafa}</strong>
-                            </div>
-                        </div>
-                    </div>
-
                     <div class="stat-cards stat-cards--dashboard">
-                        <div class="stat-card stat-card--icon">
-                            <div class="stat-card__icon stat-card__icon--purple"><i class="bi bi-stack" aria-hidden="true"></i></div>
-                            <div class="stat-card__body">
-                                <div class="value">${orders.length}</div>
-                                <div class="label">إجمالي الطلبات</div>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-card--icon">
+                        <div class="stat-card stat-card--icon stat-card--compact">
                             <div class="stat-card__icon stat-card__icon--teal"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
                             <div class="stat-card__body">
                                 <div class="value">${todayOrders.length}</div>
                                 <div class="label">طلبات اليوم</div>
                             </div>
                         </div>
-                        <div class="stat-card stat-card--icon">
+                        <div class="stat-card stat-card--icon stat-card--compact">
                             <div class="stat-card__icon stat-card__icon--pink"><i class="bi bi-star" aria-hidden="true"></i></div>
                             <div class="stat-card__body">
                                 <div class="value">${newCount}</div>
                                 <div class="label">طلبات جديدة</div>
                             </div>
                         </div>
-                        <div class="stat-card stat-card--icon">
+                        <div class="stat-card stat-card--icon stat-card--compact">
                             <div class="stat-card__icon stat-card__icon--blue"><i class="bi bi-truck" aria-hidden="true"></i></div>
                             <div class="stat-card__body">
                                 <div class="value">${assignedCount}</div>
                                 <div class="label">مع السائقين</div>
                             </div>
                         </div>
-                        <div class="stat-card stat-card--icon">
-                            <div class="stat-card__icon stat-card__icon--amber"><i class="bi bi-geo-alt" aria-hidden="true"></i></div>
+                        <div class="stat-card stat-card--icon stat-card--compact">
+                            <div class="stat-card__icon stat-card__icon--purple"><i class="bi bi-stack" aria-hidden="true"></i></div>
                             <div class="stat-card__body">
-                                <div class="value">${todayKarkh}</div>
-                                <div class="label">الكرخ اليوم</div>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-card--icon">
-                            <div class="stat-card__icon stat-card__icon--cyan"><i class="bi bi-pin-map" aria-hidden="true"></i></div>
-                            <div class="stat-card__body">
-                                <div class="value">${todayRusafa}</div>
-                                <div class="label">الرصافة اليوم</div>
+                                <div class="value">${orders.length}</div>
+                                <div class="label">إجمالي الطلبات</div>
                             </div>
                         </div>
                     </div>
