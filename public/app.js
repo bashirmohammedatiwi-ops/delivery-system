@@ -80,6 +80,163 @@ function formatIQD(val) {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(val || 0));
 }
 
+function toISODate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function parseISODate(s) {
+    if (!s) return null;
+    const parts = String(s).split('-').map(Number);
+    if (parts.length < 3) return null;
+    const [y, m, day] = parts;
+    return new Date(y, m - 1, day);
+}
+
+function formatDateAr(iso) {
+    if (!iso) return '—';
+    const d = parseISODate(iso);
+    if (!d || Number.isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat('ar-IQ', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+    }).format(d);
+}
+
+function formatDateShortAr(iso) {
+    if (!iso) return '—';
+    const d = parseISODate(iso);
+    if (!d || Number.isNaN(d.getTime())) return iso;
+    return new Intl.DateTimeFormat('ar-IQ', {
+        day: 'numeric',
+        month: 'numeric',
+        year: 'numeric'
+    }).format(d);
+}
+
+function getDateRangePreset(preset, refDateStr) {
+    const ref = parseISODate(refDateStr) || new Date();
+    const from = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+    const to = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+    switch (preset) {
+        case 'yesterday':
+            from.setDate(from.getDate() - 1);
+            to.setDate(to.getDate() - 1);
+            break;
+        case 'week':
+            from.setDate(from.getDate() - 6);
+            break;
+        case 'month':
+            from.setDate(1);
+            break;
+        case 'today':
+        default:
+            break;
+    }
+    return { from: toISODate(from), to: toISODate(to) };
+}
+
+function dateRangePickerHtml(prefix, today, opts = {}) {
+    const fromId = opts.fromId || `${prefix}DateFrom`;
+    const toId = opts.toId || `${prefix}DateTo`;
+    const singleDay = opts.singleDayDefault !== false;
+    return `
+        <div class="date-range-picker" data-prefix="${prefix}" data-today="${today}">
+            <div class="date-range-presets" role="group" aria-label="فترات سريعة">
+                <button type="button" class="date-preset-btn active" data-preset="today">اليوم</button>
+                <button type="button" class="date-preset-btn" data-preset="yesterday">أمس</button>
+                <button type="button" class="date-preset-btn" data-preset="week">7 أيام</button>
+                <button type="button" class="date-preset-btn" data-preset="month">هذا الشهر</button>
+            </div>
+            <label class="date-single-toggle">
+                <input type="checkbox" class="date-single-check" ${singleDay ? 'checked' : ''}>
+                <span>يوم واحد فقط</span>
+            </label>
+            <div class="date-range-fields">
+                <div class="date-range-field">
+                    <label class="date-range-label">من تاريخ</label>
+                    <input type="date" id="${fromId}" class="date-range-input date-from" value="${today}" lang="en-GB" dir="ltr" inputmode="numeric">
+                    <span class="date-range-hint date-from-hint">${formatDateAr(today)}</span>
+                </div>
+                <div class="date-range-field date-range-field--to">
+                    <label class="date-range-label">إلى تاريخ</label>
+                    <input type="date" id="${toId}" class="date-range-input date-to" value="${today}" lang="en-GB" dir="ltr" inputmode="numeric">
+                    <span class="date-range-hint date-to-hint">${formatDateAr(today)}</span>
+                </div>
+            </div>
+            <div class="date-range-summary">${singleDay ? `الفترة: يوم ${formatDateShortAr(today)}` : `الفترة: من ${formatDateShortAr(today)} إلى ${formatDateShortAr(today)}`}</div>
+        </div>`;
+}
+
+function initDateRangePicker(root) {
+    if (!root || root.dataset.initialized === '1') return;
+    root.dataset.initialized = '1';
+    const today = root.dataset.today || toISODate(new Date());
+    const fromEl = root.querySelector('.date-from');
+    const toEl = root.querySelector('.date-to');
+    const fromHint = root.querySelector('.date-from-hint');
+    const toHint = root.querySelector('.date-to-hint');
+    const summary = root.querySelector('.date-range-summary');
+    const singleCheck = root.querySelector('.date-single-check');
+    const toField = root.querySelector('.date-range-field--to');
+    const presetBtns = root.querySelectorAll('.date-preset-btn');
+
+    const updateHints = () => {
+        const f = fromEl?.value || '';
+        let t = toEl?.value || f;
+        if (singleCheck?.checked) t = f;
+        if (fromHint) fromHint.textContent = formatDateAr(f);
+        if (toHint) toHint.textContent = formatDateAr(t);
+        if (summary) {
+            summary.textContent = !f
+                ? 'اختر التاريخ'
+                : (f === t ? `الفترة: يوم ${formatDateShortAr(f)}` : `الفترة: من ${formatDateShortAr(f)} إلى ${formatDateShortAr(t)}`);
+        }
+    };
+
+    const applySingleDay = () => {
+        const on = !!singleCheck?.checked;
+        if (toField) toField.classList.toggle('is-hidden', on);
+        if (on && fromEl && toEl) toEl.value = fromEl.value;
+        updateHints();
+    };
+
+    singleCheck?.addEventListener('change', applySingleDay);
+    fromEl?.addEventListener('change', () => {
+        if (singleCheck?.checked && toEl) toEl.value = fromEl.value;
+        presetBtns.forEach(b => b.classList.remove('active'));
+        updateHints();
+    });
+    toEl?.addEventListener('change', () => {
+        presetBtns.forEach(b => b.classList.remove('active'));
+        if (toEl.value && fromEl?.value && toEl.value < fromEl.value) fromEl.value = toEl.value;
+        updateHints();
+    });
+
+    presetBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            presetBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            const preset = btn.dataset.preset || 'today';
+            if (singleCheck) singleCheck.checked = preset === 'today' || preset === 'yesterday';
+            const range = getDateRangePreset(preset, today);
+            if (fromEl) fromEl.value = range.from;
+            if (toEl) toEl.value = range.to;
+            applySingleDay();
+        });
+    });
+
+    applySingleDay();
+}
+
+function initAllDateRangePickers(scope) {
+    (scope || document).querySelectorAll('.date-range-picker').forEach(initDateRangePicker);
+}
+
 /* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
 function getAmountDue(o) {
     const total = Number(o.TotalIQD ?? 0) || 0;
@@ -944,33 +1101,102 @@ const screens = {
                 ? notifList.map(renderOverrideNotification).join('')
                 : '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
 
+            const userName = (currentUser?.DisplayName || currentUser?.Username || 'مدير').replace(/</g, '&lt;');
+
             container.innerHTML = `
-                <div class="screen active">
-                    <h1 class="page-title">لوحة التحكم</h1>
-                    <div class="stat-cards">
-                        <div class="stat-card">
-                            <div class="value">${orders.length}</div>
-                            <div class="label">إجمالي الطلبات</div>
+                <div class="screen active dashboard-screen">
+                    <header class="dash-hero">
+                        <div class="dash-hero__row">
+                            <div class="dash-hero__text">
+                                <p class="dash-hero__eyebrow">لوحة التحكم</p>
+                                <h1 class="dash-hero__title">مرحباً، ${userName}</h1>
+                                <p class="dash-hero__date"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
+                            </div>
+                            <div class="dash-hero__badge">
+                                <span class="dash-hero__badge-value">${todayOrders.length}</span>
+                                <span class="dash-hero__badge-label">طلب اليوم</span>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="value">${todayOrders.length}</div>
-                            <div class="label">طلبات اليوم</div>
+                    </header>
+
+                    <nav class="dash-quick-nav" aria-label="اختصارات سريعة">
+                        <button type="button" class="dash-quick-btn dash-quick-btn--primary" data-screen="new-order">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                            <span>طلب جديد</span>
+                        </button>
+                        <button type="button" class="dash-quick-btn" data-screen="orders">
+                            <i class="bi bi-box-seam" aria-hidden="true"></i>
+                            <span>الطلبات</span>
+                        </button>
+                        <button type="button" class="dash-quick-btn nav-admin" data-screen="reports" data-tab="employee">
+                            <i class="bi bi-person-badge" aria-hidden="true"></i>
+                            <span>تقرير موظف</span>
+                        </button>
+                        <button type="button" class="dash-quick-btn nav-admin" data-screen="driver-receive">
+                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
+                            <span>استلام</span>
+                        </button>
+                    </nav>
+
+                    <div class="dash-highlight">
+                        <div class="dash-highlight__main">
+                            <div class="dash-highlight__value">${todayOrders.length}</div>
+                            <div class="dash-highlight__label">إجمالي طلبات اليوم</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="value">${newCount}</div>
-                            <div class="label">طلبات جديدة</div>
+                        <div class="dash-highlight__areas">
+                            <div class="dash-area-chip">
+                                <span class="dash-area-chip__label">الكرخ</span>
+                                <strong class="dash-area-chip__value">${todayKarkh}</strong>
+                            </div>
+                            <div class="dash-area-chip">
+                                <span class="dash-area-chip__label">الرصافة</span>
+                                <strong class="dash-area-chip__value">${todayRusafa}</strong>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="value">${assignedCount}</div>
-                            <div class="label">مع السائقين</div>
+                    </div>
+
+                    <div class="stat-cards stat-cards--dashboard">
+                        <div class="stat-card stat-card--icon">
+                            <div class="stat-card__icon stat-card__icon--purple"><i class="bi bi-stack" aria-hidden="true"></i></div>
+                            <div class="stat-card__body">
+                                <div class="value">${orders.length}</div>
+                                <div class="label">إجمالي الطلبات</div>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="value">${todayKarkh}</div>
-                            <div class="label">الكرخ اليوم</div>
+                        <div class="stat-card stat-card--icon">
+                            <div class="stat-card__icon stat-card__icon--teal"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
+                            <div class="stat-card__body">
+                                <div class="value">${todayOrders.length}</div>
+                                <div class="label">طلبات اليوم</div>
+                            </div>
                         </div>
-                        <div class="stat-card">
-                            <div class="value">${todayRusafa}</div>
-                            <div class="label">الرصافة اليوم</div>
+                        <div class="stat-card stat-card--icon">
+                            <div class="stat-card__icon stat-card__icon--pink"><i class="bi bi-star" aria-hidden="true"></i></div>
+                            <div class="stat-card__body">
+                                <div class="value">${newCount}</div>
+                                <div class="label">طلبات جديدة</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--icon">
+                            <div class="stat-card__icon stat-card__icon--blue"><i class="bi bi-truck" aria-hidden="true"></i></div>
+                            <div class="stat-card__body">
+                                <div class="value">${assignedCount}</div>
+                                <div class="label">مع السائقين</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--icon">
+                            <div class="stat-card__icon stat-card__icon--amber"><i class="bi bi-geo-alt" aria-hidden="true"></i></div>
+                            <div class="stat-card__body">
+                                <div class="value">${todayKarkh}</div>
+                                <div class="label">الكرخ اليوم</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--icon">
+                            <div class="stat-card__icon stat-card__icon--cyan"><i class="bi bi-pin-map" aria-hidden="true"></i></div>
+                            <div class="stat-card__body">
+                                <div class="value">${todayRusafa}</div>
+                                <div class="label">الرصافة اليوم</div>
+                            </div>
                         </div>
                     </div>
                     ${currentUser?.Role === 'admin' ? `
@@ -988,12 +1214,27 @@ const screens = {
                         <div id="overrideNotifList" class="ovn-list">${notifHtml}</div>
                     </section>
                     ` : ''}
-                    <div class="card">
-                        <p>مرحباً بك في نظام إدارة التوصيل - شركة ديما الحياة</p>
-                        <p class="status-map" style="margin-top:12px">استخدم القائمة الجانبية للتنقل بين الأقسام</p>
+                    <div class="card dash-welcome-card">
+                        <p>مرحباً بك في نظام إدارة التوصيل — شركة ديما الحياة</p>
+                        <p class="status-map dash-welcome-hint">استخدم الاختصارات أعلاه أو القائمة للتنقل بين الأقسام</p>
                     </div>
                 </div>
             `;
+
+            container.querySelectorAll('.dash-quick-btn[data-screen]').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const screen = btn.dataset.screen;
+                    const tab = btn.dataset.tab;
+                    if (tab) {
+                        setNavActive(screen, tab);
+                        showScreen(screen, tab);
+                    } else {
+                        setNavActive(screen);
+                        showScreen(screen);
+                    }
+                });
+            });
 
             if (currentUser?.Role === 'admin') {
                 container.querySelectorAll('.btn-override-seen').forEach(btn => {
@@ -1932,8 +2173,9 @@ const screens = {
                                             ${drivers.map(d => `<label class="checkbox-label"><input type="checkbox" class="dailySummaryDriver" value="${d.DriverID}" ${drivers.length <= 5 ? 'checked' : ''}> ${(d.DriverName||'').replace(/</g,'&lt;')}</label>`).join('')}
                     </div>
                             </div>
-                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="dailySummaryFrom" value="${today}"></div>
-                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="dailySummaryTo" value="${today}"></div>
+                                    <div class="report-field report-field--full">
+                                        ${dateRangePickerHtml('dailySummary', today, { fromId: 'dailySummaryFrom', toId: 'dailySummaryTo', singleDayDefault: true })}
+                                    </div>
                                     <button type="button" class="btn btn-primary" id="btnDailySummary">عرض التقرير</button>
                             </div>
                                 <div id="dailySummaryContent"></div>
@@ -1947,8 +2189,9 @@ const screens = {
                                         <label>السائق</label>
                                         <select id="reportDriver">${drivers.map(d => `<option value="${d.DriverID}">${d.DriverName}</option>`).join('')}</select>
                             </div>
-                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="reportDateFrom" value="${today}"></div>
-                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="reportDateTo" value="${today}"></div>
+                                    <div class="report-field report-field--full">
+                                        ${dateRangePickerHtml('report', today)}
+                                    </div>
                                     <button class="btn btn-primary" id="btnDriverReport">عرض التقرير</button>
                                 </div>
                                 <div id="driverReportContent"></div>
@@ -1966,8 +2209,9 @@ const screens = {
                                                 : '<option value="">لا يوجد موظفون</option>'}
                                         </select>
                                     </div>
-                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="employeeDateFrom" value="${today}"></div>
-                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="employeeDateTo" value="${today}"></div>
+                                    <div class="report-field report-field--full">
+                                        ${dateRangePickerHtml('employee', today)}
+                                    </div>
                                     <button class="btn btn-primary" id="btnEmployeeReport" ${employees.length ? '' : 'disabled'}>عرض التقرير</button>
                                 </div>
                                 <div id="employeeReportContent"></div>
@@ -1980,8 +2224,9 @@ const screens = {
                                 <h3 class="report-pane-head">التقرير العام</h3>
                                 <p class="report-pane-desc">ملخص شامل لجميع السائقين والطلبات في الفترة المحددة</p>
                                 <div class="report-form-row">
-                                    <div class="report-field"><label>من تاريخ</label><input type="date" id="companyDateFrom" value="${today}"></div>
-                                    <div class="report-field"><label>إلى تاريخ</label><input type="date" id="companyDateTo" value="${today}"></div>
+                                    <div class="report-field report-field--full">
+                                        ${dateRangePickerHtml('company', today)}
+                                    </div>
                                     <button class="btn btn-primary" id="btnCompanyReport">عرض التقرير</button>
                         </div>
                         <div id="companyReportContent"></div>
@@ -1995,6 +2240,7 @@ const screens = {
             const initialTab = container.dataset.initialTab || 'collect';
             container.querySelectorAll('.report-pane').forEach(x => x.classList.remove('active'));
             container.querySelector('#pane-' + initialTab)?.classList.add('active');
+            initAllDateRangePickers(container);
 
             let collectExpectedAmount = null;
             let collectAlreadyPaid = false;
