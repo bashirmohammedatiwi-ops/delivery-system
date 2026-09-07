@@ -105,6 +105,11 @@ function getDatabase() {
     return db;
 }
 
+function getPool() {
+    if (!pool) throw new Error('PostgreSQL pool not initialized. Call initSchema first.');
+    return pool;
+}
+
 async function closePool() {
     if (pool) {
         await pool.end();
@@ -115,6 +120,7 @@ async function closePool() {
 
 module.exports = {
     getDatabase,
+    getPool,
     initSchema,
     closePool,
     getDbPath: () => null

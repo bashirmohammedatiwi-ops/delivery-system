@@ -166,6 +166,25 @@ function ensureDefaultAdmin() {
     ).run('alhayaa', hash, 'ديما الحياة', 'admin', '00000');
 }
 
+async function ensureDefaultAdminAsync() {
+    if (!db.isPostgres()) {
+        ensureDefaultAdmin();
+        return;
+    }
+    const { getPool } = require('../database/pg');
+    const pool = getPool();
+    const { rows } = await pool.query(
+        'SELECT "UserID" FROM "AppUsers" WHERE "Username" = $1',
+        ['alhayaa']
+    );
+    if (rows.length > 0) return;
+    const hash = hashPassword('00000');
+    await pool.query(
+        'INSERT INTO "AppUsers" ("Username", "PasswordHash", "DisplayName", "Role", "Active", "SecretCode") VALUES ($1, $2, $3, $4, 1, $5)',
+        ['alhayaa', hash, 'ديما الحياة', 'admin', '00000']
+    );
+}
+
 function getDisplayName(userId) {
     if (!userId) return '-';
     const database = db.getDatabase();
@@ -188,5 +207,6 @@ module.exports = {
     updateUser,
     deleteUser,
     ensureDefaultAdmin,
+    ensureDefaultAdminAsync,
     getDisplayName
 };

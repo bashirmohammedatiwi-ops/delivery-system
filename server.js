@@ -90,7 +90,7 @@ async function initDbWithRetry(retries = 30, delayMs = 2000) {
         try {
             await db.initSchema();
             try {
-                userAuthService.ensureDefaultAdmin();
+                await userAuthService.ensureDefaultAdminAsync();
             } catch (adminErr) {
                 console.warn('ensureDefaultAdmin warning:', adminErr.message);
             }
