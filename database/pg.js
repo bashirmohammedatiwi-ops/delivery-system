@@ -7,14 +7,12 @@ let pool = null;
 let db = null;
 
 function runAsync(promise) {
+    const deasync = require('deasync');
     let done = false;
     let result;
     let error;
     promise.then((r) => { result = r; done = true; }).catch((e) => { error = e; done = true; });
-    while (!done) {
-        // eslint-disable-next-line no-sync
-        require('deasync').runLoopOnce();
-    }
+    deasync.loopWhile(() => !done);
     if (error) throw error;
     return result;
 }
@@ -50,6 +48,24 @@ function createDbWrapper() {
     };
 }
 
+async function applySchemaIfNeeded(client) {
+    const check = await client.query(`SELECT to_regclass('public."Orders"') AS reg`);
+    if (check.rows[0]?.reg) {
+        console.log('PostgreSQL schema already exists — skip DDL');
+        return;
+    }
+    const schemaPath = path.join(__dirname, 'schema.pg.sql');
+    const schema = fs.readFileSync(schemaPath, 'utf8');
+    const statements = schema
+        .split(';')
+        .map(s => s.trim())
+        .filter(s => s.length > 0 && !s.startsWith('--'));
+    for (const stmt of statements) {
+        await client.query(stmt);
+    }
+    console.log('PostgreSQL schema created');
+}
+
 async function initSchema() {
     if (db) return;
     const connectionString = process.env.DATABASE_URL;
@@ -57,25 +73,31 @@ async function initSchema() {
         throw new Error('DATABASE_URL is required for PostgreSQL');
     }
 
-    pool = new Pool({
+    let newPool = new Pool({
         connectionString,
         max: parseInt(process.env.PG_POOL_MAX || '20', 10),
         idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000
+        connectionTimeoutMillis: 30000
     });
 
-    pool.on('error', (err) => {
+    newPool.on('error', (err) => {
         console.error('PostgreSQL pool error:', err.message);
     });
 
-    await pool.query('SELECT 1');
+    const client = await newPool.connect();
+    try {
+        await client.query('SELECT 1');
+        await applySchemaIfNeeded(client);
+    } catch (err) {
+        client.release();
+        await newPool.end().catch(() => {});
+        throw err;
+    }
+    client.release();
 
-    const schemaPath = path.join(__dirname, 'schema.pg.sql');
-    const schema = fs.readFileSync(schemaPath, 'utf8');
-    await pool.query(schema);
-
+    pool = newPool;
     db = createDbWrapper();
-    console.log('PostgreSQL connected and schema ready');
+    console.log('PostgreSQL connected and ready');
 }
 
 function getDatabase() {

@@ -40,11 +40,16 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // نقطة فحص الصحة لـ Docker (قبل أي مسار آخر)
-app.get('/health', (_req, res) => res.status(200).json({
-    ok: true,
-    version: APP_UI_VERSION,
-    db: db.isPostgres() ? 'postgres' : 'sqlite'
-}));
+app.get('/health', (_req, res) => {
+    const status = dbReady ? 200 : 503;
+    res.status(status).json({
+        ok: dbReady,
+        version: APP_UI_VERSION,
+        db: db.isPostgres() ? 'postgres' : 'sqlite',
+        dbReady,
+        error: dbReady ? undefined : (dbInitError || 'initializing')
+    });
+});
 
 // سياسة الخصوصية — قبل static حتى لا يُعاد index.html
 app.get('/privacy', (req, res) => {
@@ -78,26 +83,34 @@ app.get('/employee/', (_req, res) => res.sendFile(path.join(__dirname, 'employee
 
 // ─── تهيئة قاعدة البيانات (مع إعادة المحاولة) ───
 let dbReady = false;
-async function initDbWithRetry(retries = 5, delayMs = 3000) {
+let dbInitError = null;
+
+async function initDbWithRetry(retries = 30, delayMs = 2000) {
     for (let i = 0; i < retries; i++) {
         try {
             await db.initSchema();
+            try {
+                userAuthService.ensureDefaultAdmin();
+            } catch (adminErr) {
+                console.warn('ensureDefaultAdmin warning:', adminErr.message);
+            }
             dbReady = true;
-            userAuthService.ensureDefaultAdmin();
+            dbInitError = null;
             console.log('Database ready');
-            return;
+            return true;
         } catch (err) {
+            dbInitError = err.message;
             console.error('Database init attempt', i + 1, 'failed:', err.message);
             if (i === retries - 1) {
-                console.error('Database init failed after', retries, 'attempts. Server will run in limited mode.');
-            } else {
-                console.log('Retrying in', delayMs / 1000, 'seconds...');
-                await new Promise(r => setTimeout(r, delayMs));
+                console.error('Database init failed after', retries, 'attempts.');
+                return false;
             }
+            console.log('Retrying in', delayMs / 1000, 'seconds...');
+            await new Promise(r => setTimeout(r, delayMs));
         }
     }
+    return false;
 }
-initDbWithRetry();
 
 // ─── مصادقة مستخدمي التطبيق (ويب) ───
 function requireAppAuth(req, res, next) {
@@ -118,7 +131,12 @@ function requireAdmin(req, res, next) {
 
 // التحقق من جاهزية قاعدة البيانات لجميع طلبات API
 app.use('/api', (req, res, next) => {
-    if (!dbReady) return res.status(503).json({ error: 'قاعدة البيانات قيد التهيئة، حاول لاحقاً' });
+    if (!dbReady) {
+        return res.status(503).json({
+            error: 'قاعدة البيانات قيد التهيئة، حاول لاحقاً',
+            detail: dbInitError || undefined
+        });
+    }
     next();
 });
 
@@ -1023,6 +1041,19 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`شركة ديما الحياة - نظام التوصيل (ويب) يعمل على http://0.0.0.0:${PORT}`);
+async function startServer() {
+    console.log('Initializing database...');
+    const ok = await initDbWithRetry();
+    if (!ok) {
+        console.error('FATAL: Could not initialize database. API will return 503 until restart succeeds.');
+    }
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`شركة ديما الحياة - نظام التوصيل (ويب) يعمل على http://0.0.0.0:${PORT}`);
+        console.log('Database status:', dbReady ? 'ready' : 'NOT READY');
+    });
+}
+
+startServer().catch(err => {
+    console.error('Server startup failed:', err);
+    process.exit(1);
 });
