@@ -308,6 +308,9 @@ async function renderNewOrder(container) {
             }
             if (digits === lastLookupDigits) return;
 
+            const piecesEl = document.getElementById('pieces');
+            if (piecesEl) piecesEl.value = '1';
+
             try {
                 const data = await window.api.customers.lookupByPhone(phone);
                 lastLookupDigits = digits;

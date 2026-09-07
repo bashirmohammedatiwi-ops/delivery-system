@@ -187,34 +187,19 @@ class _LoginFormState extends State<_LoginForm> {
             EmployeeUiKit.infoBanner(message: _error!, color: EmployeeTheme.danger, icon: Icons.error_outline_rounded),
           ],
           const SizedBox(height: 24),
-          SizedBox(
-            height: 54,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: EmployeeTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
-                boxShadow: EmployeeTheme.shadowFor(EmployeeTheme.primary),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _loading ? null : _login,
-                  borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
-                  child: Center(
-                    child: _loading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(
-                            'دخول',
-                            style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
-                          ),
-                  ),
-                ),
-              ),
+          FilledButton(
+            onPressed: _loading ? null : _login,
+            style: FilledButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd)),
             ),
+            child: _loading
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('دخول'),
           ),
         ],
       ),

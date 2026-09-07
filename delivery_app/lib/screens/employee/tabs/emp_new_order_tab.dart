@@ -157,6 +157,8 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
       _phoneStatsLoading = true;
       _phoneLookupLoading = true;
       _phoneLookupHint = null;
+      // لا نجلب عدد القطع من آخر طلب — يبقى 1 لكل هاتف جديد
+      _piecesCount = 1;
     });
     try {
       final stats = await EmployeeApi.getCustomerStatsByPhone(digits);
@@ -208,6 +210,7 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
         _phoneLookupHint = null;
         _customerDeliveredCount = 0;
         _customerReturnedCount = 0;
+        _piecesCount = 1;
       });
       return;
     }

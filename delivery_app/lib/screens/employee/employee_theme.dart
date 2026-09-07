@@ -49,12 +49,15 @@ class EmployeeTheme {
         BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
       ];
 
-  static TextStyle get titleLarge => GoogleFonts.cairo(fontSize: 22, fontWeight: FontWeight.w800, color: onSurface, height: 1.2);
-  static TextStyle get titleMedium => GoogleFonts.cairo(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface);
-  static TextStyle get titleSmall => GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface);
-  static TextStyle get bodyLarge => GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w500, color: onSurface);
-  static TextStyle get bodyMedium => GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.w500, color: onSurfaceVariant);
-  static TextStyle get labelSmall => GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w700, color: onSurfaceVariant);
+  static TextStyle get titleLarge => _cairo(22, FontWeight.w800, onSurface);
+  static TextStyle get titleMedium => _cairo(17, FontWeight.w800, onSurface);
+  static TextStyle get titleSmall => _cairo(15, FontWeight.w700, onSurface);
+  static TextStyle get bodyLarge => _cairo(15, FontWeight.w500, onSurface);
+  static TextStyle get bodyMedium => _cairo(14, FontWeight.w500, onSurfaceVariant);
+  static TextStyle get labelSmall => _cairo(12, FontWeight.w700, onSurfaceVariant);
+
+  static TextStyle _cairo(double size, FontWeight weight, Color color, {double height = 1.35}) =>
+      GoogleFonts.cairo(fontSize: size, fontWeight: weight, color: color, height: height);
 
   static ThemeData materialTheme() {
     return ThemeData(
@@ -67,6 +70,10 @@ class EmployeeTheme {
         error: danger,
       ),
       scaffoldBackgroundColor: surface,
+      textTheme: GoogleFonts.cairoTextTheme().apply(
+        bodyColor: onSurface,
+        displayColor: onSurface,
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -78,9 +85,25 @@ class EmployeeTheme {
         style: FilledButton.styleFrom(
           backgroundColor: primary,
           foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
-          textStyle: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800),
+          textStyle: _cairo(16, FontWeight.w800, Colors.white),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
+          textStyle: _cairo(15, FontWeight.w700, primary),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          textStyle: _cairo(15, FontWeight.w700, primary),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(

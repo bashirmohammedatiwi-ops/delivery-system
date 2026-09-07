@@ -173,15 +173,12 @@ class _EmpReceiveTabState extends State<EmpReceiveTab> {
                         onSubmitted: (_) => _verifyDriver(),
                       ),
                       const SizedBox(height: 14),
-                      SizedBox(
-                        height: 50,
-                        child: FilledButton(
-                          onPressed: _verifying ? null : _verifyDriver,
-                          style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.secondary),
-                          child: _verifying
-                              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                              : const Text('التحقق من السائق'),
-                        ),
+                      FilledButton(
+                        onPressed: _verifying ? null : _verifyDriver,
+                        style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.secondary),
+                        child: _verifying
+                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text('التحقق من السائق'),
                       ),
                     ],
                   ),
@@ -234,16 +231,14 @@ class _EmpReceiveTabState extends State<EmpReceiveTab> {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          SizedBox(
-                            height: 56,
-                            child: FilledButton.icon(
-                              onPressed: () => setState(() => _scanning = true),
-                              icon: const Icon(Icons.qr_code_scanner_rounded, size: 26),
-                              label: const Text('مسح الباركود بالكاميرا'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: EmployeeTheme.primary,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd)),
-                              ),
+                          FilledButton.icon(
+                            onPressed: () => setState(() => _scanning = true),
+                            icon: const Icon(Icons.qr_code_scanner_rounded, size: 24),
+                            label: const Text('مسح الباركود بالكاميرا'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: EmployeeTheme.primary,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd)),
                             ),
                           ),
                           const SizedBox(height: 20),
@@ -269,14 +264,11 @@ class _EmpReceiveTabState extends State<EmpReceiveTab> {
                             onSubmitted: (_) => _assign(null),
                           ),
                           const SizedBox(height: 14),
-                          SizedBox(
-                            height: 50,
-                            child: FilledButton(
-                              onPressed: _assigning ? null : () => _assign(null),
-                              child: _assigning
-                                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : const Text('تعيين للسائق'),
-                            ),
+                          FilledButton(
+                            onPressed: _assigning ? null : () => _assign(null),
+                            child: _assigning
+                                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Text('تعيين للسائق'),
                           ),
                         ],
                       ),

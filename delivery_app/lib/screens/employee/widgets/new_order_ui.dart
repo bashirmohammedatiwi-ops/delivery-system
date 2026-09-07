@@ -439,35 +439,23 @@ class NewOrderUi {
     required VoidCallback? onSave,
     String label = 'حفظ الطلب',
   }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: EmployeeTheme.primaryGradient,
-          borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
-          boxShadow: EmployeeTheme.shadowFor(EmployeeTheme.primary),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: loading ? null : onSave,
-            borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
-            child: Center(
-              child: loading
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.check_circle_rounded, color: Colors.white, size: 22),
-                        const SizedBox(width: 8),
-                        Text(label, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800, color: Colors.white)),
-                      ],
-                    ),
-            ),
-          ),
-        ),
+    return FilledButton(
+      onPressed: loading ? null : onSave,
+      style: FilledButton.styleFrom(
+        minimumSize: const Size(double.infinity, 48),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd)),
       ),
+      child: loading
+          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle_rounded, size: 22),
+                const SizedBox(width: 8),
+                Text(label, style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800, height: 1.35)),
+              ],
+            ),
     );
   }
 
@@ -526,19 +514,17 @@ class NewOrderUi {
           icon: Icons.check_circle_rounded,
         ),
         const SizedBox(height: 14),
-        SizedBox(
-          width: double.infinity,
-          height: 54,
-          child: FilledButton.icon(
-            onPressed: loading ? null : onPrint,
-            icon: loading
-                ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Icon(Icons.print_rounded),
-            label: Text('طباعة الملصق', style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800)),
-            style: FilledButton.styleFrom(
-              backgroundColor: EmployeeTheme.success,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd)),
-            ),
+        FilledButton.icon(
+          onPressed: loading ? null : onPrint,
+          icon: loading
+              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.print_rounded),
+          label: const Text('طباعة الملصق'),
+          style: FilledButton.styleFrom(
+            backgroundColor: EmployeeTheme.success,
+            minimumSize: const Size(double.infinity, 48),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd)),
           ),
         ),
       ],

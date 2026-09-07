@@ -552,7 +552,7 @@ class EmployeeUiKit {
     return Padding(
       padding: const EdgeInsets.only(left: 8),
       child: FilterChip(
-        label: Text(label, style: GoogleFonts.cairo(fontWeight: FontWeight.w700, fontSize: 12)),
+        label: Text(label, style: GoogleFonts.cairo(fontWeight: FontWeight.w700, fontSize: 12, height: 1.3)),
         selected: selected,
         onSelected: (_) => onTap(),
         selectedColor: accent.withValues(alpha: 0.14),
@@ -605,7 +605,7 @@ class EmployeeBottomNav extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 6, 14, 10),
           child: Container(
-            height: 68,
+            constraints: const BoxConstraints(minHeight: 72),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(24),
@@ -629,28 +629,32 @@ class EmployeeBottomNav extends StatelessWidget {
                       borderRadius: BorderRadius.circular(20),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 220),
-                        margin: const EdgeInsets.all(6),
+                        margin: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
                           color: selected ? meta.accent.withValues(alpha: 0.12) : Colors.transparent,
                           borderRadius: BorderRadius.circular(18),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               selected ? meta.activeIcon : meta.icon,
-                              size: 22,
+                              size: 21,
                               color: selected ? meta.accent : EmployeeTheme.onSurfaceVariant.withValues(alpha: 0.65),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             Text(
                               meta.label,
-                              maxLines: 1,
+                              maxLines: 2,
+                              textAlign: TextAlign.center,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.cairo(
                                 fontSize: 10,
                                 fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                                 color: selected ? meta.accent : EmployeeTheme.onSurfaceVariant,
+                                height: 1.15,
                               ),
                             ),
                           ],

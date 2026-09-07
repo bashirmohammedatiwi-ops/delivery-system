@@ -70,7 +70,20 @@ class EmployeeApi {
     final p = phone.trim();
     if (p.isEmpty) return <String, dynamic>{'found': false};
     final res = await ApiService.instance.get('/api/customers/lookup?phone=${Uri.encodeComponent(p)}');
-    return res is Map<String, dynamic> ? res : <String, dynamic>{'found': false};
+    if (res is! Map<String, dynamic>) return <String, dynamic>{'found': false};
+    // العنوان والمنطقة فقط — لا نستخدم pieces/Pieces حتى لو أرسلها الخادم
+    return <String, dynamic>{
+      'found': res['found'] == true,
+      if (res['found'] == true) ...{
+        'customerName': res['customerName'] ?? '',
+        'address': res['address'] ?? '',
+        'regionId': res['regionId'],
+        'regionName': res['regionName'] ?? '',
+        'regionArea': res['regionArea'] ?? '',
+        'deliveryFeeIQD': res['deliveryFeeIQD'] ?? 0,
+        'customerLocationLink': res['customerLocationLink'] ?? '',
+      },
+    };
   }
 
   static Future<Map<String, dynamic>> getSettingsDefaults() async {

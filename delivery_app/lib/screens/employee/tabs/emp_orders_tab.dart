@@ -275,7 +275,7 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
                 ]),
                 const SizedBox(height: 12),
                 SizedBox(
-                  height: 40,
+                  height: 46,
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -850,17 +850,14 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                   label: 'حفظ التعديلات',
                 ),
                 const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: OutlinedButton(
-                    onPressed: _loading ? null : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      side: BorderSide(color: EmployeeTheme.outline),
-                    ),
-                    child: Text('إلغاء', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700)),
+                OutlinedButton(
+                  onPressed: _loading ? null : () => Navigator.pop(context),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    side: BorderSide(color: EmployeeTheme.outline),
                   ),
+                  child: const Text('إلغاء'),
                 ),
               ],
             ),
