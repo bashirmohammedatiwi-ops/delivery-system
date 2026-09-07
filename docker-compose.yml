@@ -33,7 +33,8 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=${DATABASE_URL:-}
+      # Build inside Docker network — do not use host DATABASE_URL (127.0.0.1 from migration scripts)
+      - DATABASE_URL=postgres://${POSTGRES_USER:-delivery}:${POSTGRES_PASSWORD:-delivery_secret_change_me}@postgres:5432/${POSTGRES_DB:-delivery}
       - PG_POOL_MAX=${PG_POOL_MAX:-20}
     volumes:
       - app-data:/app/data
