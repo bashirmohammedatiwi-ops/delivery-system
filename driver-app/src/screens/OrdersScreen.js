@@ -1,109 +1,142 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
-  Text,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
-  Alert,
+  Text,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
-import { getDriverOrders } from '../api';
-import { useFocusEffect } from '@react-navigation/native';
+import { useTabNav } from '../context/TabNavContext';
+import { useAppData } from '../context/AppDataContext';
+import { isDeferredOrder } from '../utils/format';
+import {
+  searchOrders,
+  sortOrders,
+  filterByRegion,
+  getUniqueRegions,
+  calcOrdersTotalIQD,
+  calcOrdersAmountDue,
+  SORT_OPTIONS,
+} from '../utils/orderUtils';
+import AppHeader from '../components/AppHeader';
+import OrderCard from '../components/OrderCard';
+import EmptyState from '../components/EmptyState';
+import SegmentControl from '../components/SegmentControl';
+import SearchBar from '../components/SearchBar';
+import SortMenu from '../components/SortMenu';
+import RegionFilter from '../components/RegionFilter';
+import OrdersSummaryBar from '../components/OrdersSummaryBar';
+import { SkeletonList } from '../components/SkeletonLoader';
 import { THEME } from '../theme';
 
-function formatIQD(n) {
-  return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
-}
-
-export default function OrdersScreen({ navigation }) {
-  const { token } = useAuth();
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function OrdersScreen({ navigation, initialFilter = 'all' }) {
+  const { ordersFilter, setOrdersFilter } = useTabNav();
+  const { orders, deferredCount, activeCount, loading, refresh } = useAppData();
   const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState(initialFilter || ordersFilter || 'all');
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState('default');
+  const [region, setRegion] = useState('all');
 
-  const fetchOrders = useCallback(async () => {
-    if (!token) return;
-    try {
-      const data = await getDriverOrders(token);
-      setOrders(data || []);
-    } catch (e) {
-      Alert.alert('خطأ', e.message || 'فشل تحميل الطلبات');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [token]);
+  useEffect(() => {
+    if (initialFilter && initialFilter !== filter) setFilter(initialFilter);
+  }, [initialFilter]);
 
-  useFocusEffect(
-    useCallback(() => {
-      setLoading(true);
-      fetchOrders();
-    }, [fetchOrders])
-  );
+  useEffect(() => {
+    if (ordersFilter && ordersFilter !== filter) setFilter(ordersFilter);
+  }, [ordersFilter]);
 
-  const onRefresh = () => {
+  const regions = useMemo(() => getUniqueRegions(orders), [orders]);
+
+  const filteredOrders = useMemo(() => {
+    let list = orders.filter((o) => {
+      const deferred = isDeferredOrder(o);
+      if (filter === 'deferred') return deferred;
+      if (filter === 'active') return !deferred;
+      return true;
+    });
+    list = filterByRegion(list, region);
+    list = searchOrders(list, search);
+    list = sortOrders(list, sortKey);
+    return list;
+  }, [orders, filter, region, search, sortKey]);
+
+  const segmentOptions = [
+    { key: 'all', label: 'الكل', count: orders.length },
+    { key: 'active', label: 'نشطة', count: activeCount },
+    { key: 'deferred', label: 'مؤجلة', count: deferredCount },
+  ];
+
+  const onRefresh = async () => {
     setRefreshing(true);
-    fetchOrders();
+    await refresh();
+    setRefreshing(false);
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => navigation.navigate('OrderDetail', { order: item })}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardHeader}>
-        <View style={styles.shipmentBadge}>
-          <Ionicons name="cube" size={16} color={THEME.primary} />
-          <Text style={styles.shipment}>#{item.ShipmentNumber}</Text>
-        </View>
-        <View style={styles.amountBadge}>
-          <Text style={styles.amount}>{formatIQD(item.TotalIQD)}</Text>
-        </View>
-      </View>
-      <View style={styles.cardBody}>
-        <Text style={styles.customer}>{item.CustomerName || '—'}</Text>
-        <Text style={styles.address} numberOfLines={2}>
-          {item.Address || '—'}
-        </Text>
-        {item.RegionName ? (
-          <View style={styles.regionRow}>
-            <Ionicons name="location" size={12} color={THEME.textLight} />
-            <Text style={styles.region}>{item.RegionName}</Text>
-          </View>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-
-  if (loading && orders.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={THEME.primary} />
-        <Text style={styles.loadingText}>جاري تحميل الطلبات...</Text>
-      </View>
-    );
-  }
+  const handleFilterChange = (next) => {
+    setFilter(next);
+    setOrdersFilter(next);
+  };
 
   return (
     <View style={styles.container}>
-      {orders.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={styles.emptyIcon}>
-            <Ionicons name="cube-outline" size={48} color={THEME.textLight} />
-          </View>
-          <Text style={styles.emptyText}>لا توجد طلبات معك حالياً</Text>
-        </View>
+      <AppHeader
+        title="طلباتي"
+        subtitle={`${orders.length} طلب — ${activeCount} نشطة${deferredCount ? ` • ${deferredCount} مؤجلة` : ''}`}
+        compact
+      />
+
+      <SearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="بحث برقم الشحنة، العميل، العنوان..."
+        onClear={() => setSearch('')}
+      />
+
+      <SegmentControl options={segmentOptions} value={filter} onChange={handleFilterChange} />
+      <RegionFilter regions={regions} value={region} onChange={setRegion} />
+      <SortMenu options={SORT_OPTIONS} value={sortKey} onChange={setSortKey} />
+
+      <OrdersSummaryBar
+        count={filteredOrders.length}
+        totalIQD={calcOrdersTotalIQD(filteredOrders)}
+        amountDue={calcOrdersAmountDue(filteredOrders)}
+      />
+
+      {search ? (
+        <Text style={styles.resultHint}>
+          {filteredOrders.length} نتيجة للبحث «{search}»
+        </Text>
+      ) : null}
+
+      {loading && orders.length === 0 ? (
+        <SkeletonList count={5} />
+      ) : filteredOrders.length === 0 ? (
+        <EmptyState
+          icon={search ? 'search-outline' : filter === 'deferred' ? 'pause-circle-outline' : 'cube-outline'}
+          title={search ? 'لا توجد نتائج' : filter === 'deferred' ? 'لا توجد طلبات مؤجلة' : 'لا توجد طلبات'}
+          subtitle={
+            search
+              ? 'جرّب كلمة بحث مختلفة'
+              : region !== 'all'
+                ? 'لا توجد طلبات في هذه المنطقة'
+                : filter === 'deferred'
+                  ? 'يمكنك تأجيل طلب من تفاصيله مع كتابة السبب'
+                  : 'استلم طلباً جديداً من زر الاستلام'
+          }
+        />
       ) : (
         <FlatList
-          data={orders}
+          data={filteredOrders}
           keyExtractor={(item) => String(item.OrderID)}
-          renderItem={renderItem}
+          renderItem={({ item }) => (
+            <OrderCard
+              order={item}
+              onPress={() => navigation.navigate('OrderDetail', { order: item })}
+            />
+          )}
           contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
           }
@@ -115,49 +148,13 @@ export default function OrdersScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: THEME.textMuted, fontSize: 15 },
-  list: { padding: 16, paddingBottom: 24 },
-  card: {
-    backgroundColor: THEME.bgCard,
-    borderRadius: THEME.radiusXl,
-    padding: 20,
-    marginBottom: 14,
-    ...THEME.shadowMd,
-    borderRightWidth: 5,
-    borderRightColor: THEME.primary,
+  list: { paddingHorizontal: THEME.spaceLg, paddingBottom: THEME.space3xl },
+  resultHint: {
+    fontSize: THEME.fontSm,
+    color: THEME.textMuted,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: THEME.spaceSm,
+    paddingHorizontal: THEME.spaceLg,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  shipmentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: THEME.primarySoft,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: THEME.radiusSm,
-  },
-  shipment: { fontSize: 17, fontWeight: '700', color: THEME.primary },
-  amountBadge: {
-    backgroundColor: THEME.successSoft,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: THEME.radiusSm,
-  },
-  amount: { fontSize: 15, fontWeight: '700', color: THEME.success },
-  cardBody: {},
-  customer: { fontSize: 16, fontWeight: '600', color: THEME.text, marginBottom: 6 },
-  address: { fontSize: 14, color: THEME.textMuted, marginBottom: 4 },
-  regionRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  region: { fontSize: 12, color: THEME.textLight },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyIcon: {
-    marginBottom: 16,
-    opacity: 0.5,
-  },
-  emptyText: { fontSize: 16, color: THEME.textMuted },
 });

@@ -59,6 +59,10 @@ function calcTotalAmountDue(orders) {
     return Math.round(t * 100) / 100;
 }
 
+function isDeferredOrder(o) {
+    return !!(o?.IsDeferred || o?.isdeferred);
+}
+
 // ─── التطبيق ───
 const app = {
     token: null,
@@ -103,6 +107,7 @@ function renderTab() {
     const content = document.getElementById('driverContent');
     if (app.currentTab === 'orders') renderOrders(content);
     else if (app.currentTab === 'receive') renderReceive(content);
+    else if (app.currentTab === 'deferred') renderDeferred(content);
     else if (app.currentTab === 'pending') renderPending(content);
     else if (app.currentTab === 'stats') renderStats(content);
     else if (app.currentTab === 'history') renderHistory(content);
@@ -117,8 +122,11 @@ async function renderOrders(container) {
             container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">📦</span><p>لا توجد طلبات معك حالياً</p></div>';
             return;
         }
-        container.innerHTML = orders.map(o => `
-            <div class="order-card" data-order-id="${o.OrderID}">
+        container.innerHTML = orders.map(o => {
+            const deferred = isDeferredOrder(o);
+            return `
+            <div class="order-card${deferred ? ' deferred' : ''}" data-order-id="${o.OrderID}">
+                ${deferred ? '<div class="order-deferred-tag">⏸ مؤجل</div>' : ''}
                 <div class="order-card-header">
                     <span class="order-shipment">#${o.ShipmentNumber}</span>
                     <span class="order-amount">${formatIQD(o.TotalIQD)}</span>
@@ -126,8 +134,9 @@ async function renderOrders(container) {
                 <div class="order-customer">${(o.CustomerName || '—')}</div>
                 <div class="order-address">${(o.Address || '—')}</div>
                 ${o.RegionName ? '<div class="order-region">' + o.RegionName + '</div>' : ''}
-            </div>
-        `).join('');
+                ${deferred && o.DeferredReason ? '<div class="order-deferred-reason">⏸ ' + o.DeferredReason + '</div>' : ''}
+            </div>`;
+        }).join('');
         container.querySelectorAll('.order-card').forEach(card => {
             card.addEventListener('click', () => {
                 const o = orders.find(x => x.OrderID == card.dataset.orderId);
@@ -228,6 +237,42 @@ function renderReceive(container) {
     input?.addEventListener('keypress', (e) => { if (e.key === 'Enter') doReceive(); });
 }
 
+async function renderDeferred(container) {
+    container.innerHTML = '<div class="loading-state">جاري تحميل الطلبات المؤجلة...</div>';
+    try {
+        const orders = await api('/api/driver/deferred-orders');
+        if (!orders.length) {
+            container.innerHTML = '<div class="empty-state"><span class="empty-state-icon">⏸</span><p>لا توجد طلبات مؤجلة</p><p style="font-size:0.9rem;color:var(--text-muted);margin-top:8px">يمكنك تأجيل طلب من تبويب «طلباتي» مع كتابة السبب</p></div>';
+            return;
+        }
+        container.innerHTML = `
+            <p style="text-align:center;font-weight:700;margin-bottom:8px">الطلبات المؤجلة</p>
+            <p style="text-align:center;font-size:0.9rem;color:var(--text-muted);margin-bottom:16px">تبقى معك — اضغط على الطلب للتفاصيل أو إلغاء التأجيل</p>
+            ${orders.map(o => `
+                <div class="order-card deferred" data-order-id="${o.OrderID}">
+                    <div class="order-deferred-tag">⏸ مؤجل</div>
+                    <div class="order-card-header">
+                        <span class="order-shipment">#${o.ShipmentNumber}</span>
+                        <span class="order-amount">${formatIQD(o.TotalIQD)}</span>
+                    </div>
+                    <div class="order-customer">${(o.CustomerName || '—')}</div>
+                    <div class="order-address">${(o.Address || '—')}</div>
+                    ${o.RegionName ? '<div class="order-region">' + o.RegionName + '</div>' : ''}
+                    ${o.DeferredReason ? '<div class="order-deferred-reason">⏸ ' + o.DeferredReason + '</div>' : ''}
+                </div>
+            `).join('')}
+        `;
+        container.querySelectorAll('.order-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const o = orders.find(x => x.OrderID == card.dataset.orderId);
+                if (o) showOrderDetail(o);
+            });
+        });
+    } catch (e) {
+        container.innerHTML = '<div class="empty-state"><p class="receive-feedback error">' + (e.message || 'فشل التحميل') + '</p></div>';
+    }
+}
+
 async function renderPending(container) {
     container.innerHTML = '<div class="loading-state">جاري التحميل...</div>';
     try {
@@ -288,7 +333,7 @@ function showPendingOrdersList(date, area) {
                 ${list.length === 0
                     ? '<div class="empty-state"><p>لا توجد طلبات</p></div>'
                     : '<div class="pending-orders-list">' + list.map(o => `
-                        <div class="order-card" style="cursor:default">
+                        <div class="order-card pending-order-clickable" data-order-id="${o.OrderID}" style="cursor:pointer">
                             <div class="order-card-header">
                                 <span class="order-shipment">#${o.ShipmentNumber}</span>
                                 <span class="order-amount">${formatIQD(o.TotalIQD)}</span>
@@ -297,10 +342,20 @@ function showPendingOrdersList(date, area) {
                             <div class="order-address">${(o.Address || '—')}</div>
                             ${o.RegionName ? '<div class="order-region">' + o.RegionName + '</div>' : ''}
                             ${o.StoreName ? '<div style="font-size:0.85rem;color:var(--text-muted);margin-top:4px">' + (o.StoreName || '') + '</div>' : ''}
+                            <div style="font-size:0.8rem;color:var(--primary);margin-top:8px;font-weight:600;text-align:center">اضغط لعرض التفاصيل الكاملة</div>
                         </div>
                     `).join('') + '</div>'
                 }
             `;
+            modal.querySelectorAll('.pending-order-clickable').forEach(card => {
+                card.onclick = () => {
+                    const o = list.find(x => x.OrderID == card.dataset.orderId);
+                    if (o) {
+                        modal.remove();
+                        showOrderDetail(o, { readOnly: true });
+                    }
+                };
+            });
         })
         .catch(e => {
             modal.querySelector('.modal-card').innerHTML = '<div class="receive-feedback error">' + (e.message || 'فشل التحميل') + '</div><button type="button" class="btn" onclick="this.closest(\'.modal-overlay\').remove()">إغلاق</button>';
@@ -447,14 +502,19 @@ function renderSettings(container) {
     };
 }
 
-function showOrderDetail(order) {
+function showOrderDetail(order, opts = {}) {
+    const readOnly = !!opts.readOnly;
+    const deferred = isDeferredOrder(order);
     app.currentOrder = order;
     const modal = document.createElement('div');
     modal.className = 'modal-overlay';
     modal.innerHTML = `
         <div class="modal-card">
-            <div class="modal-shipment">#${order.ShipmentNumber}</div>
+            ${readOnly ? '<div class="detail-banner read-only">ℹ️ طلب منتظر للاستلام — للعرض فقط</div>' : ''}
+            ${deferred ? '<div class="detail-banner deferred">⏸ طلب مؤجل' + (order.DeferredReason ? ' — ' + order.DeferredReason : '') + '</div>' : ''}
+            <div class="modal-shipment${deferred ? ' deferred' : ''}">#${order.ShipmentNumber}</div>
             <div class="modal-row"><div class="modal-label">المحل</div><div class="modal-value">${order.StoreName || '—'}</div></div>
+            ${order.StorePhone ? '<div class="modal-row"><div class="modal-label">هاتف المتجر</div><div class="modal-value">' + order.StorePhone + '</div></div>' : ''}
             <div class="modal-row"><div class="modal-label">العميل</div><div class="modal-value">${order.CustomerName || '—'}</div></div>
             <div class="modal-row">
                 <div class="modal-label">هاتف العميل</div>
@@ -469,17 +529,38 @@ function showOrderDetail(order) {
                 <div class="modal-value"><a href="${order.CustomerLocationLink}" target="_blank" class="modal-link">فتح على الخريطة</a></div>
             </div>
             ` : ''}
-            <div class="modal-row"><div class="modal-label">المبلغ</div><div class="modal-value" style="font-weight:800;color:var(--success)">${formatIQD(order.TotalIQD)}</div></div>
+            ${order.RegionName ? '<div class="modal-row"><div class="modal-label">المنطقة</div><div class="modal-value">' + order.RegionName + '</div></div>' : ''}
+            ${order.AdminOrderNo ? '<div class="modal-row"><div class="modal-label">رقم الأدمن</div><div class="modal-value">' + order.AdminOrderNo + '</div></div>' : ''}
+            <div class="modal-row"><div class="modal-label">العدد</div><div class="modal-value">${order.Pieces || 1}</div></div>
+            <div class="modal-row"><div class="modal-label">مبلغ الفاتورة</div><div class="modal-value">${formatIQD(order.AmountIQD)}</div></div>
+            <div class="modal-row"><div class="modal-label">أجرة التوصيل</div><div class="modal-value">${formatIQD(order.DeliveryFeeIQD || order.WaivedDeliveryIQD)}</div></div>
+            <div class="modal-row"><div class="modal-label">المبلغ الإجمالي</div><div class="modal-value" style="font-weight:800;color:var(--success)">${formatIQD(order.TotalIQD)}</div></div>
             ${order.Notes ? '<div class="modal-row"><div class="modal-label">ملاحظات</div><div class="modal-value">' + order.Notes + '</div></div>' : ''}
+            ${readOnly ? `
             <div class="modal-actions">
+                <button type="button" class="modal-btn" id="btnCloseDetail">إغلاق</button>
+            </div>
+            ` : `
+            <div class="modal-actions">
+                ${deferred
+                    ? '<button type="button" class="modal-btn resume" id="btnResumeDefer">▶ إلغاء التأجيل — متابعة التوصيل</button>'
+                    : '<button type="button" class="modal-btn defer" id="btnDefer">⏸ تأجيل الطلب</button>'
+                }
                 <button type="button" class="modal-btn deliver" id="btnDeliver">✓ تم التوصيل</button>
                 <button type="button" class="modal-btn return" id="btnReturn">↩ إرجاع الطلب</button>
             </div>
+            `}
         </div>
     `;
     const close = () => { modal.remove(); };
     modal.onclick = (e) => { if (e.target === modal) close(); };
     document.body.appendChild(modal);
+
+    if (readOnly) {
+        document.getElementById('btnCloseDetail').onclick = close;
+        return;
+    }
+
     document.getElementById('btnDeliver').onclick = async () => {
         if (!confirm('هل تم توصيل الطلب #' + order.ShipmentNumber + ' بنجاح؟')) return;
         try {
@@ -504,6 +585,34 @@ function showOrderDetail(order) {
             alert('خطأ: ' + (e.message || 'فشل الإرجاع'));
         }
     };
+
+    if (deferred) {
+        document.getElementById('btnResumeDefer').onclick = async () => {
+            if (!confirm('هل تريد إعادة الطلب للتوصيل الآن؟')) return;
+            try {
+                await api('/api/driver/orders/' + order.OrderID + '/resume-defer', { method: 'POST' });
+                close();
+                renderTab();
+            } catch (e) {
+                alert('خطأ: ' + (e.message || 'فشل إلغاء التأجيل'));
+            }
+        };
+    } else {
+        document.getElementById('btnDefer').onclick = async () => {
+            const reason = prompt('اكتب سبب التأجيل:');
+            if (!reason || !String(reason).trim()) return;
+            try {
+                await api('/api/driver/orders/' + order.OrderID + '/defer', {
+                    method: 'POST',
+                    body: JSON.stringify({ reason: String(reason).trim() })
+                });
+                close();
+                renderTab();
+            } catch (e) {
+                alert('خطأ: ' + (e.message || 'فشل تأجيل الطلب'));
+            }
+        };
+    }
 }
 
 // ─── البدء ───

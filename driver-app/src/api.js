@@ -63,6 +63,15 @@ export async function getDriverOrders(token) {
   return data;
 }
 
+export async function getDriverDeferredOrders(token) {
+  const res = await fetch(`${API_BASE_URL}/api/driver/deferred-orders`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل تحميل الطلبات المؤجلة');
+  return Array.isArray(data) ? data : [];
+}
+
 export async function markOrderDelivered(token, orderId) {
   const res = await fetch(`${API_BASE_URL}/api/driver/orders/${orderId}/deliver`, {
     method: 'POST',
@@ -74,6 +83,34 @@ export async function markOrderDelivered(token, orderId) {
   });
   const data = await parseResponse(res);
   if (!res.ok) throw new Error(data.error || 'فشل تأكيد التوصيل');
+  return data;
+}
+
+export async function markOrderDeferred(token, orderId, reason) {
+  const res = await fetch(`${API_BASE_URL}/api/driver/orders/${orderId}/defer`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ reason: String(reason || '').trim() }),
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل تأجيل الطلب');
+  return data;
+}
+
+export async function resumeDeferredOrder(token, orderId) {
+  const res = await fetch(`${API_BASE_URL}/api/driver/orders/${orderId}/resume-defer`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({}),
+  });
+  const data = await parseResponse(res);
+  if (!res.ok) throw new Error(data.error || 'فشل إلغاء التأجيل');
   return data;
 }
 

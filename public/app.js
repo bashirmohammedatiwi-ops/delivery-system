@@ -14,6 +14,51 @@ function invalidateDriversCache() {
     driversCache = { data: null, ts: 0 };
 }
 
+function debounce(fn, ms) {
+    let timer;
+    return (...args) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn(...args), ms);
+    };
+}
+
+let dashboardHomeCache = { data: null, ts: 0 };
+const DASHBOARD_CACHE_MS = 45000;
+
+async function getDashboardHomeCached(force) {
+    if (!force && dashboardHomeCache.data && Date.now() - dashboardHomeCache.ts < DASHBOARD_CACHE_MS) {
+        return dashboardHomeCache.data;
+    }
+    const home = await window.api.dashboard.home();
+    dashboardHomeCache = { data: home, ts: Date.now() };
+    return home;
+}
+
+function invalidateDashboardCache() {
+    dashboardHomeCache = { data: null, ts: 0 };
+}
+
+const screenMounts = new Map();
+
+function screenCacheKey(screenId, subTab) {
+    return `${screenId}:${subTab || ''}`;
+}
+
+function invalidateScreenCache(screenId) {
+    if (screenId) {
+        screenMounts.forEach((entry, key) => {
+            if (key.startsWith(`${screenId}:`)) entry.stale = true;
+        });
+        return;
+    }
+    screenMounts.clear();
+    const container = document.getElementById('screen-container');
+    if (container) container.innerHTML = '';
+}
+
+const ORDERS_LIST_LIMIT = 400;
+const ORDERS_MOBILE_MQ = window.matchMedia('(max-width: 768px)');
+
 async function checkAuth() {
     const token = window.api.auth.getToken();
     if (!token) return false;
@@ -54,8 +99,13 @@ function showApp() {
                     <div class="user-role-badge">موظف</div>
                 </div>
                </div>`
-            : `<div>${(currentUser.DisplayName || currentUser.Username || '').replace(/</g, '&lt;')}</div>
-               <div class="user-role">${currentUser.Role === 'admin' ? 'مدير' : 'موظف'}</div>`;
+            : `<div class="user-info-employee user-info-admin">
+                <div class="user-avatar user-avatar--admin"><i class="bi bi-shield-check"></i></div>
+                <div class="user-details">
+                    <div class="user-name">${(currentUser.DisplayName || currentUser.Username || 'مدير').replace(/</g, '&lt;')}</div>
+                    <div class="user-role-badge user-role-badge--admin">${currentUser.Role === 'admin' ? 'مدير النظام' : 'موظف'}</div>
+                </div>
+               </div>`;
         document.querySelectorAll('.nav-admin').forEach(el => {
             el.style.display = currentUser.Role === 'admin' ? '' : 'none';
         });
@@ -76,6 +126,9 @@ function showLogin() {
     document.getElementById('login-screen').style.display = 'flex';
     document.getElementById('app-main').style.display = 'none';
     currentUser = null;
+    invalidateScreenCache();
+    invalidateDashboardCache();
+    invalidateDriversCache();
 }
 
 const STATUS_MAP = {
@@ -365,6 +418,82 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 
+function renderUxHero(opts = {}) {
+    const icon = opts.icon || 'bi-grid';
+    const title = escapeHtml(opts.title || '');
+    const subtitle = opts.subtitle
+        ? `<p class="ux-hero__sub">${escapeHtml(opts.subtitle)}</p>`
+        : '';
+    const badges = (opts.badges || [])
+        .map(b => `<span class="ux-hero__badge">${escapeHtml(String(b))}</span>`)
+        .join('');
+    const variant = opts.variant ? ` ux-hero--${opts.variant}` : '';
+    const actions = opts.actionsHtml || '';
+    return `
+    <header class="ux-hero${variant}">
+        <div class="ux-hero__glow" aria-hidden="true"></div>
+        <div class="ux-hero__icon" aria-hidden="true"><i class="bi ${icon}"></i></div>
+        <div class="ux-hero__body">
+            <div class="ux-hero__top">
+                <h1 class="ux-hero__title">${title}</h1>
+                ${badges ? `<div class="ux-hero__badges">${badges}</div>` : ''}
+            </div>
+            ${subtitle}
+            ${actions}
+        </div>
+    </header>`;
+}
+
+function renderUxPipeline(steps) {
+    return `<div class="ux-pipeline" aria-label="مسار الطلب">${steps.map((s, i) => {
+        const btn = `<button type="button" class="ux-pipeline__step ${s.mod || ''} dash-stat-link" data-screen="${s.screen || 'orders'}" data-status="${s.status || ''}">
+            <span class="ux-pipeline__num">${s.count}</span>
+            <span class="ux-pipeline__label">${escapeHtml(s.label)}</span>
+        </button>`;
+        const line = i < steps.length - 1 ? '<div class="ux-pipeline__connector" aria-hidden="true"><i class="bi bi-chevron-left"></i></div>' : '';
+        return btn + line;
+    }).join('')}</div>`;
+}
+
+function renderUxSubnav(items, activeId) {
+    return `<nav class="ux-subnav" aria-label="تبويبات الصفحة">${items.map(item => `
+        <button type="button" class="ux-subnav__item${item.id === activeId ? ' is-active' : ''}" data-tab="${item.id}">
+            ${item.icon ? `<i class="bi ${item.icon}" aria-hidden="true"></i>` : ''}
+            <span>${escapeHtml(item.label)}</span>
+        </button>`).join('')}</nav>`;
+}
+
+function bindUxSubnav(container, opts) {
+    const { paneSelector, panePrefix, onChange } = opts;
+    container.querySelectorAll('.ux-subnav__item').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            container.querySelectorAll('.ux-subnav__item').forEach(b => b.classList.toggle('is-active', b.dataset.tab === tab));
+            container.querySelectorAll(paneSelector).forEach(p => p.classList.remove('active'));
+            container.querySelector(`${panePrefix}${tab}`)?.classList.add('active');
+            container.dataset.initialTab = tab;
+            const screenId = document.getElementById('screen-container')?.dataset.currentScreen;
+            if (screenId) updateDesktopChrome(screenId, tab);
+            if (onChange) onChange(tab);
+        });
+    });
+}
+
+function renderUxError(title, message) {
+    return `
+        <div class="screen active ux-error-screen">
+            ${renderUxHero({
+                icon: 'bi-exclamation-triangle',
+                title: title || 'حدث خطأ',
+                subtitle: message || 'تعذّر تحميل الصفحة',
+                variant: 'danger'
+            })}
+            <div class="ux-panel ux-panel--center">
+                <p class="ux-error-text">${escapeHtml(message || '')}</p>
+            </div>
+        </div>`;
+}
+
 function pickNotificationNotes(n) {
     const raw = n?.Notes ?? n?.OrderNotes ?? n?.notes ?? '';
     return String(raw).trim();
@@ -379,60 +508,43 @@ function formatNotificationWhen(value) {
 
 function renderOverrideNotification(n) {
     const notesRaw = pickNotificationNotes(n);
-    const customer = escapeHtml(n.CustomerName || '—');
-    const store = escapeHtml(n.StoreName || '—');
-    const phone = escapeHtml(n.CustomerPhone || '—');
+    const performer = escapeHtml(n.PerformedByName || '—');
+    const invoiceNo = escapeHtml(String(n.AdminOrderNo || n.ShipmentNumber || '—'));
     const address = escapeHtml((n.Address || '—').toString());
-    const performer = escapeHtml(n.PerformedByName || 'موظف');
-    const when = escapeHtml(formatNotificationWhen(n.CreatedAt));
-    const notesBlock = notesRaw
-        ? `<section class="ovn-notes ovn-notes--filled">
-                <div class="ovn-notes-badge"><i class="bi bi-chat-square-quote-fill" aria-hidden="true"></i> ملاحظات الطلب</div>
-                <blockquote class="ovn-notes-quote">${escapeHtml(notesRaw)}</blockquote>
-           </section>`
-        : `<section class="ovn-notes ovn-notes--empty">
-                <div class="ovn-notes-badge"><i class="bi bi-chat-square-text" aria-hidden="true"></i> ملاحظات الطلب</div>
-                <p class="ovn-notes-empty-text">لا توجد ملاحظات على هذا الطلب</p>
-           </section>`;
+    const price = formatIQD(n.AmountIQD ?? n.TotalIQD);
+    const notes = notesRaw ? escapeHtml(notesRaw) : '—';
 
     return `
     <article class="ovn-card" data-id="${n.NotificationID}">
         <div class="ovn-card-top">
-            <div class="ovn-card-identity">
-                <span class="ovn-shipment">#${escapeHtml(String(n.ShipmentNumber || ''))}</span>
-                ${n.AdminOrderNo ? `<span class="ovn-admin">${escapeHtml(String(n.AdminOrderNo))}</span>` : ''}
-                <span class="ovn-pill"><i class="bi bi-gift-fill" aria-hidden="true"></i> توصيل مجاني يدوي</span>
-            </div>
             <button type="button" class="ovn-done-btn btn-override-seen" data-id="${n.NotificationID}" title="تمت المراجعة">
                 <i class="bi bi-check2-circle" aria-hidden="true"></i>
                 <span>تمت المراجعة</span>
             </button>
         </div>
 
-        ${notesBlock}
-
-        <div class="ovn-details-grid">
-            <div class="ovn-detail"><i class="bi bi-person-fill" aria-hidden="true"></i><div><span>المستلم</span><strong>${customer}</strong></div></div>
-            <div class="ovn-detail"><i class="bi bi-telephone-fill" aria-hidden="true"></i><div><span>الهاتف</span><strong>${phone}</strong></div></div>
-            <div class="ovn-detail"><i class="bi bi-shop" aria-hidden="true"></i><div><span>المتجر</span><strong>${store}</strong></div></div>
-            <div class="ovn-detail ovn-detail--wide"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><div><span>العنوان</span><strong>${address}</strong></div></div>
-        </div>
-
-        <div class="ovn-amounts">
-            <div class="ovn-amount">
-                <span>مبلغ الفاتورة</span>
-                <strong class="iqd">${formatIQD(n.AmountIQD)}</strong>
+        <dl class="ovn-simple-list">
+            <div class="ovn-simple-row">
+                <dt>اسم الموظف</dt>
+                <dd>${performer}</dd>
             </div>
-            <div class="ovn-amount ovn-amount--waived">
-                <span>أجرة معفاة</span>
-                <strong class="iqd">${formatIQD(n.WaivedDeliveryIQD)}</strong>
+            <div class="ovn-simple-row">
+                <dt>رقم الفاتورة</dt>
+                <dd>${invoiceNo}</dd>
             </div>
-        </div>
-
-        <footer class="ovn-footer">
-            <span><i class="bi bi-person-badge" aria-hidden="true"></i> نفّذ: <strong>${performer}</strong></span>
-            <span><i class="bi bi-clock-history" aria-hidden="true"></i> ${when}</span>
-        </footer>
+            <div class="ovn-simple-row">
+                <dt>العنوان</dt>
+                <dd>${address}</dd>
+            </div>
+            <div class="ovn-simple-row">
+                <dt>السعر</dt>
+                <dd class="iqd">${price}</dd>
+            </div>
+            <div class="ovn-simple-row ovn-simple-row--notes">
+                <dt>ملاحظات</dt>
+                <dd>${notes}</dd>
+            </div>
+        </dl>
     </article>`;
 }
 
@@ -654,7 +766,7 @@ async function renderOrdersScreen(container, opts = {}) {
 
     const renderOrders = async () => {
         const [list, drivers] = await Promise.all([
-            window.api.orders.getAll(filters),
+            window.api.orders.getAll({ ...filters, limit: ORDERS_LIST_LIMIT }),
             getDriversCached()
         ]);
         const statNew = list.filter(o => o.Status === 'New').length;
@@ -663,18 +775,24 @@ async function renderOrdersScreen(container, opts = {}) {
         const statReturned = list.filter(o => isOrderReturned(o)).length;
 
         container.innerHTML = `
-            <div class="screen active orders-screen">
+            <div class="screen active orders-screen orders-screen--v4">
                 <div class="orders-layout">
                     <header class="orders-header">
                         <div class="orders-hero">
+                            <div class="orders-hero-icon" aria-hidden="true"><i class="bi bi-box-seam"></i></div>
                             <div class="orders-hero-text">
                                 <div class="orders-hero-title-row">
                                     <h1 class="orders-title">${title}</h1>
                                     <span class="orders-count-pill" id="ordersCount">${list.length} طلب</span>
                                 </div>
-                                <p class="orders-subtitle">إدارة وعرض جميع الطلبات مع البحث والفلترة</p>
+                                <p class="orders-subtitle">بحث، فلترة، وتعديل الطلبات — تصدير PDF للنتائج المعروضة</p>
                             </div>
                         </div>
+                        ${renderUxPipeline([
+                            { count: statNew, label: 'جديد', status: 'New', mod: 'ux-pipeline__step--new' },
+                            { count: statAssigned, label: 'مع السائق', status: 'AssignedToDriver', mod: 'ux-pipeline__step--driver' },
+                            { count: statDelivered, label: 'تم التوصيل', status: 'Delivered', mod: 'ux-pipeline__step--done' }
+                        ])}
                         <div class="orders-stats-scroll" role="status" aria-label="ملخص الحالات في النتائج">
                             <div class="orders-stats-bar">
                                 <div class="orders-stat orders-stat--all"><span class="orders-stat-value">${list.length}</span><span class="orders-stat-label">في النتائج</span></div>
@@ -740,7 +858,9 @@ async function renderOrdersScreen(container, opts = {}) {
                                 <span class="orders-table-headbar-meta">${list.length} سجل</span>
                             </div>
                         </div>
-                        ${list.length > 0 ? `<div class="orders-table-wrap">
+                        ${list.length > 0 ? (ORDERS_MOBILE_MQ.matches
+                            ? `<div class="orders-mobile-list" id="ordersMobileList">${list.map(o => renderOrderCardHtml(o)).join('')}</div>`
+                            : `<div class="orders-table-wrap">
                             <table class="orders-table">
                                 <thead>
                                     <tr>
@@ -805,10 +925,8 @@ async function renderOrdersScreen(container, opts = {}) {
                                     }).join('')}
                                 </tbody>
                             </table>
-                        </div>
-                        <div class="orders-mobile-list" id="ordersMobileList">
-                            ${list.map(o => renderOrderCardHtml(o)).join('')}
-                        </div>` : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p class="orders-empty-title">لا توجد طلبات</p><p class="orders-empty-hint">جرّب تغيير البحث، التاريخ، أو حالة الطلب</p></div>'}
+                        </div>`) : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p class="orders-empty-title">لا توجد طلبات</p><p class="orders-empty-hint">جرّب تغيير البحث، التاريخ، أو حالة الطلب</p></div>'}
+                        ${list.length >= ORDERS_LIST_LIMIT ? `<p class="orders-limit-hint">يُعرض أحدث ${ORDERS_LIST_LIMIT} طلب — استخدم الفلاتر لتضييق النتائج</p>` : ''}
                     </div>
                 </div>
             </div>
@@ -826,6 +944,13 @@ async function renderOrdersScreen(container, opts = {}) {
             });
         });
 
+        container.querySelectorAll('.ux-pipeline__step[data-status]').forEach(step => {
+            step.addEventListener('click', () => {
+                filters.status = step.dataset.status || '';
+                renderOrders();
+            });
+        });
+
         const apply = () => {
             filters.search = document.getElementById('search').value;
             filters.driverId = document.getElementById('filterDriver').value;
@@ -836,6 +961,7 @@ async function renderOrdersScreen(container, opts = {}) {
 
         document.getElementById('btnSearch').addEventListener('click', apply);
         document.getElementById('search').addEventListener('keypress', e => { if (e.key === 'Enter') apply(); });
+        document.getElementById('search').addEventListener('input', debounce(apply, 350));
         document.getElementById('btnClearFilters')?.addEventListener('click', () => {
             filters.search = '';
             filters.driverId = '';
@@ -885,6 +1011,8 @@ async function renderOrdersScreen(container, opts = {}) {
                 if (status === 'Returned' && !(await window.api.showConfirm('هل أنت متأكد من جعل هذا الطلب راجع؟'))) return;
                 try {
                     await window.api.orders.updateStatus(id, status);
+                    invalidateDashboardCache();
+                    invalidateScreenCache('orders');
                     await renderOrders();
                 } catch (err) {
                     await showMsg('خطأ: ' + (err.message || String(err)));
@@ -1115,226 +1243,328 @@ function initSidebarNav() {
     nav.addEventListener('click', handleNavClick);
 }
 
-function showScreen(screenId, subTab) {
+function showScreen(screenId, subTab, options = {}) {
+    const key = screenCacheKey(screenId, subTab);
     setNavActive(screenId, subTab);
-    updateMobileChrome(screenId);
+    updateMobileChrome(screenId, subTab);
+    updateDesktopChrome(screenId, subTab);
     const container = document.getElementById('screen-container');
-    container.innerHTML = '';
+    if (!container) return;
     container.dataset.currentScreen = screenId || '';
     container.dataset.initialTab = subTab || '';
+
+    container.querySelectorAll('.screen-mount').forEach(m => {
+        m.classList.remove('active');
+        m.hidden = true;
+    });
+
+    const cached = screenMounts.get(key);
+    if (cached && !cached.stale && !options.force) {
+        cached.mount.hidden = false;
+        cached.mount.classList.add('active');
+        return;
+    }
+
+    if (cached) {
+        cached.mount.remove();
+        screenMounts.delete(key);
+    }
+
+    const mount = document.createElement('div');
+    mount.className = 'screen-mount active';
+    mount.dataset.screenKey = key;
+    container.appendChild(mount);
+    screenMounts.set(key, { mount, stale: false });
+
+    if (options.force) mount.dataset.forceRefresh = '1';
+    if (options.ordersStatus) mount.dataset.ordersInitialStatus = options.ordersStatus;
+
     const screen = screens[screenId];
-    if (screen) screen.render(container);
+    if (screen) {
+        Promise.resolve(screen.render(mount)).catch(err => {
+            mount.innerHTML = `<div class="screen active screen-error"><p>خطأ في تحميل الصفحة: ${escapeHtml(err?.message || String(err))}</p></div>`;
+        });
+    }
+}
+
+function bindDashboardQuickNav(container) {
+    container.querySelectorAll('.dash-quick-btn[data-screen]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const screen = btn.dataset.screen;
+            const tab = btn.dataset.tab;
+            if (tab) {
+                setNavActive(screen, tab);
+                showScreen(screen, tab);
+            } else {
+                setNavActive(screen);
+                showScreen(screen);
+            }
+        });
+    });
+    container.querySelectorAll('.dash-stat-link[data-screen]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const screen = btn.dataset.screen;
+            const status = btn.dataset.status || '';
+            invalidateScreenCache('orders');
+            setNavActive(screen);
+            showScreen(screen, undefined, { force: true, ordersStatus: status });
+        });
+    });
+    container.querySelectorAll('.dash-fab[data-screen]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            setNavActive(btn.dataset.screen);
+            showScreen(btn.dataset.screen);
+        });
+    });
+}
+
+function bindOverrideNotifications(container) {
+    if (currentUser?.Role !== 'admin') return;
+    container.querySelectorAll('.btn-override-seen').forEach(btn => {
+        btn.onclick = async () => {
+            const id = parseInt(btn.dataset.id);
+            if (!id) return;
+            try {
+                await window.api.notifications.markAsReviewed(id);
+                btn.closest('.ovn-card')?.remove();
+                invalidateDashboardCache();
+                const countEl = container.querySelector('.ovn-panel-count');
+                const list = container.querySelector('#overrideNotifList');
+                const remaining = list?.querySelectorAll('.ovn-card').length || 0;
+                if (countEl) countEl.textContent = remaining;
+                if (remaining === 0 && list) {
+                    list.innerHTML = '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
+                }
+            } catch (e) {
+                await showMsg('خطأ: ' + (e?.message || e));
+            }
+        };
+    });
+}
+
+function renderDashboardMarkup(userName, today, stats, notifList) {
+    const todayOrdersCount = stats.todayCount;
+    const totalOrdersCount = stats.totalOrders;
+    const newCount = stats.newCount;
+    const assignedCount = stats.assignedCount;
+    const todayKarkh = stats.todayKarkh;
+    const todayRusafa = stats.todayRusafa;
+    const deliveredCount = stats.deliveredCount;
+    const notifCount = notifList.length;
+    const notifHtml = notifList.length > 0
+        ? notifList.map(renderOverrideNotification).join('')
+        : '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
+    const areaTotal = Math.max(todayKarkh + todayRusafa, 1);
+    const karkhPct = Math.round((todayKarkh / areaTotal) * 100);
+    const rusafaPct = 100 - karkhPct;
+    const completionPct = todayOrdersCount > 0 ? Math.round((deliveredCount / todayOrdersCount) * 100) : 0;
+    const pipelineHtml = renderUxPipeline([
+        { count: newCount, label: 'جديد', status: 'New', mod: 'ux-pipeline__step--new' },
+        { count: assignedCount, label: 'مع السائق', status: 'AssignedToDriver', mod: 'ux-pipeline__step--driver' },
+        { count: deliveredCount, label: 'تم التوصيل', status: 'Delivered', mod: 'ux-pipeline__step--done' }
+    ]);
+
+    return `
+        <div class="screen active dashboard-screen dash-v3 dash-v4">
+            <header class="dash-v3-hero dash-v4-hero">
+                <div class="dash-v3-hero__content">
+                    <span class="dash-v3-hero__chip"><i class="bi bi-stars" aria-hidden="true"></i> لوحة التحكم</span>
+                    <h1 class="dash-v3-hero__title">مرحباً، ${userName}</h1>
+                    <p class="dash-v3-hero__meta"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
+                </div>
+                <div class="dash-v3-hero__cards">
+                    <div class="dash-v3-metric dash-v3-metric--primary">
+                        <span class="dash-v3-metric__value">${todayOrdersCount}</span>
+                        <span class="dash-v3-metric__label">طلبات اليوم</span>
+                    </div>
+                    <div class="dash-v3-metric">
+                        <span class="dash-v3-metric__value">${completionPct}<small>%</small></span>
+                        <span class="dash-v3-metric__label">نسبة الإنجاز</span>
+                    </div>
+                    <div class="dash-v3-metric dash-v3-metric--ghost">
+                        <span class="dash-v3-metric__value">${todayKarkh}<span class="dash-v3-metric__sep">/</span>${todayRusafa}</span>
+                        <span class="dash-v3-metric__label">كرخ / رصافة</span>
+                    </div>
+                </div>
+            </header>
+
+            ${pipelineHtml}
+
+            <div class="dash-v4-insights">
+                <div class="dash-v4-insight dash-v4-insight--pink">
+                    <i class="bi bi-inbox" aria-hidden="true"></i>
+                    <div><strong>${newCount}</strong><span>بانتظار التعيين</span></div>
+                </div>
+                <div class="dash-v4-insight dash-v4-insight--blue">
+                    <i class="bi bi-truck" aria-hidden="true"></i>
+                    <div><strong>${assignedCount}</strong><span>قيد التوصيل</span></div>
+                </div>
+                <div class="dash-v4-insight dash-v4-insight--green">
+                    <i class="bi bi-check2-all" aria-hidden="true"></i>
+                    <div><strong>${deliveredCount}</strong><span>مكتمل اليوم</span></div>
+                </div>
+                ${currentUser?.Role === 'admin' && notifCount > 0 ? `
+                <div class="dash-v4-insight dash-v4-insight--amber">
+                    <i class="bi bi-bell-fill" aria-hidden="true"></i>
+                    <div><strong>${notifCount}</strong><span>إشعار توصيل مجاني</span></div>
+                </div>` : ''}
+            </div>
+
+            <div class="dash-v3-bento dash-v4-bento">
+                <section class="dash-v3-tile dash-v3-tile--stats" aria-label="حالة الطلبات">
+                    <div class="dash-v3-tile__head">
+                        <h2><i class="bi bi-bar-chart-steps" aria-hidden="true"></i> حالة الطلبات</h2>
+                        <span>اضغط للفلترة</span>
+                    </div>
+                    <div class="dash-v3-statgrid">
+                        <button type="button" class="dash-v3-stat dash-v3-stat--new dash-stat-link" data-screen="orders" data-status="New">
+                            <i class="bi bi-plus-lg" aria-hidden="true"></i>
+                            <strong>${newCount}</strong>
+                            <span>جديد</span>
+                        </button>
+                        <button type="button" class="dash-v3-stat dash-v3-stat--driver dash-stat-link" data-screen="orders" data-status="AssignedToDriver">
+                            <i class="bi bi-truck" aria-hidden="true"></i>
+                            <strong>${assignedCount}</strong>
+                            <span>مع السائق</span>
+                        </button>
+                        <button type="button" class="dash-v3-stat dash-v3-stat--done dash-stat-link" data-screen="orders" data-status="Delivered">
+                            <i class="bi bi-check2-circle" aria-hidden="true"></i>
+                            <strong>${deliveredCount}</strong>
+                            <span>تم التوصيل</span>
+                        </button>
+                        <button type="button" class="dash-v3-stat dash-v3-stat--all dash-stat-link" data-screen="orders" data-status="">
+                            <i class="bi bi-layers" aria-hidden="true"></i>
+                            <strong>${totalOrdersCount}</strong>
+                            <span>الكل</span>
+                        </button>
+                    </div>
+                </section>
+
+                <section class="dash-v3-tile dash-v3-tile--areas">
+                    <div class="dash-v3-tile__head">
+                        <h2><i class="bi bi-geo-alt" aria-hidden="true"></i> توزيع المناطق</h2>
+                        <span class="dash-v3-pill">${todayOrdersCount} طلب</span>
+                    </div>
+                    <div class="dash-v3-area">
+                        <div class="dash-v3-area__row">
+                            <div class="dash-v3-area__info"><span>الكرخ</span><strong>${todayKarkh}</strong></div>
+                            <div class="dash-v3-area__track"><div class="dash-v3-area__fill dash-v3-area__fill--karkh" style="width:${karkhPct}%"></div></div>
+                            <em>${karkhPct}%</em>
+                        </div>
+                        <div class="dash-v3-area__row">
+                            <div class="dash-v3-area__info"><span>الرصافة</span><strong>${todayRusafa}</strong></div>
+                            <div class="dash-v3-area__track"><div class="dash-v3-area__fill dash-v3-area__fill--rusafa" style="width:${rusafaPct}%"></div></div>
+                            <em>${rusafaPct}%</em>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="dash-v3-tile dash-v3-tile--actions">
+                    <div class="dash-v3-tile__head">
+                        <h2><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i> اختصارات</h2>
+                    </div>
+                    <nav class="dash-v3-actions" aria-label="اختصارات سريعة">
+                        <button type="button" class="dash-v3-action dash-v3-action--pink dash-quick-btn" data-screen="new-order">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i><span>طلب جديد</span>
+                        </button>
+                        <button type="button" class="dash-v3-action dash-quick-btn" data-screen="orders">
+                            <i class="bi bi-box-seam" aria-hidden="true"></i><span>الطلبات</span>
+                        </button>
+                        <button type="button" class="dash-v3-action dash-quick-btn" data-screen="driver-receive">
+                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span>استلام</span>
+                        </button>
+                        <button type="button" class="dash-v3-action dash-quick-btn nav-admin" data-screen="reports" data-tab="driver">
+                            <i class="bi bi-graph-up" aria-hidden="true"></i><span>التقارير</span>
+                        </button>
+                        <button type="button" class="dash-v3-action dash-quick-btn nav-admin" data-screen="users">
+                            <i class="bi bi-people" aria-hidden="true"></i><span>المستخدمين</span>
+                        </button>
+                        <button type="button" class="dash-v3-action dash-quick-btn nav-admin" data-screen="settings" data-tab="regions">
+                            <i class="bi bi-gear" aria-hidden="true"></i><span>الإعدادات</span>
+                        </button>
+                    </nav>
+                </section>
+
+                ${currentUser?.Role === 'admin' ? `
+                <section class="ovn-panel dash-v3-tile dash-v3-tile--notif">
+                    <header class="ovn-panel-head">
+                        <div class="ovn-panel-icon" aria-hidden="true"><i class="bi bi-bell-fill"></i></div>
+                        <div class="ovn-panel-intro">
+                            <h3 class="ovn-panel-title">
+                                إشعارات التوصيل المجاني
+                                ${notifCount > 0 ? `<span class="ovn-panel-count">${notifCount}</span>` : ''}
+                            </h3>
+                            <p class="ovn-panel-desc">اسم الموظف · رقم الفاتورة · العنوان · السعر · الملاحظات</p>
+                        </div>
+                    </header>
+                    <div id="overrideNotifList" class="ovn-list">${notifHtml}</div>
+                </section>
+                ` : ''}
+            </div>
+
+            <button type="button" class="dash-fab dash-quick-btn" data-screen="new-order" title="إدخال طلب جديد" aria-label="إدخال طلب جديد">
+                <i class="bi bi-plus-lg" aria-hidden="true"></i>
+            </button>
+        </div>
+    `;
+}
+
+function renderDashboardSkeleton(userName) {
+    return `
+        <div class="screen active dashboard-screen dash-v3 dashboard-screen--loading">
+            <header class="dash-v3-hero dash-v3-hero--loading">
+                <div class="dash-v3-hero__content">
+                    <div class="dash-skeleton dash-skeleton--badge"></div>
+                    <div class="dash-skeleton dash-skeleton--title"></div>
+                    <div class="dash-skeleton dash-skeleton--text"></div>
+                </div>
+                <div class="dash-v3-hero__cards">
+                    <div class="dash-skeleton dash-skeleton--block"></div>
+                    <div class="dash-skeleton dash-skeleton--block"></div>
+                </div>
+            </header>
+            <div class="dash-v3-bento dash-v3-bento--loading">
+                ${[1, 2, 3].map(() => '<div class="dash-v3-tile dash-v3-tile--skeleton"><div class="dash-skeleton dash-skeleton--block"></div></div>').join('')}
+            </div>
+            <p class="dash-loading-hint"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> جاري تحميل لوحة التحكم…</p>
+        </div>
+    `;
 }
 
 const screens = {
     dashboard: {
         async render(container) {
             const userName = (currentUser?.DisplayName || currentUser?.Username || 'مدير').replace(/</g, '&lt;');
-            container.innerHTML = `
-                <div class="screen active dashboard-screen dashboard-screen--loading">
-                    <header class="dash-hero dash-hero--mobile">
-                        <div class="dash-hero__brand"><i class="bi bi-truck" aria-hidden="true"></i><span>ديما الحياة</span></div>
-                        <p class="dash-hero__welcome">مرحباً، ${userName}</p>
-                        <p class="dash-hero__date"><span class="dash-skeleton dash-skeleton--text"></span></p>
-                        <div class="dash-hero__mega">
-                            <div class="dash-hero__mega-value dash-skeleton dash-skeleton--num"></div>
-                            <div class="dash-hero__mega-label">طلبات اليوم</div>
-                        </div>
-                    </header>
-                    <div class="dash-status-strip">
-                        ${[1,2,3,4].map(() => '<div class="dash-status-pill"><span class="dash-skeleton dash-skeleton--pill"></span></div>').join('')}
-                    </div>
-                    <p class="dash-loading-hint"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> جاري تحميل لوحة التحكم…</p>
-                </div>
-            `;
+            const forceRefresh = container.closest('.screen-mount')?.dataset?.forceRefresh === '1'
+                || container.dataset.forceRefresh === '1';
+            container.innerHTML = renderDashboardSkeleton(userName);
 
             let today = new Date().toISOString().split('T')[0];
             let stats = {
                 totalOrders: 0, newCount: 0, assignedCount: 0, deliveredCount: 0,
                 todayCount: 0, todayKarkh: 0, todayRusafa: 0, today
             };
-            let overrideNotifications = { list: [], count: 0 };
+            let notifList = [];
 
             try {
-                const home = await window.api.dashboard.home();
+                const home = await getDashboardHomeCached(forceRefresh);
                 today = home?.today || today;
                 stats = home?.stats || stats;
-                overrideNotifications = home?.notifications || overrideNotifications;
+                notifList = home?.notifications?.list || [];
             } catch (_) {
-                try { stats = await window.api.dashboard.stats(today); } catch (e2) { /* keep defaults */ }
+                try {
+                    stats = await window.api.dashboard.stats(today);
+                } catch (e2) { /* keep defaults */ }
             }
 
-            const todayOrdersCount = stats.todayCount;
-            const totalOrdersCount = stats.totalOrders;
-            const newCount = stats.newCount;
-            const assignedCount = stats.assignedCount;
-            const todayKarkh = stats.todayKarkh;
-            const todayRusafa = stats.todayRusafa;
-            const deliveredCount = stats.deliveredCount;
-
-            const notifList = overrideNotifications.list || [];
-            const notifCount = notifList.length;
-            const notifHtml = notifList.length > 0
-                ? notifList.map(renderOverrideNotification).join('')
-                : '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
-
-            const areaTotal = Math.max(todayKarkh + todayRusafa, 1);
-            const karkhPct = Math.round((todayKarkh / areaTotal) * 100);
-            const rusafaPct = 100 - karkhPct;
-
-            container.innerHTML = `
-                <div class="screen active dashboard-screen">
-                    <header class="dash-hero dash-hero--mobile">
-                        <div class="dash-hero__brand">
-                            <i class="bi bi-truck" aria-hidden="true"></i>
-                            <span>ديما الحياة</span>
-                        </div>
-                        <p class="dash-hero__welcome">مرحباً، ${userName}</p>
-                        <p class="dash-hero__date"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
-                        <div class="dash-hero__mega">
-                            <div class="dash-hero__mega-value">${todayOrdersCount}</div>
-                            <div class="dash-hero__mega-label">طلبات اليوم</div>
-                        </div>
-                    </header>
-
-                    <div class="dash-status-strip" aria-label="حالة الطلبات">
-                        <div class="dash-status-pill dash-status-pill--new">
-                            <span class="dash-status-pill__value">${newCount}</span>
-                            <span class="dash-status-pill__label">جديد</span>
-                        </div>
-                        <div class="dash-status-pill dash-status-pill--driver">
-                            <span class="dash-status-pill__value">${assignedCount}</span>
-                            <span class="dash-status-pill__label">مع السائق</span>
-                        </div>
-                        <div class="dash-status-pill dash-status-pill--done">
-                            <span class="dash-status-pill__value">${deliveredCount}</span>
-                            <span class="dash-status-pill__label">تم التوصيل</span>
-                        </div>
-                        <div class="dash-status-pill dash-status-pill--all">
-                            <span class="dash-status-pill__value">${totalOrdersCount}</span>
-                            <span class="dash-status-pill__label">الكل</span>
-                        </div>
-                    </div>
-
-                    <section class="dash-areas-card">
-                        <div class="dash-areas-card__head">
-                            <h2 class="dash-areas-card__title">توزيع اليوم</h2>
-                            <span class="dash-areas-card__total">${todayOrdersCount} طلب</span>
-                        </div>
-                        <div class="dash-area-bar">
-                            <div class="dash-area-bar__label"><span>الكرخ</span><strong>${todayKarkh}</strong></div>
-                            <div class="dash-area-bar__track"><div class="dash-area-bar__fill dash-area-bar__fill--karkh" style="width:${karkhPct}%"></div></div>
-                        </div>
-                        <div class="dash-area-bar">
-                            <div class="dash-area-bar__label"><span>الرصافة</span><strong>${todayRusafa}</strong></div>
-                            <div class="dash-area-bar__track"><div class="dash-area-bar__fill dash-area-bar__fill--rusafa" style="width:${rusafaPct}%"></div></div>
-                        </div>
-                    </section>
-
-                    <nav class="dash-quick-nav" aria-label="اختصارات سريعة">
-                        <button type="button" class="dash-quick-btn dash-quick-btn--primary dash-quick-btn--wide" data-screen="new-order">
-                            <i class="bi bi-plus-circle" aria-hidden="true"></i>
-                            <span>إدخال طلب جديد</span>
-                        </button>
-                        <button type="button" class="dash-quick-btn" data-screen="orders">
-                            <i class="bi bi-box-seam" aria-hidden="true"></i>
-                            <span>الطلبات</span>
-                        </button>
-                        <button type="button" class="dash-quick-btn" data-screen="driver-receive">
-                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i>
-                            <span>استلام</span>
-                        </button>
-                        <button type="button" class="dash-quick-btn nav-admin" data-screen="reports" data-tab="employee">
-                            <i class="bi bi-person-badge" aria-hidden="true"></i>
-                            <span>تقرير موظف</span>
-                        </button>
-                        <button type="button" class="dash-quick-btn nav-admin" data-screen="reports" data-tab="driver">
-                            <i class="bi bi-graph-up" aria-hidden="true"></i>
-                            <span>التقارير</span>
-                        </button>
-                    </nav>
-
-                    <div class="stat-cards stat-cards--dashboard">
-                        <div class="stat-card stat-card--icon stat-card--compact">
-                            <div class="stat-card__icon stat-card__icon--teal"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
-                            <div class="stat-card__body">
-                                <div class="value">${stats.todayCount}</div>
-                                <div class="label">طلبات اليوم</div>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-card--icon stat-card--compact">
-                            <div class="stat-card__icon stat-card__icon--pink"><i class="bi bi-star" aria-hidden="true"></i></div>
-                            <div class="stat-card__body">
-                                <div class="value">${newCount}</div>
-                                <div class="label">طلبات جديدة</div>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-card--icon stat-card--compact">
-                            <div class="stat-card__icon stat-card__icon--blue"><i class="bi bi-truck" aria-hidden="true"></i></div>
-                            <div class="stat-card__body">
-                                <div class="value">${assignedCount}</div>
-                                <div class="label">مع السائقين</div>
-                            </div>
-                        </div>
-                        <div class="stat-card stat-card--icon stat-card--compact">
-                            <div class="stat-card__icon stat-card__icon--purple"><i class="bi bi-stack" aria-hidden="true"></i></div>
-                            <div class="stat-card__body">
-                                <div class="value">${stats.totalOrders}</div>
-                                <div class="label">إجمالي الطلبات</div>
-                            </div>
-                        </div>
-                    </div>
-                    ${currentUser?.Role === 'admin' ? `
-                    <section class="ovn-panel">
-                        <header class="ovn-panel-head">
-                            <div class="ovn-panel-icon" aria-hidden="true"><i class="bi bi-bell-fill"></i></div>
-                            <div class="ovn-panel-intro">
-                                <h3 class="ovn-panel-title">
-                                    إشعارات التوصيل المجاني اليدوي
-                                    ${notifCount > 0 ? `<span class="ovn-panel-count">${notifCount}</span>` : ''}
-                                </h3>
-                                <p class="ovn-panel-desc">طلبات أقل من 50,000 د.ع — توصيل مجاني يدوي من الموظف. الملاحظات تُعرض كما في الطلب.</p>
-                            </div>
-                        </header>
-                        <div id="overrideNotifList" class="ovn-list">${notifHtml}</div>
-                    </section>
-                    ` : ''}
-                    <div class="card dash-welcome-card">
-                        <p>مرحباً بك في نظام إدارة التوصيل — شركة ديما الحياة</p>
-                        <p class="status-map dash-welcome-hint">استخدم الاختصارات أعلاه أو القائمة للتنقل بين الأقسام</p>
-                    </div>
-                </div>
-            `;
-
-            container.querySelectorAll('.dash-quick-btn[data-screen]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    const screen = btn.dataset.screen;
-                    const tab = btn.dataset.tab;
-                    if (tab) {
-                        setNavActive(screen, tab);
-                        showScreen(screen, tab);
-                    } else {
-                        setNavActive(screen);
-                        showScreen(screen);
-                    }
-                });
-            });
-
-            if (currentUser?.Role === 'admin') {
-                container.querySelectorAll('.btn-override-seen').forEach(btn => {
-                    btn.onclick = async () => {
-                        const id = parseInt(btn.dataset.id);
-                        if (!id) return;
-                        try {
-                            await window.api.notifications.markAsReviewed(id);
-                            btn.closest('.ovn-card').remove();
-                        } catch (e) {
-                            await showMsg('خطأ: ' + (e?.message || e));
-                        }
-                    };
-                });
-            }
+            container.innerHTML = renderDashboardMarkup(userName, today, stats, notifList);
+            bindDashboardQuickNav(container);
+            bindOverrideNotifications(container);
+            const mount = container.closest('.screen-mount');
+            if (mount?.dataset.forceRefresh) delete mount.dataset.forceRefresh;
         }
     },
 
@@ -1370,7 +1600,19 @@ const screens = {
             };
 
             container.innerHTML = `
-                <div class="screen active new-order-screen">
+                <div class="screen active new-order-screen new-order-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-plus-circle',
+                        title: 'إدخال طلب جديد',
+                        subtitle: 'املأ بيانات المتجر والمستلم والمبالغ — يمكنك الحفظ أو طباعة الملصق مباشرة',
+                        variant: 'pink'
+                    })}
+                    <div class="new-order-steps" aria-hidden="true">
+                        <span class="new-order-step is-active"><i class="bi bi-shop"></i> المتجر</span>
+                        <span class="new-order-step is-active"><i class="bi bi-person"></i> المستلم</span>
+                        <span class="new-order-step is-active"><i class="bi bi-geo-alt"></i> التوصيل</span>
+                        <span class="new-order-step is-active"><i class="bi bi-cash-stack"></i> المبالغ</span>
+                    </div>
                     <form id="orderForm" class="new-order-form">
                         <div class="new-order-cards">
                             <div class="new-order-card new-order-card-store">
@@ -1640,6 +1882,8 @@ const screens = {
                 };
                 try {
                     lastOrder = await window.api.orders.create(data);
+                    invalidateDashboardCache();
+                    invalidateScreenCache('orders');
                     document.getElementById('lastOrderInfo').style.display = 'block';
                     document.getElementById('lastOrderInfo').innerHTML = `
                         <strong>تم حفظ الطلب بنجاح</strong><br>
@@ -1715,7 +1959,13 @@ const screens = {
 
     orders: {
         async render(container) {
-            await renderOrdersScreen(container, { title: 'الطلبات' });
+            const mount = container.closest('.screen-mount');
+            const initialStatus = mount?.dataset?.ordersInitialStatus || '';
+            if (mount && initialStatus) delete mount.dataset.ordersInitialStatus;
+            await renderOrdersScreen(container, {
+                title: 'الطلبات',
+                initialFilters: { status: initialStatus }
+            });
         }
     },
 
@@ -1725,18 +1975,26 @@ const screens = {
             try {
                 drivers = await window.api.drivers.getAll({ all: true });
             } catch (err) {
-                container.innerHTML = `<div class="screen active"><div class="card"><p style="color:#b91c1c">خطأ في تحميل السائقين: ${err?.message || err}</p></div></div>`;
+                container.innerHTML = renderUxError('خطأ في تحميل السائقين', err?.message || String(err));
                 return;
             }
 
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+            const activeDrivers = drivers.filter(d => d.Active).length;
             container.innerHTML = `
-                <div class="screen active drivers-screen">
-                    <h1 class="page-title">السائقين</h1>
-                    <div class="card drivers-card">
-                        <h3>إضافة سائق جديد</h3>
-                        <div class="form-grid drivers-add-form">
+                <div class="screen active drivers-screen drivers-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-truck',
+                        title: 'إدارة السائقين',
+                        subtitle: 'إضافة السائقين، إنشاء الحسابات، وتفعيل أو إيقاف السائق',
+                        badges: [`${drivers.length} سائق`, `${activeDrivers} نشط`]
+                    })}
+                    <div class="ux-panel">
+                        <div class="ux-panel__head">
+                            <h2><i class="bi bi-person-plus" aria-hidden="true"></i> إضافة سائق جديد</h2>
+                        </div>
+                        <div class="form-grid drivers-add-form ux-form-grid">
                             <div class="form-group">
                                 <label>الاسم</label>
                                 <input type="text" id="newDriverName" placeholder="اسم السائق">
@@ -1750,7 +2008,12 @@ const screens = {
                                 <button type="button" class="btn btn-primary" id="btnAddDriver">إضافة سائق</button>
                             </div>
                         </div>
-                        <div class="drivers-table-wrap">
+                    </div>
+                    <div class="ux-panel ux-panel--table">
+                        <div class="ux-panel__head">
+                            <h2><i class="bi bi-list-ul" aria-hidden="true"></i> قائمة السائقين</h2>
+                        </div>
+                        <div class="drivers-table-wrap ux-table-wrap">
                             <table class="drivers-table">
                             <thead>
                                     <tr>
@@ -1877,31 +2140,34 @@ const screens = {
             };
 
             container.innerHTML = `
-                <div class="screen active">
-                    <h1 class="page-title">استلام الطلبات للسائق</h1>
-                    <div class="card driver-scan-area">
-                        ${drivers.length === 0 ? '<p style="color:#b91c1c;margin-bottom:16px">أضف سائقين من قسم السائقين أولاً</p>' : ''}
-                        <p style="color:#64748b;margin-bottom:16px;font-size:0.9rem">أدخل الرمز السري للسائق واضغط Enter لإظهار اسمه، ثم امسح أو اكتب أرقام الشحنات للتعيين.</p>
-                        <div id="receiveStep1">
-                        <div class="form-group" style="margin-bottom:16px">
-                                <label>الرمز السري للسائق</label>
-                                <input type="password" id="driverCodeInput" placeholder="أدخل الرمز السري واضغط Enter" autocomplete="off" style="width:100%;padding:12px" ${drivers.length === 0 ? 'disabled' : ''}>
+                <div class="screen active driver-receive-screen driver-receive-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-box-arrow-in-down',
+                        title: 'استلام الطلبات للسائق',
+                        subtitle: 'أدخل رمز السائق ثم امسح أو اكتب أرقام الشحنات للتعيين',
+                        variant: 'teal'
+                    })}
+                    <div class="ux-panel ux-panel--scan">
+                        ${drivers.length === 0 ? '<div class="ux-alert ux-alert--danger"><i class="bi bi-exclamation-triangle"></i> أضف سائقين من قسم السائقين أولاً</div>' : ''}
+                        <div id="receiveStep1" class="receive-step">
+                            <label class="ux-field-label" for="driverCodeInput">الرمز السري للسائق</label>
+                            <div class="ux-scan-row">
+                                <input type="password" id="driverCodeInput" class="ux-scan-input" placeholder="أدخل الرمز واضغط Enter" autocomplete="off" ${drivers.length === 0 ? 'disabled' : ''}>
+                                <span class="ux-scan-hint"><i class="bi bi-key"></i> Enter للتأكيد</span>
+                            </div>
                         </div>
-                        </div>
-                        <div id="receiveStep2" style="display:none">
-                            <div class="form-group" style="margin-bottom:16px;display:flex;align-items:center;gap:12px">
-                                <span class="driver-badge" id="driverBadge"></span>
+                        <div id="receiveStep2" class="receive-step" style="display:none">
+                            <div class="receive-driver-bar">
+                                <span class="driver-badge ux-driver-badge" id="driverBadge"></span>
                                 <button type="button" class="btn btn-secondary btn-sm" id="btnAnotherDriver" style="display:none">سائق آخر</button>
                             </div>
-                            <div class="form-group" style="display:flex;gap:8px;align-items:flex-end">
-                                <div style="flex:1">
-                                    <label>امسح الباركود أو اكتب رقم الشحنة ثم Enter</label>
-                            <input type="text" id="scanInput" placeholder="رقم الشحنة" autocomplete="off">
-                                </div>
-                                <button type="button" class="btn btn-primary" id="btnAssign" style="height:42px;white-space:nowrap">تعيين للسائق</button>
+                            <label class="ux-field-label" for="scanInput">رقم الشحنة</label>
+                            <div class="ux-scan-row">
+                                <input type="text" id="scanInput" class="ux-scan-input ux-scan-input--lg" placeholder="امسح الباركود أو اكتب رقم الشحنة" autocomplete="off">
+                                <button type="button" class="btn btn-primary" id="btnAssign">تعيين للسائق</button>
                             </div>
                         </div>
-                        <div id="scanFeedback" class="scan-feedback" style="display:none"></div>
+                        <div id="scanFeedback" class="scan-feedback ux-scan-feedback" style="display:none"></div>
                     </div>
                 </div>
             `;
@@ -1991,60 +2257,56 @@ const screens = {
 
     'support-sections': {
         async render(container) {
+            const initialTab = container.dataset.initialTab || 'driver-return';
             container.innerHTML = `
-                <div class="screen active support-sections-screen">
+                <div class="screen active support-sections-screen support-sections-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-tools',
+                        title: 'أقسام سانده',
+                        subtitle: 'عمليات الدعم: إرجاع الطلب من السائق أو تسجيله كراجع',
+                        variant: 'amber'
+                    })}
+                    ${renderUxSubnav([
+                        { id: 'driver-return', label: 'تبديل السائق', icon: 'bi-arrow-left-right' },
+                        { id: 'driver-returned', label: 'طلب راجع', icon: 'bi-x-circle' }
+                    ], initialTab)}
                     <div class="support-sections-layout">
-                        <main class="support-sections-panel">
-                            <section class="support-section-pane support-pane-driver-return" id="support-pane-driver-return">
-                                <div class="support-pane-hero">
-                                    <div class="support-pane-icon-wrap"><i class="bi bi-arrow-left-right"></i></div>
-                                    <h2 class="support-pane-title">تبديل السائق</h2>
-                                    <p class="support-pane-lead">امسح الباركود أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي. يمكنك بعدها تعيينه لسائق آخر من قسم "استلام الطلبات".</p>
-                        </div>
-                                <div class="support-scan-card">
-                                    <div class="support-scan-header">
-                                        <i class="bi bi-upc-scan"></i>
-                                        <span>مسح أو إدخال رقم الشحنة</span>
-                                    </div>
-                                    <div class="support-scan-body">
-                                        <input type="text" id="returnScanInput" placeholder="رقم الشحنة..." autocomplete="off" class="support-scan-input">
-                                        <button type="button" class="btn support-action-btn" id="btnReturnOrder">
-                                            <i class="bi bi-arrow-return-left"></i>
-                                            <span>إرجاع الطلب</span>
-                                        </button>
-                                    </div>
-                                    <div id="returnFeedback" class="support-scan-feedback" style="display:none"></div>
+                        <main class="support-sections-panel ux-panel-stack">
+                            <section class="support-section-pane ux-panel ux-panel--scan" id="support-pane-driver-return">
+                                <div class="ux-panel__head">
+                                    <h2><i class="bi bi-arrow-left-right" aria-hidden="true"></i> تبديل السائق</h2>
                                 </div>
+                                <p class="ux-panel__desc">امسح أو اكتب رقم الشحنة لإرجاع الطلب من السائق الحالي، ثم عيّنه لسائق آخر من «استلام الطلبات».</p>
+                                <label class="ux-field-label" for="returnScanInput">رقم الشحنة</label>
+                                <div class="ux-scan-row">
+                                    <input type="text" id="returnScanInput" placeholder="امسح الباركود أو اكتب رقم الشحنة" autocomplete="off" class="ux-scan-input ux-scan-input--lg">
+                                    <button type="button" class="btn btn-primary" id="btnReturnOrder"><i class="bi bi-arrow-return-left"></i> إرجاع الطلب</button>
+                                </div>
+                                <div id="returnFeedback" class="scan-feedback ux-scan-feedback" style="display:none"></div>
                             </section>
-                            <section class="support-section-pane support-pane-driver-returned" id="support-pane-driver-returned">
-                                <div class="support-pane-hero">
-                                    <div class="support-pane-icon-wrap"><i class="bi bi-x-circle-fill"></i></div>
-                                    <h2 class="support-pane-title">طلب راجع</h2>
-                                    <p class="support-pane-lead">امسح الباركود أو اكتب رقم الشحنة لتسجيل الطلب كراجع (مرفوض من الزبون).</p>
+                            <section class="support-section-pane ux-panel ux-panel--scan" id="support-pane-driver-returned">
+                                <div class="ux-panel__head">
+                                    <h2><i class="bi bi-x-circle" aria-hidden="true"></i> طلب راجع</h2>
                                 </div>
-                                <div class="support-scan-card">
-                                    <div class="support-scan-header">
-                                        <i class="bi bi-upc-scan"></i>
-                                        <span>مسح أو إدخال رقم الشحنة</span>
-                                    </div>
-                                    <div class="support-scan-body">
-                                        <input type="text" id="returnedScanInput" placeholder="رقم الشحنة..." autocomplete="off" class="support-scan-input">
-                                        <button type="button" class="btn support-action-btn" id="btnMarkReturned">
-                                            <i class="bi bi-check2-circle"></i>
-                                            <span>تسجيل كراجع</span>
-                                        </button>
-                                    </div>
-                                    <div id="returnedFeedback" class="support-scan-feedback" style="display:none"></div>
+                                <p class="ux-panel__desc">امسح أو اكتب رقم الشحنة لتسجيل الطلب كراجع (مرفوض من الزبون).</p>
+                                <label class="ux-field-label" for="returnedScanInput">رقم الشحنة</label>
+                                <div class="ux-scan-row">
+                                    <input type="text" id="returnedScanInput" placeholder="امسح الباركود أو اكتب رقم الشحنة" autocomplete="off" class="ux-scan-input ux-scan-input--lg">
+                                    <button type="button" class="btn btn-primary" id="btnMarkReturned"><i class="bi bi-check2-circle"></i> تسجيل كراجع</button>
                                 </div>
+                                <div id="returnedFeedback" class="scan-feedback ux-scan-feedback" style="display:none"></div>
                             </section>
                         </main>
                     </div>
                 </div>
             `;
 
-            const initialTab = container.dataset.initialTab || 'driver-return';
             container.querySelectorAll('.support-section-pane').forEach(p => p.classList.remove('active'));
             container.querySelector(`#support-pane-${initialTab}`)?.classList.add('active');
+            bindUxSubnav(container, {
+                paneSelector: '.support-section-pane',
+                panePrefix: '#support-pane-'
+            });
 
             const scanInput = document.getElementById('returnScanInput');
             const feedback = document.getElementById('returnFeedback');
@@ -2128,18 +2390,24 @@ const screens = {
     'receive-returned': {
         async render(container) {
             container.innerHTML = `
-                <div class="screen active">
-                    <h1 class="page-title">استلام الطلب الراجع</h1>
-                    <div class="card driver-scan-area">
-                        <p style="margin-bottom:16px;color:#64748b;text-align:center">امسح الباركود أو اكتب رقم الشحنة لتسجيل استلام الطلب الراجع عند الشركة (هل أرجع السائق الطلب الراجع المرفوض من الزبون وسلمه؟)</p>
-                        <div class="form-group" style="display:flex;gap:8px;align-items:flex-end">
-                            <div style="flex:1">
-                                <label>امسح الباركود أو اكتب رقم الشحنة</label>
-                                <input type="text" id="receiveReturnedScanInput" placeholder="رقم الشحنة" autocomplete="off">
-                            </div>
-                            <button type="button" class="btn btn-primary" id="btnReceiveReturned" style="height:42px;white-space:nowrap">تسجيل الاستلام</button>
+                <div class="screen active receive-returned-screen receive-returned-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-arrow-return-left',
+                        title: 'استلام الطلب الراجع',
+                        subtitle: 'تسجيل استلام الطلب الراجع عند الشركة بعد إرجاعه من السائق',
+                        variant: 'orange'
+                    })}
+                    <div class="ux-panel ux-panel--scan">
+                        <div class="ux-alert ux-alert--info">
+                            <i class="bi bi-info-circle"></i>
+                            <span>امسح الباركود أو اكتب رقم الشحنة — للطلبات ذات حالة «راجع» فقط</span>
                         </div>
-                        <div id="receiveReturnedFeedback" class="scan-feedback" style="display:none"></div>
+                        <label class="ux-field-label" for="receiveReturnedScanInput">رقم الشحنة</label>
+                        <div class="ux-scan-row">
+                            <input type="text" id="receiveReturnedScanInput" class="ux-scan-input ux-scan-input--lg" placeholder="امسح الباركود أو اكتب رقم الشحنة" autocomplete="off">
+                            <button type="button" class="btn btn-primary" id="btnReceiveReturned"><i class="bi bi-check2-circle"></i> تسجيل الاستلام</button>
+                        </div>
+                        <div id="receiveReturnedFeedback" class="scan-feedback ux-scan-feedback" style="display:none"></div>
                     </div>
                 </div>
             `;
@@ -2213,10 +2481,24 @@ const screens = {
             let today = new Date().toISOString().split('T')[0];
             try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
 
+            const initialTab = container.dataset.initialTab || 'collect';
             container.innerHTML = `
-                <div class="screen active reports-screen">
+                <div class="screen active reports-screen reports-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-graph-up-arrow',
+                        title: 'التقارير',
+                        subtitle: 'استحصال الأجور، التقارير اليومية، وتقارير السائقين والموظفين',
+                        variant: 'purple'
+                    })}
+                    ${renderUxSubnav([
+                        { id: 'collect', label: 'استحصال الأجور', icon: 'bi-cash-coin' },
+                        { id: 'daily', label: 'الملخص', icon: 'bi-calendar3' },
+                        { id: 'driver', label: 'تقرير السائق', icon: 'bi-truck' },
+                        { id: 'employee', label: 'تقرير الموظف', icon: 'bi-person-badge' },
+                        { id: 'company', label: 'التقرير العام', icon: 'bi-building' }
+                    ], initialTab)}
                     <div class="reports-layout">
-                        <main class="reports-panel">
+                        <main class="reports-panel ux-reports-panel">
                             <section class="report-pane" id="pane-collect">
                                 <h3 class="report-pane-head">استحصال الأجور</h3>
                                 <p class="report-pane-desc">سجّل استلام أجور التوصيل من السائق بعد إكمال الطلبات</p>
@@ -2322,9 +2604,12 @@ const screens = {
                 </div>
             `;
 
-            const initialTab = container.dataset.initialTab || 'collect';
             container.querySelectorAll('.report-pane').forEach(x => x.classList.remove('active'));
             container.querySelector('#pane-' + initialTab)?.classList.add('active');
+            bindUxSubnav(container, {
+                paneSelector: '.report-pane',
+                panePrefix: '#pane-'
+            });
             initAllDateRangePickers(container);
 
             let collectExpectedAmount = null;
@@ -2896,10 +3181,23 @@ const screens = {
                 regions = await window.api.regions.getAll();
             } catch (_) {}
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const initialTab = container.dataset.initialTab || 'regions';
             container.innerHTML = `
-                <div class="screen active settings-screen">
+                <div class="screen active settings-screen settings-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-gear-wide-connected',
+                        title: 'الإعدادات',
+                        subtitle: 'المناطق، القيم الافتراضية، التوقيت، ومعلومات النظام',
+                        variant: 'slate'
+                    })}
+                    ${renderUxSubnav([
+                        { id: 'regions', label: 'المناطق', icon: 'bi-geo-alt' },
+                        { id: 'defaults', label: 'القيم الافتراضية', icon: 'bi-sliders' },
+                        { id: 'time', label: 'التوقيت', icon: 'bi-clock' },
+                        { id: 'about', label: 'حول النظام', icon: 'bi-info-circle' }
+                    ], initialTab)}
                     <div class="settings-layout">
-                        <main class="settings-panel">
+                        <main class="settings-panel ux-panel-stack">
                             <section class="settings-pane settings-pane-regions" id="settings-pane-regions">
                                 <div class="settings-pane-hero">
                                     <div class="settings-pane-icon-wrap"><i class="bi bi-geo-alt-fill"></i></div>
@@ -3028,9 +3326,12 @@ const screens = {
                 </div>
             `;
 
-            const initialTab = container.dataset.initialTab || 'regions';
             container.querySelectorAll('.settings-pane').forEach(p => p.classList.remove('active'));
             container.querySelector(`#settings-pane-${initialTab}`)?.classList.add('active');
+            bindUxSubnav(container, {
+                paneSelector: '.settings-pane',
+                panePrefix: '#settings-pane-'
+            });
 
             document.getElementById('btnSaveDefaults').addEventListener('click', async () => {
                 const storeName = document.getElementById('defaultStoreName').value.trim();
@@ -3090,20 +3391,19 @@ const screens = {
             try {
                 users = await window.api.users.getAll();
             } catch (err) {
-                container.innerHTML = `<div class="screen active"><div class="card"><p style="color:#b91c1c">خطأ: ${err?.message || err}</p></div></div>`;
+                container.innerHTML = renderUxError('خطأ في تحميل المستخدمين', err?.message || String(err));
                 return;
             }
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             container.innerHTML = `
-                <div class="screen active users-screen">
+                <div class="screen active users-screen users-screen--v4">
+                    ${renderUxHero({
+                        icon: 'bi-people',
+                        title: 'إدارة المستخدمين',
+                        subtitle: 'إضافة حسابات الموظفين والمديرين مع تحديد الأدوار والصلاحيات',
+                        badges: [`${users.length} مستخدم`]
+                    })}
                     <div class="users-layout">
-                        <header class="users-header">
-                            <div class="users-header-top">
-                                <h1 class="users-title">إدارة المستخدمين</h1>
-                                <span class="users-count" id="usersCount">${users.length} مستخدم</span>
-                            </div>
-                            <p class="users-subtitle">إضافة وإدارة حسابات المستخدمين مع تحديد الأدوار والصلاحيات</p>
-                        </header>
                         <div class="users-content">
                             <section class="users-add-section">
                                 <div class="users-add-card">
@@ -3292,8 +3592,25 @@ document.getElementById('mainNav')?.addEventListener('click', (e) => {
     if (link) setMobileNavOpen(false);
 });
 
-MOBILE_NAV_MQ.addEventListener('change', applySidebarForViewport);
+MOBILE_NAV_MQ.addEventListener('change', () => {
+    applySidebarForViewport();
+    const container = document.getElementById('screen-container');
+    if (container?.dataset.currentScreen) {
+        updateDesktopChrome(container.dataset.currentScreen, container.dataset.initialTab || '');
+    }
+});
 applySidebarForViewport();
+
+document.getElementById('btnRefreshScreen')?.addEventListener('click', () => {
+    const container = document.getElementById('screen-container');
+    const screenId = container?.dataset.currentScreen;
+    const subTab = container?.dataset.initialTab || '';
+    if (!screenId) return;
+    if (screenId === 'dashboard') invalidateDashboardCache();
+    if (screenId === 'drivers') invalidateDriversCache();
+    invalidateScreenCache(screenId);
+    showScreen(screenId, subTab || undefined, { force: true });
+});
 
 const MOBILE_SCREEN_TITLES = {
     dashboard: 'لوحة التحكم',
@@ -3307,6 +3624,48 @@ const MOBILE_SCREEN_TITLES = {
     users: 'المستخدمين',
     settings: 'الإعدادات'
 };
+
+const DESKTOP_SCREEN_SUBTITLES = {
+    reports: {
+        collect: 'استحصال الأجور',
+        daily: 'التقرير الملخص',
+        driver: 'تقرير السائق',
+        employee: 'تقرير الموظف',
+        company: 'التقرير العام'
+    },
+    settings: {
+        regions: 'إدارة المناطق',
+        defaults: 'القيم الافتراضية',
+        time: 'إعدادات التوقيت',
+        about: 'حول النظام'
+    },
+    'support-sections': {
+        'driver-return': 'تبديل السائق',
+        'driver-returned': 'طلب راجع'
+    }
+};
+
+function updateDesktopChrome(screenId, subTab) {
+    const topbar = document.getElementById('contentTopbar');
+    if (!topbar) return;
+    topbar.hidden = isMobileNav();
+    const titleEl = document.getElementById('contentTopbarTitle');
+    const subtitleEl = document.getElementById('contentTopbarSubtitle');
+    const crumbEl = document.getElementById('contentTopbarCrumb');
+    const mainTitle = MOBILE_SCREEN_TITLES[screenId] || 'ديما الحياة';
+    const sub = subTab && DESKTOP_SCREEN_SUBTITLES[screenId]?.[subTab];
+    if (titleEl) titleEl.textContent = sub || mainTitle;
+    if (subtitleEl) {
+        subtitleEl.textContent = sub
+            ? `قسم ${mainTitle} — شركة ديما الحياة`
+            : 'نظام إدارة التوصيل — شركة ديما الحياة';
+    }
+    if (crumbEl) {
+        crumbEl.innerHTML = sub
+            ? `<span>${mainTitle}</span><i class="bi bi-chevron-left" aria-hidden="true"></i><span>${sub}</span>`
+            : `<span>${mainTitle}</span>`;
+    }
+}
 
 function updateMobileChrome(screenId) {
     const titleEl = document.getElementById('mobileTopbarTitle');

@@ -168,6 +168,9 @@ function getOrders(filters = {}) {
         sql += ` AND date(o.CreatedDate) <= date(?)`;
         params.push(filters.dateTo);
     }
+    if (filters.deferredOnly) {
+        sql += ` AND COALESCE(o.IsDeferred, 0) = 1`;
+    }
 
     sql += ` ORDER BY o.OrderID DESC`;
     const limitVal = filters.limit != null && filters.limit !== ''
@@ -343,7 +346,8 @@ function markDeliveredByDriver(orderId, driverId) {
     if (order.Status !== 'AssignedToDriver') return { success: false, error: 'الطلب ليس مع سائق حالياً' };
 
     const now = getLocalDateTimeStr();
-    database.prepare('UPDATE Orders SET Status = ?, DeliveredDate = ? WHERE OrderID = ?').run('Delivered', now, orderId);
+    database.prepare('UPDATE Orders SET Status = ?, DeliveredDate = ?, IsDeferred = 0, DeferredReason = NULL, DeferredDate = NULL WHERE OrderID = ?')
+        .run('Delivered', now, orderId);
     return { success: true, order: getOrderById(orderId) };
 }
 
@@ -356,9 +360,44 @@ function markReturnedByDriver(orderId, driverId, returnReason = '') {
     if (order.Status !== 'AssignedToDriver') return { success: false, error: 'الطلب ليس مع سائق حالياً' };
 
     const now = getLocalDateTimeStr();
-    database.prepare('UPDATE Orders SET Status = ?, ReturnReason = ?, ReturnedDate = ?, ReturnedByDriverID = ?, DriverID = NULL WHERE OrderID = ?')
+    database.prepare('UPDATE Orders SET Status = ?, ReturnReason = ?, ReturnedDate = ?, ReturnedByDriverID = ?, DriverID = NULL, IsDeferred = 0, DeferredReason = NULL, DeferredDate = NULL WHERE OrderID = ?')
         .run('Returned', (returnReason || '').trim() || null, now, driverId, orderId);
     return { success: true, order: getOrderById(orderId) };
+}
+
+function markDeferredByDriver(orderId, driverId, deferredReason = '') {
+    const database = db.getDatabase();
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, error: 'الطلب غير موجود' };
+    if (parseInt(order.DriverID) !== parseInt(driverId)) return { success: false, error: 'الطلب ليس معك' };
+    if (order.Status !== 'AssignedToDriver') return { success: false, error: 'الطلب ليس مع سائق حالياً' };
+
+    const reason = String(deferredReason || '').trim();
+    if (!reason) return { success: false, error: 'سبب التأجيل مطلوب' };
+
+    const now = getLocalDateTimeStr();
+    database.prepare(
+        'UPDATE Orders SET IsDeferred = 1, DeferredReason = ?, DeferredDate = ? WHERE OrderID = ?'
+    ).run(reason, now, orderId);
+    invalidateDashboardStatsCache();
+    return { success: true, order: getOrderById(orderId) };
+}
+
+function resumeDeferredByDriver(orderId, driverId) {
+    const database = db.getDatabase();
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, error: 'الطلب غير موجود' };
+    if (parseInt(order.DriverID) !== parseInt(driverId)) return { success: false, error: 'الطلب ليس معك' };
+    if (!order.IsDeferred) return { success: false, error: 'الطلب غير مؤجل' };
+
+    database.prepare(
+        'UPDATE Orders SET IsDeferred = 0, DeferredReason = NULL, DeferredDate = NULL WHERE OrderID = ?'
+    ).run(orderId);
+    return { success: true, order: getOrderById(orderId) };
+}
+
+function getDriverDeferredOrders(driverId) {
+    return getOrders({ driverId, status: 'AssignedToDriver', deferredOnly: true });
 }
 
 /* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
@@ -597,6 +636,9 @@ module.exports = {
     markLabelPrinted,
     markDeliveredByDriver,
     markReturnedByDriver,
+    markDeferredByDriver,
+    resumeDeferredByDriver,
+    getDriverDeferredOrders,
     getDriverStats,
     getDriverDeliveredOrders,
     getDriverReturnedOrders,

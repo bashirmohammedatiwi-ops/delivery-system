@@ -78,12 +78,16 @@ function createDbWrapper() {
     };
 }
 
-async function applyPerformanceIndexes(client) {
-    const indexes = [
+async function applySchemaPatches(client) {
+    const patches = [
+        `ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "IsDeferred" INTEGER DEFAULT 0`,
+        `ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "DeferredReason" TEXT`,
+        `ALTER TABLE "Orders" ADD COLUMN IF NOT EXISTS "DeferredDate" TEXT`,
         `CREATE INDEX IF NOT EXISTS idx_fdo_notif_unreviewed ON "FreeDeliveryOverrideNotifications"("Reviewed", "CreatedAt" DESC) WHERE "Reviewed" = 0`,
-        `CREATE INDEX IF NOT EXISTS idx_orders_created_day ON "Orders"("CreatedDate") WHERE "CreatedDate" IS NOT NULL`
+        `CREATE INDEX IF NOT EXISTS idx_orders_created_day ON "Orders"("CreatedDate") WHERE "CreatedDate" IS NOT NULL`,
+        `CREATE INDEX IF NOT EXISTS idx_orders_driver_deferred ON "Orders"("DriverID", "IsDeferred") WHERE "Status" = 'AssignedToDriver'`
     ];
-    for (const stmt of indexes) {
+    for (const stmt of patches) {
         await client.query(stmt);
     }
 }
@@ -92,7 +96,7 @@ async function applySchemaIfNeeded(client) {
     const check = await client.query(`SELECT to_regclass('public."Orders"') AS reg`);
     if (check.rows[0]?.reg) {
         console.log('PostgreSQL schema already exists — skip DDL');
-        await applyPerformanceIndexes(client);
+        await applySchemaPatches(client);
         return;
     }
     const schemaPath = path.join(__dirname, 'schema.pg.sql');

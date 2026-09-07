@@ -7,16 +7,33 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>شركة ديما الحياة - نظام إدارة التوصيل</title>
-    <link rel="stylesheet" href="styles.css?v=20260907perf">
+    <link rel="stylesheet" href="styles.css?v=20260907v5">
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Tajawal:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body>
     <!-- شاشة تسجيل دخول المدير -->
     <div id="login-screen" class="login-screen" style="display:none">
-        <div class="login-card">
-            <div class="login-logo">شركة ديما الحياة</div>
-            <p class="login-subtitle">تسجيل دخول المدير</p>
+        <div class="login-shell">
+            <aside class="login-showcase" aria-hidden="true">
+                <div class="login-showcase__icon"><i class="bi bi-truck"></i></div>
+                <h2 class="login-showcase__title">شركة ديما الحياة</h2>
+                <p class="login-showcase__text">نظام متكامل لإدارة طلبات التوصيل — من الإدخال إلى التسليم والتقارير</p>
+                <ul class="login-showcase__features">
+                    <li><i class="bi bi-check2-circle"></i> إدارة الطلبات والسائقين</li>
+                    <li><i class="bi bi-check2-circle"></i> تقارير واستحصال الأجور</li>
+                    <li><i class="bi bi-check2-circle"></i> تطبيق سائق متصل</li>
+                </ul>
+            </aside>
+            <div class="login-card">
+            <div class="login-brand">
+                <div class="login-brand-icon" aria-hidden="true"><i class="bi bi-truck"></i></div>
+                <div class="login-brand-text">
+                    <div class="login-logo">شركة ديما الحياة</div>
+                    <p class="login-subtitle">نظام إدارة التوصيل</p>
+                </div>
+            </div>
+            <p class="login-form-title">تسجيل دخول المدير</p>
             <form id="login-form">
                 <div class="form-group">
                     <label>اسم المستخدم</label>
@@ -30,6 +47,7 @@
                 <button type="submit" class="btn btn-primary btn-block" id="btnLogin">تسجيل الدخول</button>
                 <button type="button" class="btn btn-secondary btn-block" id="btnLoginCancel" style="margin-top:8px">إلغاء</button>
             </form>
+        </div>
         </div>
     </div>
 
@@ -49,16 +67,27 @@
             </button>
             <aside class="sidebar" id="sidebar">
                 <div class="logo">
-                    <i class="bi bi-truck logo-icon"></i>
-                    <span class="logo-text">شركة ديما الحياة</span>
+                    <div class="logo-mark" aria-hidden="true"><i class="bi bi-truck"></i></div>
+                    <div class="logo-copy">
+                        <span class="logo-text">ديما الحياة</span>
+                        <span class="logo-tagline">نظام التوصيل</span>
+                    </div>
                 </div>
                 <div class="user-info" id="sidebarUserInfo"></div>
                 <nav class="nav" id="mainNav">
-                    <a href="#" data-screen="dashboard" class="nav-item nav-admin"><i class="bi bi-grid-1x2"></i><span>لوحة التحكم</span></a>
-                    <a href="#" data-screen="orders" class="nav-item"><i class="bi bi-box-seam"></i><span>الطلبات</span></a>
-                    <a href="#" data-screen="new-order" class="nav-item"><i class="bi bi-plus-circle"></i><span>إدخال طلب جديد</span></a>
-                    <a href="#" data-screen="drivers" class="nav-item nav-admin"><i class="bi bi-truck"></i><span>السائقين</span></a>
-                    <a href="#" data-screen="driver-receive" class="nav-item"><i class="bi bi-box-arrow-in-down"></i><span>استلام الطلبات</span></a>
+                    <div class="nav-section nav-admin">
+                        <div class="nav-section__label">الرئيسية</div>
+                        <a href="#" data-screen="dashboard" class="nav-item nav-admin"><i class="bi bi-grid-1x2"></i><span>لوحة التحكم</span></a>
+                    </div>
+                    <div class="nav-section">
+                        <div class="nav-section__label">العمليات</div>
+                        <a href="#" data-screen="orders" class="nav-item"><i class="bi bi-box-seam"></i><span>الطلبات</span></a>
+                        <a href="#" data-screen="new-order" class="nav-item nav-item--accent"><i class="bi bi-plus-circle"></i><span>إدخال طلب جديد</span></a>
+                        <a href="#" data-screen="driver-receive" class="nav-item"><i class="bi bi-box-arrow-in-down"></i><span>استلام الطلبات</span></a>
+                    </div>
+                    <div class="nav-section nav-admin">
+                        <div class="nav-section__label">الإدارة</div>
+                        <a href="#" data-screen="drivers" class="nav-item nav-admin"><i class="bi bi-truck"></i><span>السائقين</span></a>
                     <div class="nav-group nav-admin">
                         <a href="#" data-screen="support-sections" class="nav-item nav-parent"><i class="bi bi-tools"></i><span>أقسام سانده</span><i class="bi bi-chevron-down nav-chevron"></i></a>
                         <div class="nav-sub">
@@ -67,24 +96,28 @@
                         </div>
                     </div>
                     <a href="#" data-screen="receive-returned" class="nav-item nav-admin"><i class="bi bi-arrow-return-left"></i><span>استلام الطلب الراجع</span></a>
-                    <div class="nav-group nav-admin">
-                        <a href="#" data-screen="reports" class="nav-item nav-parent"><i class="bi bi-graph-up"></i><span>التقارير</span><i class="bi bi-chevron-down nav-chevron"></i></a>
-                        <div class="nav-sub">
-                            <a href="#" data-screen="reports" data-tab="collect" class="nav-item nav-child"><span>استحصال الأجور</span></a>
-                            <a href="#" data-screen="reports" data-tab="daily" class="nav-item nav-child"><span>التقرير الملخص</span></a>
-                            <a href="#" data-screen="reports" data-tab="driver" class="nav-item nav-child"><span>تقرير السائق</span></a>
-                            <a href="#" data-screen="reports" data-tab="employee" class="nav-item nav-child"><span>تقرير الموظف</span></a>
-                            <a href="#" data-screen="reports" data-tab="company" class="nav-item nav-child"><span>التقرير العام</span></a>
-                        </div>
                     </div>
-                    <a href="#" data-screen="users" class="nav-item nav-admin"><i class="bi bi-people"></i><span>المستخدمين</span></a>
-                    <div class="nav-group nav-admin">
-                        <a href="#" data-screen="settings" class="nav-item nav-parent"><i class="bi bi-gear"></i><span>الإعدادات</span><i class="bi bi-chevron-down nav-chevron"></i></a>
-                        <div class="nav-sub">
-                            <a href="#" data-screen="settings" data-tab="regions" class="nav-item nav-child"><span>المناطق</span></a>
-                            <a href="#" data-screen="settings" data-tab="defaults" class="nav-item nav-child"><span>القيم الافتراضية</span></a>
-                            <a href="#" data-screen="settings" data-tab="time" class="nav-item nav-child"><span>التوقيت</span></a>
-                            <a href="#" data-screen="settings" data-tab="about" class="nav-item nav-child"><span>حول النظام</span></a>
+                    <div class="nav-section nav-admin">
+                        <div class="nav-section__label">التقارير والنظام</div>
+                        <div class="nav-group nav-admin">
+                            <a href="#" data-screen="reports" class="nav-item nav-parent"><i class="bi bi-graph-up"></i><span>التقارير</span><i class="bi bi-chevron-down nav-chevron"></i></a>
+                            <div class="nav-sub">
+                                <a href="#" data-screen="reports" data-tab="collect" class="nav-item nav-child"><span>استحصال الأجور</span></a>
+                                <a href="#" data-screen="reports" data-tab="daily" class="nav-item nav-child"><span>التقرير الملخص</span></a>
+                                <a href="#" data-screen="reports" data-tab="driver" class="nav-item nav-child"><span>تقرير السائق</span></a>
+                                <a href="#" data-screen="reports" data-tab="employee" class="nav-item nav-child"><span>تقرير الموظف</span></a>
+                                <a href="#" data-screen="reports" data-tab="company" class="nav-item nav-child"><span>التقرير العام</span></a>
+                            </div>
+                        </div>
+                        <a href="#" data-screen="users" class="nav-item nav-admin"><i class="bi bi-people"></i><span>المستخدمين</span></a>
+                        <div class="nav-group nav-admin">
+                            <a href="#" data-screen="settings" class="nav-item nav-parent"><i class="bi bi-gear"></i><span>الإعدادات</span><i class="bi bi-chevron-down nav-chevron"></i></a>
+                            <div class="nav-sub">
+                                <a href="#" data-screen="settings" data-tab="regions" class="nav-item nav-child"><span>المناطق</span></a>
+                                <a href="#" data-screen="settings" data-tab="defaults" class="nav-item nav-child"><span>القيم الافتراضية</span></a>
+                                <a href="#" data-screen="settings" data-tab="time" class="nav-item nav-child"><span>التوقيت</span></a>
+                                <a href="#" data-screen="settings" data-tab="about" class="nav-item nav-child"><span>حول النظام</span></a>
+                            </div>
                         </div>
                     </div>
                 </nav>
@@ -94,7 +127,18 @@
                 </div>
             </aside>
             <main class="content">
-                <div id="screen-container"></div>
+                <header class="content-topbar" id="contentTopbar" hidden>
+                    <div class="content-topbar__text">
+                        <nav class="content-topbar__crumb" id="contentTopbarCrumb" aria-label="مسار الصفحة"></nav>
+                        <h1 class="content-topbar__title" id="contentTopbarTitle">لوحة التحكم</h1>
+                        <p class="content-topbar__subtitle" id="contentTopbarSubtitle">نظام إدارة التوصيل — شركة ديما الحياة</p>
+                    </div>
+                    <button type="button" class="content-topbar__refresh" id="btnRefreshScreen" title="تحديث الصفحة">
+                        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i>
+                        <span>تحديث</span>
+                    </button>
+                </header>
+                <div id="screen-container" class="screen-container"></div>
             </main>
         </div>
         <footer class="app-footer">
@@ -117,7 +161,7 @@
             <button type="button" class="mobile-bottom-nav__item" id="mobileBottomMenu" aria-label="فتح القائمة الكاملة"><i class="bi bi-list" aria-hidden="true"></i><span>المزيد</span></button>
         </nav>
     </div>
-    <script src="api.js?v=20260907perf"></script>
-    <script src="app.js?v=20260907perf"></script>
+    <script src="api.js?v=20260907v5"></script>
+    <script src="app.js?v=20260907v5"></script>
 </body>
 </html>

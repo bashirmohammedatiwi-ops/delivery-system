@@ -133,6 +133,9 @@ async function initSchema() {
     try { nativeDb.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_appusers_secretcode ON AppUsers(SecretCode) WHERE SecretCode IS NOT NULL AND SecretCode != \'\''); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE AppUsers ADD COLUMN StoreName TEXT'); saveDb(); } catch (e) {}
     try { nativeDb.run('ALTER TABLE AppUsers ADD COLUMN StorePhone TEXT'); saveDb(); } catch (e) {}
+    try { nativeDb.run('ALTER TABLE Orders ADD COLUMN IsDeferred INTEGER DEFAULT 0'); saveDb(); } catch (e) {}
+    try { nativeDb.run('ALTER TABLE Orders ADD COLUMN DeferredReason TEXT'); saveDb(); } catch (e) {}
+    try { nativeDb.run('ALTER TABLE Orders ADD COLUMN DeferredDate TEXT'); saveDb(); } catch (e) {}
 
     try {
         nativeDb.run(`CREATE TABLE IF NOT EXISTS FreeDeliveryOverrideNotifications (

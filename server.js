@@ -560,6 +560,52 @@ app.post('/api/driver/orders/:id/return', async (req, res) => {
     }
 });
 
+app.post('/api/driver/orders/:id/defer', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const orderId = parseInt(req.params.id, 10);
+        if (isNaN(orderId)) return res.status(400).json({ error: 'معرّف الطلب غير صالح' });
+        const reason = req.body?.reason || req.body?.deferredReason || '';
+        const result = orderService.markDeferredByDriver(orderId, driver.DriverID, reason);
+        if (!result.success) return res.status(400).json({ error: result.error });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/driver/orders/:id/resume-defer', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح' });
+        const orderId = parseInt(req.params.id, 10);
+        if (isNaN(orderId)) return res.status(400).json({ error: 'معرّف الطلب غير صالح' });
+        const result = orderService.resumeDeferredByDriver(orderId, driver.DriverID);
+        if (!result.success) return res.status(400).json({ error: result.error });
+        res.json(result);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/driver/deferred-orders', async (req, res) => {
+    try {
+        const auth = req.headers.authorization || '';
+        const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+        const driver = authService.getDriverByToken(token);
+        if (!driver) return res.status(401).json({ error: 'غير مصرح - سجّل الدخول مجدداً' });
+        const orders = orderService.getDriverDeferredOrders(driver.DriverID);
+        res.json(orders);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.get('/api/driver/stats', async (req, res) => {
     try {
         const auth = req.headers.authorization || '';

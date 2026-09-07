@@ -5,33 +5,46 @@ import {
   StyleSheet,
   RefreshControl,
   ScrollView,
-  ActivityIndicator,
   Alert,
-  TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { THEME } from '../theme';
 import { getDriverStats, getDriverDeliveredOrders, getDriverToday } from '../api';
 import { calcTotalAmountDue } from '../utils/amountUtils';
+import { formatIQD } from '../utils/format';
 import { getLocalDateStr, addDays } from '../utils/dateUtils';
-
-function formatIQD(n) {
-  return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
-}
+import DateNavigator from '../components/DateNavigator';
+import LoadingView from '../components/LoadingView';
+import { Ionicons } from '@expo/vector-icons';
 
 function formatDate(d) {
   if (!d) return '';
-  const dt = new Date(d);
-  return dt.toLocaleDateString('ar-IQ', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 }
 
 function formatDateShort(d) {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
+  return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 }
 
-export default function StatsScreen() {
+function MetricCard({ icon, iconColor, iconBg, label, value, wide }) {
+  return (
+    <View style={[styles.metricCard, wide && styles.metricCardWide]}>
+      <View style={[styles.metricIcon, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={20} color={iconColor} />
+      </View>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
+export default function StatsScreen({ embedded = false }) {
   const { token } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +53,7 @@ export default function StatsScreen() {
   const [todayStr, setTodayStr] = useState(getLocalDateStr());
 
   React.useEffect(() => {
-    if (token) getDriverToday(token).then(t => setTodayStr(t || getLocalDateStr()));
+    if (token) getDriverToday(token).then((t) => setTodayStr(t || getLocalDateStr()));
   }, [token]);
 
   const fetchStats = useCallback(async () => {
@@ -50,8 +63,7 @@ export default function StatsScreen() {
         getDriverStats(token, selectedDate),
         getDriverDeliveredOrders(token, selectedDate),
       ]);
-      const totalAmountDue = calcTotalAmountDue(deliveredOrders);
-      setStats({ ...statsData, totalAmountDue });
+      setStats({ ...statsData, totalAmountDue: calcTotalAmountDue(deliveredOrders) });
     } catch (e) {
       Alert.alert('خطأ', e.message || 'فشل تحميل الإحصائيات');
     } finally {
@@ -65,98 +77,64 @@ export default function StatsScreen() {
     fetchStats();
   }, [fetchStats]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchStats();
-  };
-
-  const goPrevDay = () => {
-    setSelectedDate(addDays(selectedDate, -1));
-  };
-
-  const goNextDay = () => {
-    if (addDays(selectedDate, 1) <= todayStr) {
-      setSelectedDate(addDays(selectedDate, 1));
-    }
-  };
-  const canGoNext = selectedDate < todayStr;
-
   if (loading && !stats) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={THEME.primary} />
-        <Text style={styles.loadingText}>جاري تحميل الإحصائيات...</Text>
-      </View>
-    );
+    return <LoadingView message="جاري تحميل الإحصائيات..." />;
   }
+
+  const canGoNext = selectedDate < todayStr;
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={styles.content}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
+        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchStats(); }} colors={[THEME.primary]} />
       }
+      showsVerticalScrollIndicator={false}
     >
-      <View style={styles.dateNav}>
-        <TouchableOpacity style={styles.dateBtn} onPress={goPrevDay}>
-          <Text style={styles.dateBtnText}>← السابق</Text>
-        </TouchableOpacity>
-        <Text style={styles.dateLabel}>{formatDateShort(selectedDate)}</Text>
-        <TouchableOpacity
-          style={[styles.dateBtn, !canGoNext && styles.dateBtnDisabled]}
-          onPress={goNextDay}
-          disabled={!canGoNext}
-        >
-          <Text style={[styles.dateBtnText, !canGoNext && styles.dateBtnTextDisabled]}>التالي →</Text>
-        </TouchableOpacity>
+      <DateNavigator
+        label={formatDateShort(selectedDate)}
+        onPrev={() => setSelectedDate(addDays(selectedDate, -1))}
+        onNext={() => canGoNext && setSelectedDate(addDays(selectedDate, 1))}
+        canGoNext={canGoNext}
+      />
+      <Text style={styles.dateTitle}>{formatDate(selectedDate)}</Text>
+
+      <View style={styles.grid}>
+        <MetricCard icon="checkmark-circle" iconColor={THEME.success} iconBg={THEME.successSoft} label="تم التوصيل" value={stats?.delivered ?? 0} />
+        <MetricCard icon="close-circle" iconColor={THEME.danger} iconBg={THEME.dangerSoft} label="تم الإرجاع" value={stats?.returned ?? 0} />
+        <MetricCard icon="layers" iconColor={THEME.accentBlue} iconBg={THEME.accentBlueSoft} label="عدد الطلبات" value={stats?.orderCount ?? 0} />
+        <MetricCard icon="cube" iconColor={THEME.primary} iconBg={THEME.primarySoft} label="لم يوصل" value={stats?.notDelivered ?? 0} />
       </View>
 
-      <Text style={styles.dateTitle}>تاريخ الطلب: {formatDate(selectedDate)}</Text>
-
-      <View style={styles.cardsRow}>
-        <View style={[styles.statCard, styles.cardGreen]}>
-          <Text style={styles.statValue}>{stats?.delivered ?? 0}</Text>
-          <Text style={styles.statLabel}>تم التوصيل</Text>
+      <View style={styles.amountCard}>
+        <View style={styles.amountRow}>
+          <Text style={styles.amountLabel}>المبلغ الكلي (الموصّل)</Text>
+          <Text style={styles.amountValue}>{formatIQD(stats?.totalDeliveredIQD)}</Text>
         </View>
-        <View style={[styles.statCard, styles.cardRed]}>
-          <Text style={styles.statValue}>{stats?.returned ?? 0}</Text>
-          <Text style={styles.statLabel}>تم الإرجاع</Text>
-        </View>
-      </View>
-
-      <View style={[styles.statCard, styles.cardGray, styles.orderCountCard]}>
-        <Text style={styles.statValue}>{stats?.orderCount ?? 0}</Text>
-        <Text style={styles.statLabel}>عدد الطلبات</Text>
-        <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownText}>تم التوصيل: {stats?.delivered ?? 0}</Text>
-          <Text style={styles.breakdownText}>تم الإرجاع: {stats?.returned ?? 0}</Text>
-          <Text style={styles.breakdownText}>لم يوصل: {stats?.notDelivered ?? 0}</Text>
+        <View style={styles.amountDivider} />
+        <View style={styles.amountRow}>
+          <Text style={styles.amountLabel}>المبلغ المستحق</Text>
+          <Text style={[styles.amountValue, { color: THEME.primary }]}>{formatIQD(stats?.totalAmountDue)}</Text>
         </View>
       </View>
 
-      <View style={styles.cardsRow}>
-        <View style={[styles.statCard, styles.cardPurple]}>
-          <Text style={[styles.statValue, styles.amountText]}>{formatIQD(stats?.totalDeliveredIQD)}</Text>
-          <Text style={styles.statLabel}>المبلغ الكلي (الموصّل)</Text>
-        </View>
-        <View style={[styles.statCard, styles.cardTeal]}>
-          <Text style={[styles.statValue, styles.amountText]}>{formatIQD(stats?.totalAmountDue)}</Text>
-          <Text style={styles.statLabel}>المبلغ المستحق</Text>
-        </View>
-      </View>
-
-      {stats?.feesCollected !== undefined && (
+      {stats?.feesCollected !== undefined ? (
         <View style={[styles.feeBadge, stats.feesCollected ? styles.feePaid : styles.feeUnpaid]}>
-          <Text style={[styles.feeBadgeText, stats.feesCollected ? styles.feeBadgeTextPaid : styles.feeBadgeTextUnpaid]}>
-            {stats.feesCollected ? '✓ تم تسديد المستحقات الخاصة بذلك اليوم' : '○ لم يُسدّد المستحقات الخاصة بهذا اليوم بعد'}
+          <Ionicons
+            name={stats.feesCollected ? 'checkmark-circle' : 'alert-circle'}
+            size={20}
+            color={stats.feesCollected ? THEME.success : THEME.warning}
+          />
+          <Text style={[styles.feeText, stats.feesCollected ? styles.feeTextPaid : styles.feeTextUnpaid]}>
+            {stats.feesCollected ? 'تم تسديد المستحقات لهذا اليوم' : 'لم يُسدّد المستحقات بعد'}
           </Text>
         </View>
-      )}
+      ) : null}
 
-      <View style={styles.totalFooter}>
-        <Text style={styles.totalFooterLabel}>العدد الكلي المعك حالياً</Text>
-        <Text style={styles.totalFooterValue}>{stats?.assigned ?? 0}</Text>
+      <View style={styles.assignedCard}>
+        <Text style={styles.assignedLabel}>الطلبات المعك حالياً</Text>
+        <Text style={styles.assignedValue}>{stats?.assigned ?? 0}</Text>
       </View>
     </ScrollView>
   );
@@ -164,84 +142,78 @@ export default function StatsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.bg },
-  content: { padding: 16, paddingBottom: 32 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#64748b', fontSize: 15 },
-  dateNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  dateBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: THEME.primary,
-    borderRadius: THEME.radiusMd,
-  },
-  dateBtnDisabled: { backgroundColor: '#cbd5e1' },
-  dateBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  dateBtnTextDisabled: { color: '#64748b' },
-  dateLabel: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
+  content: { paddingBottom: THEME.space3xl },
   dateTitle: {
-    fontSize: 14,
-    color: '#475569',
+    fontSize: THEME.fontSm,
+    color: THEME.textMuted,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: THEME.spaceLg,
+    fontWeight: '600',
   },
-  cardsRow: {
+  grid: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    flexWrap: 'wrap',
+    gap: THEME.spaceSm,
+    paddingHorizontal: THEME.spaceLg,
+    marginBottom: THEME.spaceMd,
   },
-  statCard: {
-    flex: 1,
+  metricCard: {
+    width: '48%',
+    flexGrow: 1,
+    backgroundColor: THEME.bgCard,
     borderRadius: THEME.radiusLg,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    padding: THEME.spaceLg,
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
+    ...THEME.shadowSm,
   },
-  cardGreen: { backgroundColor: '#10b981' },
-  cardRed: { backgroundColor: '#ef4444' },
-  cardBlue: { backgroundColor: '#0ea5e9' },
-  cardPurple: { backgroundColor: '#8b5cf6' },
-  cardTeal: { backgroundColor: THEME.primary },
-  cardGray: { backgroundColor: '#64748b' },
-  cardOrange: { backgroundColor: '#f97316' },
-  orderCountCard: { marginBottom: 12, alignSelf: 'stretch' },
-  statValue: { fontSize: 28, fontWeight: '800', color: '#fff' },
-  amountText: { fontSize: 16 },
-  statLabel: { fontSize: 14, color: 'rgba(255,255,255,0.9)', marginTop: 4 },
-  breakdownRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 10 },
-  breakdownText: { fontSize: 12, color: 'rgba(255,255,255,0.85)' },
-  feeBadge: {
-    marginTop: 20,
-    padding: 16,
-    borderRadius: THEME.radiusMd,
+  metricCardWide: { width: '100%' },
+  metricIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: THEME.spaceSm,
   },
-  feePaid: { backgroundColor: '#dcfce7', borderWidth: 1, borderColor: '#22c55e' },
-  feeUnpaid: { backgroundColor: '#fef3c7', borderWidth: 1, borderColor: '#f59e0b' },
-  feeBadgeText: { fontSize: 15, fontWeight: '600' },
-  feeBadgeTextPaid: { color: '#166534' },
-  feeBadgeTextUnpaid: { color: '#b45309' },
-  totalFooter: {
-    marginTop: 24,
-    padding: 20,
-    backgroundColor: THEME.primary,
+  metricValue: { fontSize: THEME.font2xl, fontWeight: '900', color: THEME.text },
+  metricLabel: { fontSize: THEME.fontSm, color: THEME.textMuted, fontWeight: '700', marginTop: 4 },
+  amountCard: {
+    marginHorizontal: THEME.spaceLg,
+    backgroundColor: THEME.bgCard,
     borderRadius: THEME.radiusXl,
-    alignItems: 'center',
-    shadowColor: THEME.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    padding: THEME.spaceLg,
+    marginBottom: THEME.spaceMd,
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
+    ...THEME.shadowMd,
   },
-  totalFooterLabel: { fontSize: 14, color: 'rgba(255,255,255,0.8)', marginBottom: 6 },
-  totalFooterValue: { fontSize: 32, fontWeight: '800', color: '#fff' },
+  amountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
+  amountLabel: { fontSize: THEME.fontMd, color: THEME.textSecondary, fontWeight: '700' },
+  amountValue: { fontSize: THEME.fontLg, fontWeight: '900', color: THEME.success },
+  amountDivider: { height: 1, backgroundColor: THEME.divider, marginVertical: THEME.spaceSm },
+  feeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginHorizontal: THEME.spaceLg,
+    padding: THEME.spaceLg,
+    borderRadius: THEME.radiusLg,
+    marginBottom: THEME.spaceMd,
+  },
+  feePaid: { backgroundColor: THEME.successSoft, borderWidth: 1, borderColor: 'rgba(5,150,105,0.2)' },
+  feeUnpaid: { backgroundColor: THEME.warningSoft, borderWidth: 1, borderColor: 'rgba(217,119,6,0.2)' },
+  feeText: { flex: 1, fontSize: THEME.fontSm, fontWeight: '800' },
+  feeTextPaid: { color: THEME.success },
+  feeTextUnpaid: { color: THEME.warning },
+  assignedCard: {
+    marginHorizontal: THEME.spaceLg,
+    backgroundColor: THEME.primaryDark,
+    borderRadius: THEME.radiusXl,
+    padding: THEME.space2xl,
+    alignItems: 'center',
+    ...THEME.shadowMd,
+  },
+  assignedLabel: { fontSize: THEME.fontSm, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
+  assignedValue: { fontSize: 42, fontWeight: '900', color: '#fff', marginTop: 6 },
 });

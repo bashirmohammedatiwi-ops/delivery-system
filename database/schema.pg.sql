@@ -76,7 +76,10 @@ CREATE TABLE IF NOT EXISTS "Orders" (
     "ReturnedByDriverID" INTEGER REFERENCES "Drivers"("DriverID"),
     "ReturnedOrderReceived" INTEGER DEFAULT 0,
     "ReturnedOrderReceivedAt" TEXT,
-    "LabelPrinted" INTEGER DEFAULT 0
+    "LabelPrinted" INTEGER DEFAULT 0,
+    "IsDeferred" INTEGER DEFAULT 0,
+    "DeferredReason" TEXT,
+    "DeferredDate" TEXT
 );
 
 CREATE TABLE IF NOT EXISTS "OrderTracking" (
@@ -126,4 +129,4 @@ CREATE INDEX IF NOT EXISTS idx_orders_status_created ON "Orders"("Status", "Crea
 CREATE INDEX IF NOT EXISTS idx_orders_created_day ON "Orders"("CreatedDate") WHERE "CreatedDate" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_fdo_notif_unreviewed ON "FreeDeliveryOverrideNotifications"("Reviewed", "CreatedAt" DESC) WHERE "Reviewed" = 0;
 CREATE INDEX IF NOT EXISTS idx_tracking_order ON "OrderTracking"("OrderID");
-CREATE UNIQUE INDEX IF NOT EXISTS idx_drivers_username ON "Drivers"("Username");
+CREATE INDEX IF NOT EXISTS idx_orders_driver_deferred ON "Orders"("DriverID", "IsDeferred") WHERE "Status" = 'AssignedToDriver';

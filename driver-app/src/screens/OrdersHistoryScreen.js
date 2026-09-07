@@ -3,31 +3,29 @@ import {
   View,
   Text,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { THEME } from '../theme';
 import { getDriverDeliveredOrders, getDriverReturnedOrders, getDriverStats, getDriverToday } from '../api';
+import { formatIQD } from '../utils/format';
 import { getLocalDateStr, addDays } from '../utils/dateUtils';
-
-function formatIQD(n) {
-  return new Intl.NumberFormat('ar-IQ').format(n || 0) + ' د.ع';
-}
+import DateNavigator from '../components/DateNavigator';
+import SegmentControl from '../components/SegmentControl';
+import EmptyState from '../components/EmptyState';
+import LoadingView from '../components/LoadingView';
 
 function formatDateShort(d) {
   if (!d) return '';
-  return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
+  return new Date(d + 'T12:00:00').toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short' });
 }
 
 function formatDateTime(d) {
   if (!d) return '—';
-  const dt = new Date(d);
-  return dt.toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(d).toLocaleDateString('ar-IQ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function OrdersHistoryScreen() {
@@ -41,18 +39,8 @@ export default function OrdersHistoryScreen() {
   const [todayStr, setTodayStr] = useState(getLocalDateStr());
 
   React.useEffect(() => {
-    if (token) getDriverToday(token).then(t => setTodayStr(t || getLocalDateStr()));
+    if (token) getDriverToday(token).then((t) => setTodayStr(t || getLocalDateStr()));
   }, [token]);
-
-  const goPrevDay = () => {
-    setSelectedDate(addDays(selectedDate, -1));
-  };
-
-  const goNextDay = () => {
-    if (addDays(selectedDate, 1) <= todayStr) {
-      setSelectedDate(addDays(selectedDate, 1));
-    }
-  };
 
   const fetchOrders = useCallback(async () => {
     if (!token) return;
@@ -78,86 +66,69 @@ export default function OrdersHistoryScreen() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchOrders();
-  };
+  const canGoNext = selectedDate < todayStr;
 
   const renderItem = ({ item }) => (
     <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <Text style={styles.shipment}>#{item.ShipmentNumber}</Text>
+      <View style={styles.cardTop}>
+        <View style={styles.shipmentPill}>
+          <Ionicons name="cube-outline" size={14} color={tab === 'delivered' ? THEME.success : THEME.danger} />
+          <Text style={styles.shipment}>#{item.ShipmentNumber}</Text>
+        </View>
         {tab === 'delivered' ? <Text style={styles.amount}>{formatIQD(item.TotalIQD)}</Text> : null}
       </View>
       <Text style={styles.customer}>{item.CustomerName || '—'}</Text>
-      <Text style={styles.address} numberOfLines={2}>
-        {item.Address || '—'}
-      </Text>
+      <Text style={styles.address} numberOfLines={2}>{item.Address || '—'}</Text>
       {item.RegionName ? <Text style={styles.region}>{item.RegionName}</Text> : null}
       {tab === 'returned' && item.ReturnReason ? (
-        <Text style={styles.reason}>سبب الإرجاع: {item.ReturnReason}</Text>
+        <View style={styles.reasonBox}>
+          <Text style={styles.reasonText}>سبب الإرجاع: {item.ReturnReason}</Text>
+        </View>
       ) : null}
-      <Text style={styles.orderDateLabel}>تاريخ الطلب: {formatDateTime(item.CreatedDate)}</Text>
-      <Text style={styles.date}>
-        {tab === 'delivered' ? `تاريخ التوصيل: ${formatDateTime(item.DeliveredDate)}` : `تاريخ الإرجاع: ${formatDateTime(item.ReturnedDate)}`}
-      </Text>
+      <View style={styles.footerRow}>
+        <Ionicons name="time-outline" size={14} color={THEME.textLight} />
+        <Text style={styles.dateText}>
+          {tab === 'delivered'
+            ? `التوصيل: ${formatDateTime(item.DeliveredDate)}`
+            : `الإرجاع: ${formatDateTime(item.ReturnedDate)}`}
+        </Text>
+      </View>
     </View>
   );
 
-  if (loading && orders.length === 0) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={THEME.primary} />
-        <Text style={styles.loadingText}>جاري تحميل السجل...</Text>
-      </View>
-    );
-  }
-
-  const canGoNext = selectedDate < todayStr;
-
   return (
     <View style={styles.container}>
-      <View style={styles.dateNav}>
-        <TouchableOpacity style={styles.dateBtn} onPress={goPrevDay}>
-          <Text style={styles.dateBtnText}>← السابق</Text>
-        </TouchableOpacity>
-        <Text style={styles.dateLabel}>{formatDateShort(selectedDate)}</Text>
-        <TouchableOpacity
-          style={[styles.dateBtn, !canGoNext && styles.dateBtnDisabled]}
-          onPress={goNextDay}
-          disabled={!canGoNext}
-        >
-          <Text style={[styles.dateBtnText, !canGoNext && styles.dateBtnTextDisabled]}>التالي →</Text>
-        </TouchableOpacity>
-      </View>
+      <DateNavigator
+        label={formatDateShort(selectedDate)}
+        onPrev={() => setSelectedDate(addDays(selectedDate, -1))}
+        onNext={() => canGoNext && setSelectedDate(addDays(selectedDate, 1))}
+        canGoNext={canGoNext}
+      />
 
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'delivered' && styles.tabActive]}
-          onPress={() => setTab('delivered')}
-        >
-          <Text style={[styles.tabText, tab === 'delivered' && styles.tabTextActive]}>الموصّل</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, tab === 'returned' && styles.tabActive]}
-          onPress={() => setTab('returned')}
-        >
-          <Text style={[styles.tabText, tab === 'returned' && styles.tabTextActive]}>المراجع</Text>
-        </TouchableOpacity>
-      </View>
+      <SegmentControl
+        options={[
+          { key: 'delivered', label: 'الموصّل' },
+          { key: 'returned', label: 'المراجع' },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
 
       {stats?.assigned != null ? (
-        <View style={styles.totalCountBadge}>
-          <Text style={styles.totalCountText}>طلبات لم توصل (جميع الأيام): {stats.assigned}</Text>
+        <View style={styles.infoBanner}>
+          <Ionicons name="information-circle-outline" size={18} color={THEME.primary} />
+          <Text style={styles.infoBannerText}>طلبات لم توصل (جميع الأيام): {stats.assigned}</Text>
         </View>
       ) : null}
 
-      {orders.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={styles.emptyText}>
-            {tab === 'delivered' ? 'لا توجد طلبات موصّلة لهذا اليوم' : 'لا توجد طلبات مرتجعة لهذا اليوم'}
-          </Text>
-        </View>
+      {loading && orders.length === 0 ? (
+        <LoadingView message="جاري تحميل السجل..." />
+      ) : orders.length === 0 ? (
+        <EmptyState
+          icon={tab === 'delivered' ? 'checkmark-circle-outline' : 'return-down-back-outline'}
+          title={tab === 'delivered' ? 'لا توجد طلبات موصّلة' : 'لا توجد طلبات مرتجعة'}
+          subtitle="جرّب تاريخاً آخر"
+        />
       ) : (
         <FlatList
           data={orders}
@@ -165,7 +136,7 @@ export default function OrdersHistoryScreen() {
           renderItem={renderItem}
           contentContainerStyle={styles.list}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[THEME.primary]} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchOrders(); }} colors={[THEME.primary]} />
           }
         />
       )}
@@ -175,69 +146,49 @@ export default function OrdersHistoryScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: THEME.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#64748b' },
-  dateNav: {
+  list: { paddingHorizontal: THEME.spaceLg, paddingBottom: THEME.space3xl },
+  infoBanner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dateBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: THEME.primary,
-    borderRadius: THEME.radiusSm,
-  },
-  dateBtnDisabled: { backgroundColor: '#cbd5e1' },
-  dateBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
-  dateBtnTextDisabled: { color: '#64748b' },
-  dateLabel: { fontSize: 15, fontWeight: '600', color: '#0f172a' },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: THEME.bgCard,
-    padding: 4,
-    margin: 16,
-    marginBottom: 8,
+    gap: 8,
+    marginHorizontal: THEME.spaceLg,
+    marginBottom: THEME.spaceMd,
+    backgroundColor: THEME.primarySoft,
+    padding: THEME.spaceMd,
     borderRadius: THEME.radiusMd,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: THEME.radiusSm,
-  },
-  tabActive: { backgroundColor: THEME.primary },
-  tabText: { fontSize: 15, color: '#64748b' },
-  tabTextActive: { color: '#fff', fontWeight: '600' },
-  totalCountBadge: {
-    backgroundColor: THEME.primary,
-    borderRadius: THEME.radiusSm,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginHorizontal: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  totalCountText: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  list: { padding: 16, paddingBottom: 32 },
+  infoBannerText: { flex: 1, fontSize: THEME.fontSm, fontWeight: '700', color: THEME.primaryDark },
   card: {
     backgroundColor: THEME.bgCard,
-    borderRadius: THEME.radiusMd,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: THEME.radiusLg,
+    padding: THEME.spaceLg,
+    marginBottom: THEME.spaceMd,
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
     ...THEME.shadowSm,
   },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  shipment: { fontSize: 16, fontWeight: '700', color: THEME.primary },
-  amount: { fontSize: 14, fontWeight: '600', color: THEME.success },
-  customer: { fontSize: 15, color: '#1e293b', marginBottom: 4 },
-  address: { fontSize: 13, color: '#64748b', marginBottom: 4 },
-  region: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },
-  reason: { fontSize: 12, color: '#ef4444', marginTop: 4 },
-  orderDateLabel: { fontSize: 11, color: '#64748b', marginTop: 6 },
-  date: { fontSize: 11, color: '#94a3b8', marginTop: 2 },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { fontSize: 15, color: '#94a3b8' },
+  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: THEME.spaceSm },
+  shipmentPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: THEME.bgMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: THEME.radiusFull,
+  },
+  shipment: { fontSize: THEME.fontMd, fontWeight: '800', color: THEME.text },
+  amount: { fontSize: THEME.fontSm, fontWeight: '800', color: THEME.success },
+  customer: { fontSize: THEME.fontMd, fontWeight: '700', color: THEME.text, marginBottom: 4 },
+  address: { fontSize: THEME.fontSm, color: THEME.textMuted, lineHeight: 20 },
+  region: { fontSize: THEME.fontXs, color: THEME.textLight, marginTop: 4, fontWeight: '600' },
+  reasonBox: {
+    marginTop: THEME.spaceSm,
+    backgroundColor: THEME.dangerSoft,
+    borderRadius: THEME.radiusSm,
+    padding: 10,
+  },
+  reasonText: { fontSize: THEME.fontSm, color: THEME.danger, fontWeight: '700' },
+  footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: THEME.spaceSm },
+  dateText: { fontSize: THEME.fontXs, color: THEME.textLight, fontWeight: '600' },
 });

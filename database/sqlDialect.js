@@ -12,7 +12,7 @@ const PG_COLUMNS = [
     'DeliveredDate', 'ReturnedDate', 'ReturnReason', 'CollectionID', 'NotificationID',
     'TrackingID', 'SettingKey', 'SettingValue', 'RegionName', 'RegionArea', 'DriverName',
     'OrderDate', 'ScanTime', 'OrderNotes', 'ReviewedAt', 'CreatedAt', 'ExpiresAt',
-    'CollectedAt', 'CreatedByName', 'DriverID', 'RegionID', 'Username', 'UserID',
+    'CollectedAt', 'CreatedByName', 'IsDeferred', 'DeferredReason', 'DeferredDate', 'DriverID', 'RegionID', 'Username', 'UserID',
     'OrderID', 'TotalIQD', 'AmountIQD', 'FreeDelivery', 'LabelPrinted', 'Active',
     'Phone', 'Address', 'Pieces', 'Notes', 'Status', 'Token', 'Role', 'Reviewed'
 ].sort((a, b) => b.length - a.length);
