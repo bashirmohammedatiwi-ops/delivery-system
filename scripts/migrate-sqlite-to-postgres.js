@@ -134,6 +134,8 @@ async function main() {
                 RESTART IDENTITY CASCADE
             `);
             await client.query('BEGIN');
+            // SQLite قد يحتوي سجلات بمراجع سائقين محذوفين — نعطّل FK مؤقتاً (مثل SQLite)
+            await client.query('SET session_replication_role = replica');
             for (const { name } of TABLES) {
                 const rows = sqliteRows(sqlite, name);
                 console.log(`==> ${name}: ${rows.length} rows`);
@@ -142,6 +144,7 @@ async function main() {
                     await client.query(sql, values);
                 }
             }
+            await client.query('SET session_replication_role = DEFAULT');
             await client.query('COMMIT');
         }
 
@@ -173,7 +176,10 @@ async function main() {
         console.log('  3. Verify /health shows db=postgres');
         console.log('  4. Keep SQLite backup at:', backupPath);
     } catch (err) {
-        try { await client.query('ROLLBACK'); } catch (_) {}
+        try {
+            await client.query('SET session_replication_role = DEFAULT');
+            await client.query('ROLLBACK');
+        } catch (_) {}
         console.error('Migration failed:', err.message);
         process.exit(1);
     } finally {
