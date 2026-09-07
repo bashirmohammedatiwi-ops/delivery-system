@@ -1,4 +1,7 @@
-# multisite + المنفذ 3000 مكشوف على IP السيرفر (مثلاً http://187.124.23.65:3000)
+# multisite + المنافذ مكشوفة على IP السيرفر
+# http://IP:3000  لوحة الإدارة
+# http://IP:3001  تطبيق السائق
+# http://IP:3002  تطبيق الموظف
 # docker compose -f docker-compose.yml -f docker-compose.override-multisite-public.yml up -d --build
 
 services:
@@ -8,8 +11,8 @@ services:
 
   employee-web:
     ports: !override
-      - "127.0.0.1:3002:3002"
+      - "3002:3002"
 
   driver-web:
     ports: !override
-      - "127.0.0.1:3001:3001"
+      - "3001:3001"

@@ -6,20 +6,21 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 MULTISITE=true
-PUBLIC_DELIVERY_PORT=false
+PUBLIC_DELIVERY_PORT=true
+if [ -f "$ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT/.env"
+  set +a
+fi
 if [ -f "$ROOT/scripts/server-apps.env" ]; then
   set -a
   # shellcheck disable=SC1091
   source "$ROOT/scripts/server-apps.env"
   set +a
-elif [ -f .env ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
 fi
 MULTISITE="${MULTISITE:-true}"
-PUBLIC_DELIVERY_PORT="${PUBLIC_DELIVERY_PORT:-false}"
+PUBLIC_DELIVERY_PORT="${PUBLIC_DELIVERY_PORT:-true}"
 
 COMPOSE="-f docker-compose.yml"
 if [ "$MULTISITE" = "true" ]; then

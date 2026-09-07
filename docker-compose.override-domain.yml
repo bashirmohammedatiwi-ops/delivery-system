@@ -1,8 +1,8 @@
 # تشغيل على الدومين مع Let's Encrypt (https://demaalhayaadelivery.online)
 #
-# ⚠️ سيرفر فيه دومينات أخرى (nginx على Ubuntu)؟ استخدم override-multisite.yml:
-#   docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml up -d --build
-#   أو: bash scripts/deploy-update.sh
+# ⚠️ سيرفر فيه دومينات أخرى (nginx على Ubuntu)؟
+#   bash scripts/deploy-update.sh
+#   (يفعّل الدومين + IP :3000/:3001/:3002 افتراضياً)
 #
 # سيرفر مخصص لدومين التوصيل فقط (Docker nginx على 80/443):
 #   docker compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https up -d
