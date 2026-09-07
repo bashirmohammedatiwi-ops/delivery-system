@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../services/driver_api.dart';
+import '../../../utils/json_helpers.dart';
 import '../driver_app.dart';
 import '../driver_theme.dart';
+import '../../../widgets/app_layout.dart';
 import '../driver_ui_kit.dart';
 
 class DriverPendingTab extends StatefulWidget {
@@ -14,8 +16,9 @@ class DriverPendingTab extends StatefulWidget {
 }
 
 class _DriverPendingTabState extends State<DriverPendingTab> {
-  List<dynamic> _days = [];
+  List<Map<String, dynamic>> _days = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -23,41 +26,41 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
     _load();
   }
 
-  String _addDays(String d, int delta) {
-    final dt = DateTime.tryParse('$d 12:00:00') ?? DateTime.now();
-    return DateFormat('yyyy-MM-dd').format(dt.add(Duration(days: delta)));
-  }
-
-  String _getLocalDateStr([DateTime? d]) {
-    d ??= DateTime.now();
-    return DateFormat('yyyy-MM-dd').format(d);
-  }
-
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final today = _getLocalDateStr();
-      final weekAgo = DateTime.now().subtract(const Duration(days: 6));
-      final dateFrom = _getLocalDateStr(weekAgo);
+      final today = await DriverApi.getToday();
+      final dateFrom = DriverApi.addDays(today, -29);
       final list = await DriverApi.getPendingOrders(dateFrom, today);
-      final filtered = (list is List ? list : []).where((d) {
-        final m = d as Map<String, dynamic>;
-        final k = (m['countKarkh'] ?? 0) as num;
-        final r = (m['countRusafa'] ?? 0) as num;
-        return (k.toInt() + r.toInt()) > 0;
+      final filtered = list.map((e) => Map<String, dynamic>.from(e as Map)).where((m) {
+        final k = pickFieldInt(m, ['countKarkh', 'countkarkh']);
+        final r = pickFieldInt(m, ['countRusafa', 'countrusafa']);
+        return k + r > 0;
       }).toList();
+      if (!mounted) return;
       setState(() {
         _days = filtered;
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
     }
   }
 
   String _formatDateFull(String d) {
     final dt = DateTime.tryParse('$d 12:00:00') ?? DateTime.now();
-    return DateFormat('EEEE، d MMMM yyyy', 'ar').format(dt);
+    try {
+      return DateFormat('EEEE، d MMMM yyyy', 'ar').format(dt);
+    } catch (_) {
+      return d;
+    }
   }
 
   void _showPendingOrdersList(BuildContext context, String date, String area) {
@@ -72,18 +75,38 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
   @override
   Widget build(BuildContext context) {
     if (_loading) return DriverUiKit.skeletonList(count: 4, cardHeight: 160);
+    if (_error != null) {
+      return DriverUiKit.emptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'تعذّر تحميل الطلبات المنتظرة',
+        subtitle: _error!,
+        accent: DriverTheme.danger,
+        action: FilledButton.icon(
+          onPressed: _load,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('إعادة المحاولة'),
+          style: FilledButton.styleFrom(backgroundColor: DriverTheme.primary),
+        ),
+      );
+    }
     if (_days.isEmpty) {
       return DriverUiKit.emptyState(
         icon: Icons.schedule_rounded,
         title: 'لا توجد طلبات منتظرة',
-        subtitle: 'ستظهر هنا الطلبات الجاهزة للاستلام خلال آخر 7 أيام',
+        subtitle: 'الطلبات الجديدة غير المعيّنة لسائق تظهر هنا للاستلام',
         accent: DriverTheme.warning,
+        action: OutlinedButton.icon(
+          onPressed: _load,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('تحديث'),
+        ),
       );
     }
 
-    final totalPending = _days.fold<int>(0, (sum, d) {
-      final m = d as Map<String, dynamic>;
-      return sum + ((m['countKarkh'] ?? 0) as num).toInt() + ((m['countRusafa'] ?? 0) as num).toInt();
+    final totalPending = _days.fold<int>(0, (sum, m) {
+      return sum +
+          pickFieldInt(m, ['countKarkh', 'countkarkh']) +
+          pickFieldInt(m, ['countRusafa', 'countrusafa']);
     });
 
     return Column(
@@ -104,7 +127,7 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
             onRefresh: _load,
             color: DriverTheme.primary,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: EdgeInsets.fromLTRB(16, 12, 16, AppLayout.scrollBottomInset(context)),
               children: [
                 DriverUiKit.infoBanner(
                   message: 'اضغط على الكرخ أو الرصافة لعرض تفاصيل الطلبات',
@@ -112,12 +135,11 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
                   icon: Icons.touch_app_outlined,
                 ),
                 const SizedBox(height: 14),
-                ..._days.map((d) {
-                  final m = d as Map<String, dynamic>;
-                  final orderDate = m['orderDate'] ?? '';
-                  final karkh = (m['countKarkh'] ?? 0) as num;
-                  final rusafa = (m['countRusafa'] ?? 0) as num;
-                  final total = karkh.toInt() + rusafa.toInt();
+                ..._days.map((m) {
+                  final orderDate = pickField(m, ['orderDate', 'OrderDate']);
+                  final karkh = pickFieldInt(m, ['countKarkh', 'countkarkh']);
+                  final rusafa = pickFieldInt(m, ['countRusafa', 'countrusafa']);
+                  final total = karkh + rusafa;
                   return DriverUiKit.listCard(
                     accent: DriverTheme.warning,
                     child: Column(
@@ -126,7 +148,7 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(_formatDateFull(orderDate), style: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 16)),
+                              child: Text(_formatDateFull(orderDate), style: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 16, height: 1.3)),
                             ),
                             DriverUiKit.statusChip('$total طلب', DriverTheme.warning),
                           ],
@@ -137,7 +159,7 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
                             Expanded(
                               child: DriverUiKit.areaCountTile(
                                 label: 'الكرخ',
-                                count: karkh.toInt(),
+                                count: karkh,
                                 color: DriverTheme.karkh,
                                 onTap: () => _showPendingOrdersList(context, orderDate, 'الكرخ'),
                               ),
@@ -146,7 +168,7 @@ class _DriverPendingTabState extends State<DriverPendingTab> {
                             Expanded(
                               child: DriverUiKit.areaCountTile(
                                 label: 'الرصافة',
-                                count: rusafa.toInt(),
+                                count: rusafa,
                                 color: DriverTheme.rusafa,
                                 onTap: () => _showPendingOrdersList(context, orderDate, 'الرصافة'),
                               ),
@@ -177,8 +199,9 @@ class _PendingOrdersListSheet extends StatefulWidget {
 }
 
 class _PendingOrdersListSheetState extends State<_PendingOrdersListSheet> {
-  List<dynamic> _orders = [];
+  List<Map<String, dynamic>> _orders = [];
   bool _loading = true;
+  String? _error;
 
   @override
   void initState() {
@@ -187,21 +210,33 @@ class _PendingOrdersListSheetState extends State<_PendingOrdersListSheet> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final list = await DriverApi.getPendingOrdersList(widget.date, widget.area);
+      if (!mounted) return;
       setState(() {
-        _orders = list is List ? list : [];
+        _orders = list.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         _loading = false;
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
     }
   }
 
   String _formatDate(String d) {
     final dt = DateTime.tryParse('$d 12:00:00') ?? DateTime.now();
-    return DateFormat('EEEE، d MMMM', 'ar').format(dt);
+    try {
+      return DateFormat('EEEE، d MMMM', 'ar').format(dt);
+    } catch (_) {
+      return d;
+    }
   }
 
   @override
@@ -221,46 +256,61 @@ class _PendingOrdersListSheetState extends State<_PendingOrdersListSheet> {
           Expanded(
             child: _loading
                 ? DriverUiKit.skeletonList(count: 4, cardHeight: 110)
-                : _orders.isEmpty
+                : _error != null
                     ? DriverUiKit.emptyState(
-                        icon: Icons.inbox_outlined,
-                        title: 'لا توجد طلبات',
-                        subtitle: 'لا توجد شحنات في هذه المنطقة لهذا اليوم',
-                        accent: DriverTheme.primary,
+                        icon: Icons.cloud_off_rounded,
+                        title: 'تعذّر التحميل',
+                        subtitle: _error!,
+                        accent: DriverTheme.danger,
+                        action: FilledButton(onPressed: _load, child: const Text('إعادة المحاولة')),
                       )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-                        itemCount: _orders.length,
-                        itemBuilder: (_, i) {
-                          final o = _orders[i] as Map<String, dynamic>;
-                          return DriverUiKit.listCard(
-                            accent: widget.area == 'الكرخ' ? DriverTheme.karkh : DriverTheme.rusafa,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                    : _orders.isEmpty
+                        ? DriverUiKit.emptyState(
+                            icon: Icons.inbox_outlined,
+                            title: 'لا توجد طلبات',
+                            subtitle: 'لا توجد شحنات في هذه المنطقة لهذا اليوم',
+                            accent: DriverTheme.primary,
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+                            itemCount: _orders.length,
+                            itemBuilder: (_, i) {
+                              final o = _orders[i];
+                              final store = pickField(o, ['StoreName', 'storename']);
+                              return DriverUiKit.listCard(
+                                accent: widget.area == 'الكرخ' ? DriverTheme.karkh : DriverTheme.rusafa,
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Expanded(
-                                      child: Text('#${o['ShipmentNumber']}', style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: DriverTheme.primary, fontSize: 16)),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '#${pickField(o, ['ShipmentNumber', 'shipmentnumber'])}',
+                                            style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: DriverTheme.primary, fontSize: 16, height: 1.3),
+                                          ),
+                                        ),
+                                        Text(
+                                          formatIQD(pickFieldInt(o, ['TotalIQD', 'totaliqd'])),
+                                          style: GoogleFonts.cairo(fontWeight: FontWeight.w700, color: DriverTheme.success, height: 1.3),
+                                        ),
+                                      ],
                                     ),
-                                    Text(formatIQD(o['TotalIQD'] ?? o['totaliqd']), style: GoogleFonts.cairo(fontWeight: FontWeight.w700, color: DriverTheme.success)),
+                                    const SizedBox(height: 8),
+                                    Text(pickField(o, ['CustomerName', 'customername'], '—'), style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
+                                    if (pickField(o, ['Address', 'address']).isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(pickField(o, ['Address', 'address']), style: GoogleFonts.cairo(fontSize: 12, color: DriverTheme.onSurfaceVariant, height: 1.35), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    ],
+                                    if (store.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      DriverUiKit.statusChip(store, DriverTheme.secondary),
+                                    ],
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                Text(o['CustomerName'] ?? '—', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700)),
-                                if (o['Address'] != null) ...[
-                                  const SizedBox(height: 4),
-                                  Text('${o['Address']}', style: GoogleFonts.cairo(fontSize: 12, color: DriverTheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                ],
-                                if (o['StoreName'] != null && '${o['StoreName']}'.isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  DriverUiKit.statusChip('${o['StoreName']}', DriverTheme.secondary),
-                                ],
-                              ],
-                            ),
-                          );
-                        },
-                      ),
+                              );
+                            },
+                          ),
           ),
         ],
       ),

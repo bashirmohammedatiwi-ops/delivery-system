@@ -163,27 +163,16 @@ class _LoginFormState extends State<_LoginForm> {
             DriverUiKit.infoBanner(message: _error!, color: DriverTheme.danger, icon: Icons.error_outline_rounded),
           ],
           const SizedBox(height: 24),
-          SizedBox(
-            height: 54,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: DriverTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(DriverTheme.radiusMd),
-                boxShadow: DriverTheme.shadowFor(DriverTheme.primary),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _loading ? null : _login,
-                  borderRadius: BorderRadius.circular(DriverTheme.radiusMd),
-                  child: Center(
-                    child: _loading
-                        ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Text('دخول', style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white)),
-                  ),
-                ),
-              ),
+          FilledButton(
+            onPressed: _loading ? null : _login,
+            style: FilledButton.styleFrom(
+              backgroundColor: DriverTheme.primary,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
             ),
+            child: _loading
+                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Text('دخول'),
           ),
         ],
       ),

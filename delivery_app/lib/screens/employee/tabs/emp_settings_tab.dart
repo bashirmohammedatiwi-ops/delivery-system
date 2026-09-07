@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
 import '../employee_ui_kit.dart';
+import '../../../widgets/app_layout.dart';
 
 class EmpSettingsTab extends StatelessWidget {
   final VoidCallback onLogout;
@@ -20,7 +21,7 @@ class EmpSettingsTab extends StatelessWidget {
         final initial = name.toString().isNotEmpty ? name.toString().substring(0, 1).toUpperCase() : '?';
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: AppLayout.scrollPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

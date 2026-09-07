@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:typed_data';
 import 'dart:async';
 import '../../../services/employee_api.dart';
+import '../../../widgets/app_layout.dart';
 import '../employee_theme.dart';
 import '../employee_ui_kit.dart';
 import '../widgets/order_form_ui.dart';
@@ -355,17 +356,11 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
   Widget build(BuildContext context) {
     final saved = _lastOrder != null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return ListView(
+      padding: AppLayout.scrollPadding(context),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       children: [
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                NewOrderUi.progressStrip(_progress),
+        NewOrderUi.progressStrip(_progress),
                 NewOrderUi.adminHero(_adminOrderNo),
                 NewOrderUi.block(
                   icon: Icons.lock_outline_rounded,
@@ -487,24 +482,13 @@ class _EmpNewOrderTabState extends State<EmpNewOrderTab> {
                     onPrint: _printLabel,
                   ),
                 ],
-                const SizedBox(height: 80),
+                if (!saved) ...[
+                  const SizedBox(height: 16),
+                  NewOrderUi.compactTotalBar(total: _total, freeDelivery: _freeDeliveryState.value),
+                  const SizedBox(height: 10),
+                  NewOrderUi.saveButton(loading: _loading, onSave: _submit),
+                ],
               ],
-            ),
-          ),
-        ),
-        if (!saved)
-          EmployeeUiKit.stickyBar(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                NewOrderUi.compactTotalBar(total: _total, freeDelivery: _freeDeliveryState.value),
-                const SizedBox(height: 10),
-                NewOrderUi.saveButton(loading: _loading, onSave: _submit),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }

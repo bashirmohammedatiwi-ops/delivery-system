@@ -1,5 +1,29 @@
 const db = require('../database/index');
 
+let _deferredColumnsReady = false;
+
+/** يضمن وجود أعمدة التأجيل (لقواعد قديمة لم تُحدَّث بعد) */
+function ensureDeferredColumns() {
+    if (_deferredColumnsReady) return;
+    const database = db.getDatabase();
+    try {
+        database.prepare('SELECT IsDeferred FROM Orders LIMIT 1').get();
+        _deferredColumnsReady = true;
+        return;
+    } catch (_) {}
+    try { database.exec('ALTER TABLE Orders ADD COLUMN IsDeferred INTEGER DEFAULT 0'); } catch (_) {}
+    try { database.exec('ALTER TABLE Orders ADD COLUMN DeferredReason TEXT'); } catch (_) {}
+    try { database.exec('ALTER TABLE Orders ADD COLUMN DeferredDate TEXT'); } catch (_) {}
+    _deferredColumnsReady = true;
+}
+
+function isDeferredOrderRow(order) {
+    if (!order) return false;
+    const v = order.IsDeferred ?? order.isdeferred;
+    if (v === true || v === 1 || v === '1') return true;
+    return false;
+}
+
 /** تاريخ ووقت محلي لضمان تطابق مع توقيت السائق (بدلاً من UTC) */
 function getLocalDateTimeStr() {
     const d = new Date();
@@ -169,6 +193,7 @@ function getOrders(filters = {}) {
         params.push(filters.dateTo);
     }
     if (filters.deferredOnly) {
+        ensureDeferredColumns();
         sql += ` AND COALESCE(o.IsDeferred, 0) = 1`;
     }
 
@@ -366,6 +391,7 @@ function markReturnedByDriver(orderId, driverId, returnReason = '') {
 }
 
 function markDeferredByDriver(orderId, driverId, deferredReason = '') {
+    ensureDeferredColumns();
     const database = db.getDatabase();
     const order = getOrderById(orderId);
     if (!order) return { success: false, error: 'الطلب غير موجود' };
@@ -384,6 +410,7 @@ function markDeferredByDriver(orderId, driverId, deferredReason = '') {
 }
 
 function resumeDeferredByDriver(orderId, driverId) {
+    ensureDeferredColumns();
     const database = db.getDatabase();
     const order = getOrderById(orderId);
     if (!order) return { success: false, error: 'الطلب غير موجود' };
@@ -397,7 +424,14 @@ function resumeDeferredByDriver(orderId, driverId) {
 }
 
 function getDriverDeferredOrders(driverId) {
-    return getOrders({ driverId, status: 'AssignedToDriver', deferredOnly: true });
+    ensureDeferredColumns();
+    try {
+        return getOrders({ driverId, status: 'AssignedToDriver', deferredOnly: true });
+    } catch (err) {
+        console.warn('getDriverDeferredOrders SQL fallback:', err.message);
+        const all = getOrders({ driverId, status: 'AssignedToDriver' });
+        return all.filter(isDeferredOrderRow);
+    }
 }
 
 /* المبلغ المستحق = المبلغ النهائي - أجرة التوصيل */
@@ -454,14 +488,15 @@ function getDriverStats(driverId, date) {
 
     totalAmountDue = Math.round(totalAmountDue * 100) / 100;
 
-    const deliveredCount = (delivered && delivered.c) || 0;
-    const returnedCount = (returned && returned.c) || 0;
-    const notDeliveredCount = (notDelivered && notDelivered.c) || 0;
+    const countVal = (row) => Number(row && row.c != null ? row.c : 0) || 0;
+    const deliveredCount = countVal(delivered);
+    const returnedCount = countVal(returned);
+    const notDeliveredCount = countVal(notDelivered);
     return {
         date: d,
         delivered: deliveredCount,
         returned: returnedCount,
-        assigned: (assigned && assigned.c) || 0,
+        assigned: countVal(assigned),
         notDelivered: notDeliveredCount,
         orderCount: deliveredCount + returnedCount + notDeliveredCount,
         totalDeliveredIQD,

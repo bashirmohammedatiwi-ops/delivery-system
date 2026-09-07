@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../../../utils/json_helpers.dart';
 import '../../../services/driver_api.dart';
 import '../driver_app.dart';
 import '../driver_theme.dart';
+import '../../../widgets/app_layout.dart';
 import '../driver_ui_kit.dart';
 
 class DriverStatsTab extends StatefulWidget {
@@ -17,32 +19,25 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
   bool _loading = true;
   String? _error;
   String _date = '';
+  String _todayStr = '';
 
   @override
   void initState() {
     super.initState();
-    _date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    _load();
+    _init();
   }
 
-  String get _today => DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-  String _addDays(String d, int delta) {
-    final dt = DateTime.tryParse('$d 12:00:00') ?? DateTime.now();
-    return DateFormat('yyyy-MM-dd').format(dt.add(Duration(days: delta)));
+  Future<void> _init() async {
+    final today = await DriverApi.getToday();
+    if (!mounted) return;
+    setState(() {
+      _date = today;
+      _todayStr = today;
+    });
+    await _load();
   }
 
-  double _calcAmountDue(List<dynamic> orders) {
-    double total = 0;
-    for (final o in orders) {
-      final m = o as Map<String, dynamic>;
-      final amt = (m['TotalIQD'] ?? m['totaliqd'] ?? 0) as num;
-      final free = m['FreeDelivery'] == 1 || m['FreeDelivery'] == '1';
-      final fee = free ? (m['WaivedDeliveryIQD'] ?? m['waiveddeliveryiqd'] ?? 0) : (m['DeliveryFeeIQD'] ?? m['deliveryfeeiqd'] ?? 0);
-      total += (amt - (fee as num));
-    }
-    return total;
-  }
+  String get _today => _todayStr;
 
   Future<void> _load() async {
     setState(() {
@@ -53,12 +48,14 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
       final stats = await DriverApi.getStats(_date);
       final delivered = await DriverApi.getDeliveredOrders(_date);
       final amountDue = _calcAmountDue(delivered);
+      if (!mounted) return;
       setState(() {
         _stats = stats;
         _stats?['totalAmountDue'] = amountDue;
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString().replaceFirst('Exception: ', '');
         _loading = false;
@@ -66,17 +63,45 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
     }
   }
 
-  int _num(String key) {
-    final v = _stats?[key];
-    if (v is num) return v.toInt();
-    return int.tryParse('$v') ?? 0;
+  double _calcAmountDue(List<dynamic> orders) {
+    double total = 0;
+    for (final o in orders) {
+      final m = o as Map<String, dynamic>;
+      final amt = pickDouble(m['TotalIQD'] ?? m['totaliqd']);
+      final free = pickBool(m['FreeDelivery']);
+      final fee = free
+          ? pickDouble(m['WaivedDeliveryIQD'] ?? m['waiveddeliveryiqd'])
+          : pickDouble(m['DeliveryFeeIQD'] ?? m['deliveryfeeiqd']);
+      total += amt - fee;
+    }
+    return total;
   }
+
+  int _num(String key) => pickFieldInt(_stats ?? {}, [key]);
 
   double get _successRate {
     final d = _num('delivered');
     final r = _num('returned');
     final t = d + r;
     return t > 0 ? d / t : 0;
+  }
+
+  String _dateLabel() {
+    final dt = DateTime.tryParse('$_date 12:00:00') ?? DateTime.now();
+    try {
+      return DateFormat('EEEE، d MMMM yyyy', 'ar').format(dt);
+    } catch (_) {
+      return _date;
+    }
+  }
+
+  String _dateShortLabel() {
+    final dt = DateTime.tryParse('$_date 12:00:00') ?? DateTime.now();
+    try {
+      return DateFormat('yMMMd', 'ar').format(dt);
+    } catch (_) {
+      return _date;
+    }
   }
 
   @override
@@ -98,48 +123,67 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
       );
     }
 
-    final dateLabel = DateFormat('yMMMd', 'ar_IQ').format(DateTime.tryParse('$_date 12:00:00') ?? DateTime.now());
+    final delivered = _num('delivered');
+    final returned = _num('returned');
+    final notDelivered = _num('notDelivered');
+    final orderTotal = delivered + returned + notDelivered;
+    final assigned = _num('assigned');
     final feesCollected = _stats?['feesCollected'] == true;
+    final isToday = _date == _today;
 
     return RefreshIndicator(
       onRefresh: _load,
       color: DriverTheme.primary,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        padding: AppLayout.scrollPadding(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             DriverUiKit.dateNavigator(
-              label: dateLabel,
+              label: _dateShortLabel(),
               onPrev: () {
-                setState(() => _date = _addDays(_date, -1));
+                setState(() => _date = DriverApi.addDays(_date, -1));
                 _load();
               },
-              onNext: _date == _today
+              onNext: isToday
                   ? null
                   : () {
-                      setState(() => _date = _addDays(_date, 1));
+                      setState(() => _date = DriverApi.addDays(_date, 1));
                       _load();
                     },
             ),
-            const SizedBox(height: 14),
-            DriverUiKit.highlightHero(
-              title: 'الطلبات المعيّنة لك الآن',
-              value: '${_num('assigned')}',
-              icon: Icons.inventory_2_rounded,
-              accent: DriverTheme.rusafa,
-              subtitle: '$_date · ${_date == _today ? 'اليوم' : 'تاريخ محدد'}',
+            const SizedBox(height: 8),
+            Text(
+              _dateLabel(),
+              textAlign: TextAlign.center,
+              style: DriverTheme.bodyMedium.copyWith(fontSize: 13, height: 1.35),
             ),
-            const SizedBox(height: 14),
+            if (isToday)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'إحصائيات اليوم الحالي',
+                  textAlign: TextAlign.center,
+                  style: DriverTheme.labelSmall.copyWith(color: DriverTheme.primary),
+                ),
+              ),
+            const SizedBox(height: 16),
             Row(
               children: [
-                DriverUiKit.statTile(label: 'موصّل', value: '${_num('delivered')}', icon: Icons.check_circle_rounded, color: DriverTheme.success),
+                DriverUiKit.statTile(label: 'موصّل', value: '$delivered', icon: Icons.check_circle_rounded, color: DriverTheme.success),
                 const SizedBox(width: 10),
-                DriverUiKit.statTile(label: 'راجع', value: '${_num('returned')}', icon: Icons.undo_rounded, color: DriverTheme.danger),
+                DriverUiKit.statTile(label: 'راجع', value: '$returned', icon: Icons.undo_rounded, color: DriverTheme.danger),
                 const SizedBox(width: 10),
-                DriverUiKit.statTile(label: 'لم يُوصَل', value: '${_num('notDelivered')}', icon: Icons.schedule_rounded, color: DriverTheme.warning),
+                DriverUiKit.statTile(label: 'لم يُوصَّل', value: '$notDelivered', icon: Icons.schedule_rounded, color: DriverTheme.warning),
               ],
+            ),
+            const SizedBox(height: 14),
+            DriverUiKit.dayOrderSummary(
+              total: orderTotal,
+              delivered: delivered,
+              returned: returned,
+              notDelivered: notDelivered,
             ),
             const SizedBox(height: 14),
             Container(
@@ -153,7 +197,7 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
               child: DriverUiKit.progressBar(
                 value: _successRate,
                 color: DriverTheme.success,
-                label: 'نسبة نجاح التوصيل',
+                label: 'نسبة نجاح التوصيل (موصّل ÷ موصّل + راجع)',
               ),
             ),
             const SizedBox(height: 14),
@@ -161,8 +205,8 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
               children: [
                 Expanded(
                   child: DriverUiKit.metricCard(
-                    value: formatIQD(_stats?['totalDeliveredIQD']),
-                    label: 'إجمالي المبالغ',
+                    value: formatIQD(pickDouble(_stats?['totalDeliveredIQD'])),
+                    label: 'إجمالي مبالغ التوصيل',
                     icon: Icons.payments_rounded,
                     color: DriverTheme.primary,
                   ),
@@ -170,7 +214,7 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: DriverUiKit.metricCard(
-                    value: formatIQD(_stats?['totalAmountDue']),
+                    value: formatIQD(pickDouble(_stats?['totalAmountDue'])),
                     label: 'المبلغ المستحق',
                     icon: Icons.account_balance_wallet_rounded,
                     color: DriverTheme.secondary,
@@ -186,16 +230,14 @@ class _DriverStatsTabState extends State<DriverStatsTab> {
                 icon: feesCollected ? Icons.verified_rounded : Icons.schedule_rounded,
               ),
             ],
-            if (_stats?['orderCount'] != null) ...[
-              const SizedBox(height: 14),
-              DriverUiKit.metricCard(
-                value: '${_num('orderCount')}',
-                label: 'إجمالي الطلبات في اليوم',
-                icon: Icons.receipt_long_rounded,
-                color: DriverTheme.info,
-                badge: 'موصّل ${_num('delivered')}',
-              ),
-            ],
+            const SizedBox(height: 14),
+            DriverUiKit.highlightHero(
+              title: 'الطلبات المعيّنة لك الآن',
+              value: '$assigned',
+              icon: Icons.inventory_2_rounded,
+              accent: DriverTheme.rusafa,
+              subtitle: 'شحنات بحوزتك ولم تُوصَّل أو تُرجَع بعد',
+            ),
           ],
         ),
       ),

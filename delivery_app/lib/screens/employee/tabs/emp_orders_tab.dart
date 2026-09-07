@@ -8,6 +8,7 @@ import 'dart:typed_data';
 import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
 import '../employee_ui_kit.dart';
+import '../../../widgets/app_layout.dart';
 import '../../../utils/open_pdf_bytes/open_pdf_bytes.dart';
 import '../../../utils/order_label_printed.dart';
 import '../widgets/order_form_ui.dart';
@@ -239,139 +240,170 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
   @override
   Widget build(BuildContext context) {
     final visible = _visibleOrders;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Row(
-            children: [
-              EmployeeUiKit.statTile(
-                label: 'المعروض',
-                value: '${visible.length}',
-                icon: Icons.receipt_long_rounded,
-                color: EmployeeTheme.primary,
-              ),
-              const SizedBox(width: 10),
-              EmployeeUiKit.statTile(
-                label: 'مطبوع',
-                value: '$_printedCount',
-                icon: Icons.print_rounded,
-                color: EmployeeTheme.success,
-              ),
-              const SizedBox(width: 10),
-              EmployeeUiKit.statTile(
-                label: 'غير مطبوع',
-                value: '$_unprintedCount',
-                icon: Icons.print_disabled_rounded,
-                color: EmployeeTheme.warning,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 40,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              EmployeeUiKit.filterChip(
-                label: 'الكل',
-                selected: _statusFilter == null,
-                accent: EmployeeTheme.primary,
-                onTap: () => setState(() => _statusFilter = null),
-              ),
-              EmployeeUiKit.filterChip(
-                label: 'جديد',
-                selected: _statusFilter == 'New',
-                accent: EmployeeTheme.info,
-                onTap: () => setState(() => _statusFilter = 'New'),
-              ),
-              EmployeeUiKit.filterChip(
-                label: 'مع السائق',
-                selected: _statusFilter == 'AssignedToDriver',
-                accent: EmployeeTheme.primary,
-                onTap: () => setState(() => _statusFilter = 'AssignedToDriver'),
-              ),
-              EmployeeUiKit.filterChip(
-                label: 'تم التوصيل',
-                selected: _statusFilter == 'Delivered',
-                accent: EmployeeTheme.success,
-                onTap: () => setState(() => _statusFilter = 'Delivered'),
-              ),
-              EmployeeUiKit.filterChip(
-                label: 'راجع',
-                selected: _statusFilter == 'Returned',
-                accent: EmployeeTheme.warning,
-                onTap: () => setState(() => _statusFilter = 'Returned'),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-          child: EmployeeUiKit.searchBar(
-            controller: _search,
-            hint: 'رقم الشحنة، الاسم، الهاتف، العنوان...',
-            onChanged: _onSearchChanged,
-            onClear: () {
-              _search.clear();
-              _searchQuery = '';
-              setState(() {});
-            },
-          ),
-        ),
-        if (_refreshing)
-          LinearProgressIndicator(minHeight: 2, color: EmployeeTheme.primary),
-        Expanded(
-          child: _buildBody(visible),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBody(List<Map<String, dynamic>> visible) {
-    if (_loading) {
-      return EmployeeUiKit.skeletonList();
-    }
-
-    if (_loadError != null) {
-      return EmployeeUiKit.emptyState(
-        icon: Icons.cloud_off_rounded,
-        title: 'تعذّر تحميل الطلبات',
-        subtitle: _loadError!,
-        accent: EmployeeTheme.danger,
-        action: FilledButton.icon(
-          onPressed: _load,
-          icon: const Icon(Icons.refresh_rounded),
-          label: const Text('إعادة المحاولة'),
-          style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
-        ),
-      );
-    }
-
-    if (visible.isEmpty) {
-      return EmployeeUiKit.emptyState(
-        icon: Icons.receipt_long_rounded,
-        title: 'لا توجد طلبات',
-        subtitle: _isSearching || _statusFilter != null ? 'جرّب تغيير البحث أو الفلتر' : 'ستظهر الطلبات هنا',
-        accent: EmployeeTheme.primary,
-      );
-    }
-
     return RefreshIndicator(
       onRefresh: _load,
       color: EmployeeTheme.primary,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        cacheExtent: 400,
-        itemCount: visible.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 12),
-        itemBuilder: (_, i) => _buildOrderCard(visible[i]),
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 10),
+                EmployeeUiKit.statTileRow([
+                  EmployeeUiKit.statTile(
+                    expanded: false,
+                    label: 'المعروض',
+                    value: '${visible.length}',
+                    icon: Icons.receipt_long_rounded,
+                    color: EmployeeTheme.primary,
+                  ),
+                  EmployeeUiKit.statTile(
+                    expanded: false,
+                    label: 'مطبوع',
+                    value: '$_printedCount',
+                    icon: Icons.print_rounded,
+                    color: EmployeeTheme.success,
+                  ),
+                  EmployeeUiKit.statTile(
+                    expanded: false,
+                    label: 'غير مطبوع',
+                    value: '$_unprintedCount',
+                    icon: Icons.print_disabled_rounded,
+                    color: EmployeeTheme.warning,
+                  ),
+                ]),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    children: [
+                      EmployeeUiKit.filterChip(
+                        label: 'الكل',
+                        selected: _statusFilter == null,
+                        accent: EmployeeTheme.primary,
+                        onTap: () => setState(() => _statusFilter = null),
+                      ),
+                      EmployeeUiKit.filterChip(
+                        label: 'جديد',
+                        selected: _statusFilter == 'New',
+                        accent: EmployeeTheme.info,
+                        onTap: () => setState(() => _statusFilter = 'New'),
+                      ),
+                      EmployeeUiKit.filterChip(
+                        label: 'مع السائق',
+                        selected: _statusFilter == 'AssignedToDriver',
+                        accent: EmployeeTheme.primary,
+                        onTap: () => setState(() => _statusFilter = 'AssignedToDriver'),
+                      ),
+                      EmployeeUiKit.filterChip(
+                        label: 'تم التوصيل',
+                        selected: _statusFilter == 'Delivered',
+                        accent: EmployeeTheme.success,
+                        onTap: () => setState(() => _statusFilter = 'Delivered'),
+                      ),
+                      EmployeeUiKit.filterChip(
+                        label: 'راجع',
+                        selected: _statusFilter == 'Returned',
+                        accent: EmployeeTheme.warning,
+                        onTap: () => setState(() => _statusFilter = 'Returned'),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  child: EmployeeUiKit.searchBar(
+                    controller: _search,
+                    hint: 'رقم الشحنة، الاسم، الهاتف، العنوان...',
+                    onChanged: _onSearchChanged,
+                    onClear: () {
+                      _search.clear();
+                      _searchQuery = '';
+                      setState(() {});
+                    },
+                  ),
+                ),
+                if (_refreshing)
+                  LinearProgressIndicator(minHeight: 2, color: EmployeeTheme.primary),
+              ],
+            ),
+          ),
+          ..._buildBodySlivers(visible),
+        ],
       ),
     );
+  }
+
+  List<Widget> _buildBodySlivers(List<Map<String, dynamic>> visible) {
+    if (_loading) {
+      return [
+        SliverPadding(
+          padding: AppLayout.scrollPadding(context, top: 0),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (_, i) => Padding(
+                padding: EdgeInsets.only(bottom: i < 4 ? 12 : 0),
+                child: EmployeeUiKit.skeletonCard(),
+              ),
+              childCount: 5,
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (_loadError != null) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: EmployeeUiKit.emptyState(
+            icon: Icons.cloud_off_rounded,
+            title: 'تعذّر تحميل الطلبات',
+            subtitle: _loadError!,
+            accent: EmployeeTheme.danger,
+            action: FilledButton.icon(
+              onPressed: _load,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('إعادة المحاولة'),
+              style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
+            ),
+          ),
+        ),
+      ];
+    }
+
+    if (visible.isEmpty) {
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: EmployeeUiKit.emptyState(
+            icon: Icons.receipt_long_rounded,
+            title: 'لا توجد طلبات',
+            subtitle: _isSearching || _statusFilter != null ? 'جرّب تغيير البحث أو الفلتر' : 'ستظهر الطلبات هنا',
+            accent: EmployeeTheme.primary,
+          ),
+        ),
+      ];
+    }
+
+    return [
+      SliverPadding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, AppLayout.scrollBottomInset(context)),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              if (i.isOdd) return const SizedBox(height: 12);
+              final orderIndex = i ~/ 2;
+              return _buildOrderCard(visible[orderIndex]);
+            },
+            childCount: visible.length * 2 - 1,
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildOrderCard(Map<String, dynamic> o) {

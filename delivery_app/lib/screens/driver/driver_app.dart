@@ -60,8 +60,14 @@ class _DriverAppState extends State<DriverApp> {
       );
     }
     return _loggedIn
-        ? DriverMainScreen(onLogout: _onLoggedOut)
-        : DriverLoginScreen(onLoggedIn: _onLoggedIn);
+        ? Theme(
+            data: DriverTheme.materialTheme(),
+            child: DriverMainScreen(onLogout: _onLoggedOut),
+          )
+        : Theme(
+            data: DriverTheme.materialTheme(),
+            child: DriverLoginScreen(onLoggedIn: _onLoggedIn),
+          );
   }
 }
 

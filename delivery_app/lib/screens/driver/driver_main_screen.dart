@@ -20,7 +20,9 @@ class DriverMainScreen extends StatefulWidget {
 
 class _DriverMainScreenState extends State<DriverMainScreen> {
   int _index = 0;
+  int _ordersTabVersion = 0;
   Map<String, dynamic>? _driver;
+  int _deferredCount = 0;
 
   static const _tabs = [
     DriverTabMeta(
@@ -28,7 +30,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
       activeIcon: Icons.inventory_2_rounded,
       label: 'طلباتي',
       title: 'طلباتي',
-      subtitle: 'الشحنات المعينة لك اليوم',
+      subtitle: 'الشحنات المعينة لك · نشطة ومؤجلة',
       accent: DriverTheme.primary,
     ),
     DriverTabMeta(
@@ -84,14 +86,30 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
     if (mounted) setState(() => _driver = d);
   }
 
+  void _onDeferredCountChanged(int count) {
+    if (mounted) setState(() => _deferredCount = count);
+  }
+
+  void _onOrdersChanged() {}
+
   Widget _buildTab() {
     switch (_index) {
       case 0:
-        return const DriverOrdersTab();
+        return DriverOrdersTab(
+          key: ValueKey('orders_$_ordersTabVersion'),
+          onChanged: _onOrdersChanged,
+          onDeferredCountChanged: _onDeferredCountChanged,
+        );
       case 1:
         return DriverReceiveTab(
-          onReceived: _loadDriver,
-          onShowOrderDetail: (order) => showDriverOrderDetail(context, order),
+          onReceived: () {
+            _loadDriver();
+            setState(() => _ordersTabVersion++);
+          },
+          onShowOrderDetail: (order) => showDriverOrderDetail(context, order, onAction: () {
+            Navigator.pop(context);
+            _onOrdersChanged();
+          }),
         );
       case 2:
         return const DriverPendingTab();
@@ -102,7 +120,11 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
       case 5:
         return DriverSettingsTab(onLogout: widget.onLogout);
       default:
-        return const DriverOrdersTab();
+        return DriverOrdersTab(
+          key: ValueKey('orders_$_ordersTabVersion'),
+          onChanged: _onOrdersChanged,
+          onDeferredCountChanged: _onDeferredCountChanged,
+        );
     }
   }
 
@@ -140,6 +162,7 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
         bottomNavigationBar: DriverBottomNav(
           tabs: _tabs,
           selectedIndex: _index,
+          badges: {0: _deferredCount},
           onSelected: (i) => setState(() => _index = i),
         ),
       ),

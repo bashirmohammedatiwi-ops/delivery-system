@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../services/driver_api.dart';
 import '../../../widgets/barcode_scanner_view.dart';
 import '../driver_theme.dart';
+import '../../../widgets/app_layout.dart';
 import '../driver_ui_kit.dart';
 
 class DriverReceiveTab extends StatefulWidget {
@@ -70,7 +71,7 @@ class _DriverReceiveTabState extends State<DriverReceiveTab> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      padding: AppLayout.scrollPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -135,16 +136,14 @@ class _DriverReceiveTabState extends State<DriverReceiveTab> {
               label: const Text('إيقاف المسح'),
             ),
           ] else ...[
-            SizedBox(
-              height: 56,
-              child: FilledButton.icon(
-                onPressed: () => setState(() => _scanning = true),
-                icon: const Icon(Icons.qr_code_scanner_rounded, size: 26),
-                label: const Text('مسح الباركود بالكاميرا'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: DriverTheme.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
-                ),
+            FilledButton.icon(
+              onPressed: () => setState(() => _scanning = true),
+              icon: const Icon(Icons.qr_code_scanner_rounded, size: 24),
+              label: const Text('مسح الباركود بالكاميرا'),
+              style: FilledButton.styleFrom(
+                backgroundColor: DriverTheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
               ),
             ),
             const SizedBox(height: 20),
@@ -172,14 +171,11 @@ class _DriverReceiveTabState extends State<DriverReceiveTab> {
               onSubmitted: _receive,
             ),
             const SizedBox(height: 14),
-            SizedBox(
-              height: 52,
-              child: FilledButton(
-                onPressed: _submitting ? null : () => _receive(_controller.text),
-                child: _submitting
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('استلام الطلب'),
-              ),
+            FilledButton(
+              onPressed: _submitting ? null : () => _receive(_controller.text),
+              child: _submitting
+                  ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('استلام الطلب'),
             ),
           ],
           if (_message != null) ...[

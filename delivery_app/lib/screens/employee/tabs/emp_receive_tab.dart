@@ -4,6 +4,7 @@ import '../../../services/employee_api.dart';
 import '../../../widgets/barcode_scanner_view.dart';
 import '../employee_theme.dart';
 import '../employee_ui_kit.dart';
+import '../../../widgets/app_layout.dart';
 
 class EmpReceiveTab extends StatefulWidget {
   const EmpReceiveTab({super.key});
@@ -110,7 +111,7 @@ class _EmpReceiveTabState extends State<EmpReceiveTab> {
     final hasDriver = _currentDriver != null;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+      padding: AppLayout.scrollPadding(context),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

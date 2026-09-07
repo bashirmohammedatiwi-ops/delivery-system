@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../services/driver_api.dart';
 import '../driver_theme.dart';
+import '../../../widgets/app_layout.dart';
 import '../driver_ui_kit.dart';
 
 class DriverSettingsTab extends StatelessWidget {
@@ -19,7 +20,7 @@ class DriverSettingsTab extends StatelessWidget {
         final initial = name.toString().isNotEmpty ? name.toString().substring(0, 1).toUpperCase() : '?';
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          padding: AppLayout.scrollPadding(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
