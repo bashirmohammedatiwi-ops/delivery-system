@@ -123,5 +123,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_returned_driver ON "Orders"("ReturnedByDri
 CREATE INDEX IF NOT EXISTS idx_orders_created_by ON "Orders"("CreatedByUserID");
 CREATE INDEX IF NOT EXISTS idx_orders_region ON "Orders"("RegionID");
 CREATE INDEX IF NOT EXISTS idx_orders_status_created ON "Orders"("Status", "CreatedDate");
+CREATE INDEX IF NOT EXISTS idx_orders_created_day ON "Orders"("CreatedDate") WHERE "CreatedDate" IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_fdo_notif_unreviewed ON "FreeDeliveryOverrideNotifications"("Reviewed", "CreatedAt" DESC) WHERE "Reviewed" = 0;
 CREATE INDEX IF NOT EXISTS idx_tracking_order ON "OrderTracking"("OrderID");
 CREATE UNIQUE INDEX IF NOT EXISTS idx_drivers_username ON "Drivers"("Username");

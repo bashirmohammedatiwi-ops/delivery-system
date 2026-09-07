@@ -1863,6 +1863,54 @@ body {
     transform: scale(0.98);
 }
 
+.dash-loading-hint {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    padding: 24px 12px;
+}
+
+.dash-loading-hint i {
+    display: inline-block;
+    animation: dashSpin 0.9s linear infinite;
+    margin-left: 6px;
+}
+
+@keyframes dashSpin {
+    to { transform: rotate(360deg); }
+}
+
+.dash-skeleton {
+    display: inline-block;
+    background: linear-gradient(90deg, rgba(255,255,255,0.35) 25%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0.35) 75%);
+    background-size: 200% 100%;
+    animation: dashShimmer 1.2s ease-in-out infinite;
+    border-radius: 8px;
+}
+
+.dash-skeleton--num {
+    width: 72px;
+    height: 42px;
+    margin: 0 auto;
+}
+
+.dash-skeleton--text {
+    width: 140px;
+    height: 16px;
+}
+
+.dash-skeleton--pill {
+    width: 48px;
+    height: 28px;
+    margin: 8px auto;
+    display: block;
+}
+
+@keyframes dashShimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
 .dash-highlight {
     display: grid;
     grid-template-columns: 1.2fr 1fr;

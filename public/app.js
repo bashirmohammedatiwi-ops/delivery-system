@@ -1,6 +1,19 @@
 // ─── المصادقة والصلاحيات ───
 let currentUser = null;
 
+let driversCache = { data: null, ts: 0 };
+async function getDriversCached(force) {
+    if (!force && driversCache.data && Date.now() - driversCache.ts < 120000) {
+        return driversCache.data;
+    }
+    const data = await window.api.drivers.getAll();
+    driversCache = { data, ts: Date.now() };
+    return data;
+}
+function invalidateDriversCache() {
+    driversCache = { data: null, ts: 0 };
+}
+
 async function checkAuth() {
     const token = window.api.auth.getToken();
     if (!token) return false;
@@ -640,8 +653,10 @@ async function renderOrdersScreen(container, opts = {}) {
     let statusClickAttached = false;
 
     const renderOrders = async () => {
-        const list = await window.api.orders.getAll(filters);
-        const drivers = await window.api.drivers.getAll();
+        const [list, drivers] = await Promise.all([
+            window.api.orders.getAll(filters),
+            getDriversCached()
+        ]);
         const statNew = list.filter(o => o.Status === 'New').length;
         const statAssigned = list.filter(o => o.Status === 'AssignedToDriver').length;
         const statDelivered = list.filter(o => o.Status === 'Delivered').length;
@@ -1114,16 +1129,40 @@ function showScreen(screenId, subTab) {
 const screens = {
     dashboard: {
         async render(container) {
-            let today = new Date().toISOString().split('T')[0];
-            try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
+            const userName = (currentUser?.DisplayName || currentUser?.Username || 'مدير').replace(/</g, '&lt;');
+            container.innerHTML = `
+                <div class="screen active dashboard-screen dashboard-screen--loading">
+                    <header class="dash-hero dash-hero--mobile">
+                        <div class="dash-hero__brand"><i class="bi bi-truck" aria-hidden="true"></i><span>ديما الحياة</span></div>
+                        <p class="dash-hero__welcome">مرحباً، ${userName}</p>
+                        <p class="dash-hero__date"><span class="dash-skeleton dash-skeleton--text"></span></p>
+                        <div class="dash-hero__mega">
+                            <div class="dash-hero__mega-value dash-skeleton dash-skeleton--num"></div>
+                            <div class="dash-hero__mega-label">طلبات اليوم</div>
+                        </div>
+                    </header>
+                    <div class="dash-status-strip">
+                        ${[1,2,3,4].map(() => '<div class="dash-status-pill"><span class="dash-skeleton dash-skeleton--pill"></span></div>').join('')}
+                    </div>
+                    <p class="dash-loading-hint"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> جاري تحميل لوحة التحكم…</p>
+                </div>
+            `;
 
+            let today = new Date().toISOString().split('T')[0];
             let stats = {
                 totalOrders: 0, newCount: 0, assignedCount: 0, deliveredCount: 0,
                 todayCount: 0, todayKarkh: 0, todayRusafa: 0, today
             };
+            let overrideNotifications = { list: [], count: 0 };
+
             try {
-                stats = await window.api.dashboard.stats(today);
-            } catch (_) {}
+                const home = await window.api.dashboard.home();
+                today = home?.today || today;
+                stats = home?.stats || stats;
+                overrideNotifications = home?.notifications || overrideNotifications;
+            } catch (_) {
+                try { stats = await window.api.dashboard.stats(today); } catch (e2) { /* keep defaults */ }
+            }
 
             const todayOrdersCount = stats.todayCount;
             const totalOrdersCount = stats.totalOrders;
@@ -1133,20 +1172,12 @@ const screens = {
             const todayRusafa = stats.todayRusafa;
             const deliveredCount = stats.deliveredCount;
 
-            let overrideNotifications = { list: [], count: 0 };
-            if (currentUser?.Role === 'admin') {
-                try {
-                    overrideNotifications = await window.api.notifications.getFreeDeliveryOverrides();
-                } catch (_) {}
-            }
-
             const notifList = overrideNotifications.list || [];
-            const notifCount = notifList.length; // العداد من القائمة الفعلية لضمان التطابق
+            const notifCount = notifList.length;
             const notifHtml = notifList.length > 0
                 ? notifList.map(renderOverrideNotification).join('')
                 : '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
 
-            const userName = (currentUser?.DisplayName || currentUser?.Username || 'مدير').replace(/</g, '&lt;');
             const areaTotal = Math.max(todayKarkh + todayRusafa, 1);
             const karkhPct = Math.round((todayKarkh / areaTotal) * 100);
             const rusafaPct = 100 - karkhPct;

@@ -531,25 +531,45 @@ function getCustomerPhoneStats(customerPhone) {
     };
 }
 
+let dashboardStatsCache = { key: '', data: null, ts: 0 };
+const DASHBOARD_STATS_CACHE_MS = 30000;
+
+function nextDayIso(isoDate) {
+    const d = new Date(isoDate + 'T12:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+}
+
+function invalidateDashboardStatsCache() {
+    dashboardStatsCache = { key: '', data: null, ts: 0 };
+}
+
 function getDashboardStats(today) {
+    const cacheKey = String(today || '');
+    const now = Date.now();
+    if (dashboardStatsCache.key === cacheKey && dashboardStatsCache.data && now - dashboardStatsCache.ts < DASHBOARD_STATS_CACHE_MS) {
+        return dashboardStatsCache.data;
+    }
+
     const database = db.getDatabase();
-    const prefix = `${today}%`;
+    const dayStart = `${cacheKey} 00:00:00`;
+    const dayEnd = `${nextDayIso(cacheKey)} 00:00:00`;
     const row = database.prepare(`
         SELECT
-            (SELECT COUNT(*) FROM Orders) AS totalOrders,
-            (SELECT COUNT(*) FROM Orders WHERE Status = 'New') AS newCount,
-            (SELECT COUNT(*) FROM Orders WHERE Status = 'AssignedToDriver') AS assignedCount,
-            (SELECT COUNT(*) FROM Orders WHERE Status = 'Delivered') AS deliveredCount,
-            (SELECT COUNT(*) FROM Orders WHERE CreatedDate LIKE ?) AS todayCount,
-            (SELECT COUNT(*) FROM Orders o
-             LEFT JOIN Regions r ON o.RegionID = r.RegionID
-             WHERE o.CreatedDate LIKE ? AND TRIM(COALESCE(r.RegionArea, '')) = 'الكرخ') AS todayKarkh,
-            (SELECT COUNT(*) FROM Orders o
-             LEFT JOIN Regions r ON o.RegionID = r.RegionID
-             WHERE o.CreatedDate LIKE ? AND TRIM(COALESCE(r.RegionArea, 'الرصافة')) = 'الرصافة') AS todayRusafa
-    `).get(prefix, prefix, prefix);
+            COUNT(*) AS totalOrders,
+            SUM(CASE WHEN o.Status = 'New' THEN 1 ELSE 0 END) AS newCount,
+            SUM(CASE WHEN o.Status = 'AssignedToDriver' THEN 1 ELSE 0 END) AS assignedCount,
+            SUM(CASE WHEN o.Status = 'Delivered' THEN 1 ELSE 0 END) AS deliveredCount,
+            SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ? THEN 1 ELSE 0 END) AS todayCount,
+            SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ?
+                AND TRIM(COALESCE(r.RegionArea, '')) = 'الكرخ' THEN 1 ELSE 0 END) AS todayKarkh,
+            SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ?
+                AND TRIM(COALESCE(r.RegionArea, 'الرصافة')) = 'الرصافة' THEN 1 ELSE 0 END) AS todayRusafa
+        FROM Orders o
+        LEFT JOIN Regions r ON o.RegionID = r.RegionID
+    `).get(dayStart, dayEnd, dayStart, dayEnd, dayStart, dayEnd);
 
-    return {
+    const result = {
         totalOrders: Number(row?.totalOrders || 0),
         newCount: Number(row?.newCount || 0),
         assignedCount: Number(row?.assignedCount || 0),
@@ -557,8 +577,10 @@ function getDashboardStats(today) {
         todayCount: Number(row?.todayCount || 0),
         todayKarkh: Number(row?.todayKarkh || 0),
         todayRusafa: Number(row?.todayRusafa || 0),
-        today
+        today: cacheKey
     };
+    dashboardStatsCache = { key: cacheKey, data: result, ts: now };
+    return result;
 }
 
 module.exports = {
@@ -581,6 +603,7 @@ module.exports = {
     markReturnedOrderReceived,
     getCustomerPhoneStats,
     getDashboardStats,
+    invalidateDashboardStatsCache,
     getPendingOrdersByArea,
     getPendingOrdersList
 };

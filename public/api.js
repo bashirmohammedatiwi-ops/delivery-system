@@ -89,6 +89,7 @@ window.api = {
     },
 
     dashboard: {
+        home: () => apiGet('/api/dashboard/home'),
         stats: (today) => {
             const q = today ? `?today=${encodeURIComponent(today)}` : '';
             return apiGet('/api/dashboard/stats' + q);

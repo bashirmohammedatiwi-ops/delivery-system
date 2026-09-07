@@ -213,18 +213,27 @@ app.put('/api/regions/:id', requireAppAuth, requireAdmin, (req, res) => {
 });
 
 // ─── API: القيم الافتراضية (لويب الموظفين) ───
+let appSettingsCache = { data: null, ts: 0 };
+const APP_SETTINGS_CACHE_MS = 60000;
+
 function getAppSettings() {
+    const now = Date.now();
+    if (appSettingsCache.data && now - appSettingsCache.ts < APP_SETTINGS_CACHE_MS) {
+        return appSettingsCache.data;
+    }
     try {
         const database = db.getDatabase();
         const rows = database.prepare('SELECT SettingKey, SettingValue FROM AppSettings').all();
         const obj = {};
         (rows || []).forEach(r => { obj[r.SettingKey] = r.SettingValue || ''; });
+        appSettingsCache = { data: obj, ts: now };
         return obj;
     } catch (e) { return {}; }
 }
 function setAppSetting(key, value) {
     const database = db.getDatabase();
     database.prepare('INSERT OR REPLACE INTO AppSettings (SettingKey, SettingValue) VALUES (?, ?)').run(key, value || '');
+    appSettingsCache = { data: null, ts: 0 };
 }
 function getTodayFromSettings() {
     const s = getAppSettings();
@@ -670,7 +679,25 @@ app.get('/api/dashboard/stats', requireAppAuth, requireAdmin, (req, res) => {
     try {
         const today = req.query.today || getTodayFromSettings();
         const stats = orderService.getDashboardStats(today);
+        res.set('Cache-Control', 'private, max-age=15');
         res.json(stats);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/** لوحة التحكم — طلب واحد بدل 3 (today + stats + notifications) */
+app.get('/api/dashboard/home', requireAppAuth, requireAdmin, (req, res) => {
+    try {
+        const today = getTodayFromSettings();
+        const stats = orderService.getDashboardStats(today);
+        const list = notificationService.getUnreviewedNotifications();
+        res.set('Cache-Control', 'private, max-age=15');
+        res.json({
+            today,
+            stats,
+            notifications: { list, count: list.length }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -897,8 +924,8 @@ app.post('/api/orders/:id/receive-returned', requireAppAuth, async (req, res) =>
 app.get('/api/notifications/free-delivery-overrides', requireAppAuth, requireAdmin, async (req, res) => {
     try {
         const list = notificationService.getUnreviewedNotifications();
-        const count = notificationService.getUnreviewedCount();
-        res.json({ list, count });
+        res.set('Cache-Control', 'private, max-age=10');
+        res.json({ list, count: list.length });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

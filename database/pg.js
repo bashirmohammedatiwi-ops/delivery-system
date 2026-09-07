@@ -78,10 +78,21 @@ function createDbWrapper() {
     };
 }
 
+async function applyPerformanceIndexes(client) {
+    const indexes = [
+        `CREATE INDEX IF NOT EXISTS idx_fdo_notif_unreviewed ON "FreeDeliveryOverrideNotifications"("Reviewed", "CreatedAt" DESC) WHERE "Reviewed" = 0`,
+        `CREATE INDEX IF NOT EXISTS idx_orders_created_day ON "Orders"("CreatedDate") WHERE "CreatedDate" IS NOT NULL`
+    ];
+    for (const stmt of indexes) {
+        await client.query(stmt);
+    }
+}
+
 async function applySchemaIfNeeded(client) {
     const check = await client.query(`SELECT to_regclass('public."Orders"') AS reg`);
     if (check.rows[0]?.reg) {
         console.log('PostgreSQL schema already exists — skip DDL');
+        await applyPerformanceIndexes(client);
         return;
     }
     const schemaPath = path.join(__dirname, 'schema.pg.sql');
