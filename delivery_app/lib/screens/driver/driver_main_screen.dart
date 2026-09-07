@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../services/driver_api.dart';
 import 'driver_theme.dart';
+import 'driver_ui_kit.dart';
+import '../../services/driver_api.dart';
 import 'tabs/driver_orders_tab.dart' show DriverOrdersTab, showDriverOrderDetail;
 import 'tabs/driver_receive_tab.dart';
 import 'tabs/driver_pending_tab.dart';
@@ -22,6 +22,57 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
   int _index = 0;
   Map<String, dynamic>? _driver;
 
+  static const _tabs = [
+    DriverTabMeta(
+      icon: Icons.inventory_2_outlined,
+      activeIcon: Icons.inventory_2_rounded,
+      label: 'طلباتي',
+      title: 'طلباتي',
+      subtitle: 'الشحنات المعينة لك اليوم',
+      accent: DriverTheme.primary,
+    ),
+    DriverTabMeta(
+      icon: Icons.add_circle_outline_rounded,
+      activeIcon: Icons.add_circle_rounded,
+      label: 'استلام',
+      title: 'استلام',
+      subtitle: 'مسح واستلام شحنات جديدة',
+      accent: DriverTheme.secondary,
+    ),
+    DriverTabMeta(
+      icon: Icons.schedule_outlined,
+      activeIcon: Icons.schedule_rounded,
+      label: 'منتظرة',
+      title: 'المنتظرة',
+      subtitle: 'طلبات بانتظار التوصيل',
+      accent: DriverTheme.warning,
+    ),
+    DriverTabMeta(
+      icon: Icons.analytics_outlined,
+      activeIcon: Icons.analytics_rounded,
+      label: 'إحصائيات',
+      title: 'الإحصائيات',
+      subtitle: 'أداؤك اليومي والمبالغ',
+      accent: DriverTheme.rusafa,
+    ),
+    DriverTabMeta(
+      icon: Icons.history_outlined,
+      activeIcon: Icons.history_rounded,
+      label: 'السجل',
+      title: 'السجل',
+      subtitle: 'توصيل · راجع · ملغي',
+      accent: DriverTheme.info,
+    ),
+    DriverTabMeta(
+      icon: Icons.settings_outlined,
+      activeIcon: Icons.settings_rounded,
+      label: 'إعدادات',
+      title: 'الإعدادات',
+      subtitle: 'حسابك وتسجيل الخروج',
+      accent: Color(0xFFDB2777),
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -30,17 +81,8 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
 
   Future<void> _loadDriver() async {
     final d = await DriverApi.getDriver();
-    setState(() => _driver = d);
+    if (mounted) setState(() => _driver = d);
   }
-
-  static const _tabs = [
-    (icon: Icons.inventory_2_rounded, label: 'طلباتي'),
-    (icon: Icons.add_circle_outline_rounded, label: 'استلام'),
-    (icon: Icons.schedule_rounded, label: 'منتظرة'),
-    (icon: Icons.analytics_rounded, label: 'إحصائيات'),
-    (icon: Icons.history_rounded, label: 'السجل'),
-    (icon: Icons.settings_rounded, label: 'إعدادات'),
-  ];
 
   Widget _buildTab() {
     switch (_index) {
@@ -66,157 +108,39 @@ class _DriverMainScreenState extends State<DriverMainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tab = _tabs[_index];
+    final driverName = _driver?['DriverName']?.toString();
+
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
         backgroundColor: DriverTheme.surface,
-        appBar: AppBar(
-          elevation: 0,
-          scrolledUnderElevation: 0,
-          backgroundColor: Colors.transparent,
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: DriverTheme.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(Icons.local_shipping_rounded, color: DriverTheme.primary, size: 22),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                'تطبيق السائق',
-                style: GoogleFonts.cairo(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: DriverTheme.onSurface,
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            Container(
-              margin: const EdgeInsets.only(left: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: DriverTheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: DriverTheme.primary.withValues(alpha: 0.2)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(color: DriverTheme.success, shape: BoxShape.circle),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _driver?['DriverName'] ?? '—',
-                    style: GoogleFonts.cairo(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: DriverTheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        body: _buildTab(),
-        bottomNavigationBar: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 20,
-                offset: const Offset(0, -4),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final itemWidth = constraints.maxWidth / _tabs.length;
-                  return Row(
-                    children: List.generate(
-                      _tabs.length,
-                      (i) => _NavItem(
-                        width: itemWidth,
-                        icon: _tabs[i].icon,
-                        label: _tabs[i].label,
-                        isSelected: _index == i,
-                        onTap: () => setState(() => _index = i),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final double width;
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.width,
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: SizedBox(
-        width: width,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-          decoration: BoxDecoration(
-            color: isSelected ? DriverTheme.primary.withValues(alpha: 0.12) : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-          ),
+        body: DriverUiKit.pageBackground(
+          accent: tab.accent,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(
-                icon,
-                size: 24,
-                color: isSelected ? DriverTheme.primary : DriverTheme.onSurfaceVariant,
+              DriverUiKit.heroHeader(
+                title: tab.title,
+                subtitle: tab.subtitle,
+                icon: tab.activeIcon,
+                accent: tab.accent,
+                badge: driverName,
               ),
-              const SizedBox(height: 4),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  style: GoogleFonts.cairo(
-                    fontSize: 11,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected ? DriverTheme.primary : DriverTheme.onSurfaceVariant,
-                  ),
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOutCubic,
+                  child: KeyedSubtree(key: ValueKey(_index), child: _buildTab()),
                 ),
               ),
             ],
           ),
+        ),
+        bottomNavigationBar: DriverBottomNav(
+          tabs: _tabs,
+          selectedIndex: _index,
+          onSelected: (i) => setState(() => _index = i),
         ),
       ),
     );

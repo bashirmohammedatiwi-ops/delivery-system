@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../services/employee_api.dart';
 import 'employee_login_screen.dart';
 import 'employee_main_screen.dart';
+import 'employee_theme.dart';
 
 class EmployeeApp extends StatefulWidget {
   const EmployeeApp({super.key});
@@ -42,8 +43,29 @@ class _EmployeeAppState extends State<EmployeeApp> {
   @override
   Widget build(BuildContext context) {
     if (!_checked) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: EmployeeTheme.surface,
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: EmployeeTheme.primaryGradient,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(Icons.badge_rounded, color: Colors.white, size: 32),
+                ),
+                const SizedBox(height: 20),
+                const CircularProgressIndicator(color: EmployeeTheme.primary),
+              ],
+            ),
+          ),
+        ),
       );
     }
     return _loggedIn

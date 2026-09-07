@@ -119,6 +119,7 @@ async function renderNewOrder(container) {
                 <div class="form-group">
                     <label>هاتف المستلم <span class="required">*</span></label>
                     <input type="tel" id="customerPhone" placeholder="07701234567" required>
+                    <div id="phoneLookupHint" class="phone-lookup-hint" style="display:none" role="status"></div>
                 </div>
                 <div class="form-group">
                     <label>المنطقة <span class="required">*</span></label>
@@ -267,6 +268,79 @@ async function renderNewOrder(container) {
                 if (r) applyRegionSelection(r);
             }
         });
+
+        const phoneEl = document.getElementById('customerPhone');
+        const hintEl = document.getElementById('phoneLookupHint');
+        let lastLookupDigits = '';
+        let lookupTimer = null;
+
+        const hidePhoneHint = () => {
+            if (!hintEl) return;
+            hintEl.style.display = 'none';
+            hintEl.textContent = '';
+        };
+
+        const showPhoneHint = (msg) => {
+            if (!hintEl) return;
+            hintEl.textContent = msg;
+            hintEl.style.display = 'block';
+        };
+
+        const resolveRegionFromLookup = (data) => {
+            if (data.regionId) {
+                const byId = regions.find(x => x.RegionID == data.regionId);
+                if (byId) return byId;
+            }
+            if (data.regionName) {
+                const name = data.regionName.trim().toLowerCase();
+                return regions.find(r => (r.RegionName || '').trim().toLowerCase() === name);
+            }
+            return null;
+        };
+
+        const applyPhoneLookup = async () => {
+            const phone = (phoneEl?.value || '').trim();
+            const digits = phone.replace(/\D/g, '');
+            if (digits.length !== 11) {
+                if (digits.length < 11) lastLookupDigits = '';
+                hidePhoneHint();
+                return;
+            }
+            if (digits === lastLookupDigits) return;
+
+            try {
+                const data = await window.api.customers.lookupByPhone(phone);
+                lastLookupDigits = digits;
+                if (!data?.found) {
+                    hidePhoneHint();
+                    return;
+                }
+
+                const addrEl = document.getElementById('address');
+                if (data.address && addrEl) addrEl.value = data.address;
+
+                const nameEl = document.getElementById('customerName');
+                if (data.customerName && nameEl && !nameEl.value.trim()) nameEl.value = data.customerName;
+
+                const region = resolveRegionFromLookup(data);
+                if (region) applyRegionSelection(region);
+
+                showPhoneHint('تم جلب العنوان والمنطقة من آخر طلب — يمكنك تعديلها');
+            } catch (_) {
+                hidePhoneHint();
+            }
+        };
+
+        phoneEl?.addEventListener('input', () => {
+            const digits = (phoneEl.value || '').replace(/\D/g, '');
+            if (digits.length !== 11) {
+                lastLookupDigits = '';
+                hidePhoneHint();
+            }
+            clearTimeout(lookupTimer);
+            if (digits.length === 11) lookupTimer = setTimeout(applyPhoneLookup, 450);
+        });
+        phoneEl?.addEventListener('blur', applyPhoneLookup);
     })();
     document.getElementById('amount')?.addEventListener('input', () => updateOrderTotal(true));
     document.getElementById('amount')?.addEventListener('change', () => updateOrderTotal(true));

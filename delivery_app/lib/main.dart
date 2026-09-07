@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'screens/entry_screen.dart';
 import 'screens/driver/driver_app.dart';
 import 'screens/employee/employee_app.dart';
+import 'screens/employee/employee_theme.dart';
 import 'screens/privacy_screen.dart';
 
 void main() async {
@@ -34,11 +35,7 @@ class DeliveryApp extends StatelessWidget {
     return MaterialApp(
       title: 'ديما الحياة - نظام التوصيل',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7C3AED)),
-        useMaterial3: true,
-        fontFamily: 'Cairo',
-      ),
+      theme: EmployeeTheme.materialTheme(),
       home: const EntryScreen(),
       routes: {
         '/driver': (ctx) => const DriverApp(),

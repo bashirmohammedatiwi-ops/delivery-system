@@ -110,6 +110,9 @@ window.api = {
     regions: {
         getAll: () => apiGet('/api/regions')
     },
+    customers: {
+        lookupByPhone: (phone) => apiGet('/api/customers/lookup?phone=' + encodeURIComponent(phone || ''))
+    },
     settings: {
         getDefaults: () => apiGet('/api/settings/defaults')
     }

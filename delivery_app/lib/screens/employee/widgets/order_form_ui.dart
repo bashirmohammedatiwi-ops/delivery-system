@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../employee_theme.dart';
+import '../employee_ui_kit.dart';
 
 const _gap = 10.0;
 const _radius = 14.0;
@@ -564,52 +565,88 @@ class _RegionPickerSheetState extends State<_RegionPickerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final h = MediaQuery.of(context).size.height * 0.7;
+    final h = MediaQuery.of(context).size.height * 0.72;
     return Container(
       height: h,
       decoration: BoxDecoration(
-        color: EmployeeTheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        color: EmployeeTheme.surfaceVariant,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(EmployeeTheme.radiusXl)),
+        boxShadow: EmployeeTheme.cardShadow,
       ),
       child: Column(
         children: [
-          const SizedBox(height: 8),
-          Container(width: 36, height: 4, decoration: BoxDecoration(color: EmployeeTheme.outline, borderRadius: BorderRadius.circular(2))),
+          const SizedBox(height: 10),
+          Container(width: 44, height: 4, decoration: BoxDecoration(color: EmployeeTheme.outline, borderRadius: BorderRadius.circular(2))),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-            child: Text('اختر المنطقة', style: GoogleFonts.cairo(fontSize: 17, fontWeight: FontWeight.w700)),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: EmployeeTheme.secondary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.location_on_rounded, color: EmployeeTheme.secondary, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: Text('اختر المنطقة', style: EmployeeTheme.titleMedium)),
+              ],
+            ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               controller: _search,
-              decoration: OrderFormUi.field('بحث', hint: 'اسم المنطقة'),
+              decoration: EmployeeTheme.inputDecoration(
+                label: 'بحث',
+                hint: 'اسم المنطقة أو المنطقة الجغرافية',
+                prefixIcon: const Icon(Icons.search_rounded),
+              ),
               style: GoogleFonts.cairo(fontSize: 15),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Expanded(
             child: _filtered.isEmpty
-                ? Center(child: Text('لا توجد مناطق', style: GoogleFonts.cairo(color: EmployeeTheme.onSurfaceVariant)))
+                ? EmployeeUiKit.emptyState(
+                    icon: Icons.location_off_outlined,
+                    title: 'لا توجد مناطق',
+                    subtitle: 'جرّب كلمة بحث أخرى',
+                    accent: EmployeeTheme.secondary,
+                  )
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                     itemCount: _filtered.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
                     itemBuilder: (_, i) {
                       final m = _filtered[i] as Map<String, dynamic>;
                       final id = m['RegionID'] as int?;
                       final name = m['RegionName']?.toString() ?? '';
                       final fee = (m['DeliveryFeeIQD'] ?? m['DeliveryFee'] ?? 0) as num;
                       final selected = id != null && id == widget.selectedId;
-                      return ListTile(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(_radius),
-                          side: BorderSide(color: selected ? EmployeeTheme.primary : EmployeeTheme.outline),
+                      return Material(
+                        color: selected ? EmployeeTheme.secondary.withValues(alpha: 0.08) : Colors.white,
+                        borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
+                        child: InkWell(
+                          onTap: () => Navigator.pop(context, m),
+                          borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
+                              border: Border.all(color: selected ? EmployeeTheme.secondary : EmployeeTheme.outline),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(name, style: GoogleFonts.cairo(fontWeight: FontWeight.w700, fontSize: 15)),
+                                ),
+                                EmployeeUiKit.statusChip(OrderFormUi.formatIQD(fee), EmployeeTheme.secondary),
+                              ],
+                            ),
+                          ),
                         ),
-                        tileColor: selected ? EmployeeTheme.primary.withValues(alpha: 0.06) : Colors.white,
-                        title: Text(name, style: GoogleFonts.cairo(fontWeight: FontWeight.w600)),
-                        trailing: Text(OrderFormUi.formatIQD(fee), style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
-                        onTap: () => Navigator.pop(context, m),
                       );
                     },
                   ),

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../services/driver_api.dart';
 import '../driver_app.dart';
 import '../driver_theme.dart';
+import '../driver_ui_kit.dart';
 
 class DriverHistoryTab extends StatefulWidget {
   const DriverHistoryTab({super.key});
@@ -61,153 +62,124 @@ class _DriverHistoryTabState extends State<DriverHistoryTab> {
 
   @override
   Widget build(BuildContext context) {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final dateLabel = DateFormat('yMMMd', 'ar_IQ').format(DateTime.tryParse('$_date 12:00:00') ?? DateTime.now());
+
     return Column(
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          margin: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: DriverTheme.outline.withValues(alpha: 0.5)),
-            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(
-                onPressed: () {
-                  setState(() => _date = _addDays(_date, -1));
-                  _load();
-                },
-                icon: const Icon(Icons.chevron_right_rounded),
-              ),
-              Text(
-                DateFormat('yMMMd', 'ar_IQ').format(DateTime.tryParse('$_date 12:00:00') ?? DateTime.now()),
-                style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w800),
-              ),
-              IconButton(
-                onPressed: _date == DateFormat('yyyy-MM-dd').format(DateTime.now())
-                    ? null
-                    : () {
-                        setState(() => _date = _addDays(_date, 1));
-                        _load();
-                      },
-                icon: const Icon(Icons.chevron_left_rounded),
-              ),
-            ],
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: DriverUiKit.dateNavigator(
+            label: dateLabel,
+            onPrev: () {
+              setState(() => _date = _addDays(_date, -1));
+              _load();
+            },
+            onNext: _date == today
+                ? null
+                : () {
+                    setState(() => _date = _addDays(_date, 1));
+                    _load();
+                  },
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: SegmentedButton<bool>(
-            segments: const [
-              ButtonSegment(value: true, label: Text('الموصّل'), icon: Icon(Icons.check_circle_rounded, size: 20)),
-              ButtonSegment(value: false, label: Text('المراجع'), icon: Icon(Icons.undo_rounded, size: 20)),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+          child: DriverUiKit.segmentPills<bool>(
+            options: const [
+              (true, 'الموصّل', Icons.check_circle_rounded),
+              (false, 'المراجع', Icons.undo_rounded),
             ],
-            selected: {_showDelivered},
-            onSelectionChanged: (s) {
+            selected: _showDelivered,
+            onChanged: (v) {
               setState(() {
-                _showDelivered = s.first;
+                _showDelivered = v;
                 _load();
               });
             },
+            accent: _showDelivered ? DriverTheme.success : DriverTheme.danger,
           ),
         ),
         if (_stats?['assigned'] != null && (_stats!['assigned'] as num).toInt() > 0) ...[
-          const SizedBox(height: 12),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: [DriverTheme.primary, DriverTheme.primaryDark]),
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [BoxShadow(color: DriverTheme.primary.withValues(alpha: 0.35), blurRadius: 12, offset: const Offset(0, 4))],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: DriverUiKit.infoBanner(
+              message: 'طلبات لم تُوصَّل بعد: ${_stats!['assigned']}',
+              color: DriverTheme.warning,
+              icon: Icons.info_outline_rounded,
             ),
+          ),
+        ],
+        if (!_loading && _orders.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.info_outline_rounded, color: Colors.white, size: 22),
+                DriverUiKit.statTile(
+                  label: _showDelivered ? 'موصّل' : 'راجع',
+                  value: '${_orders.length}',
+                  icon: _showDelivered ? Icons.check_circle_rounded : Icons.undo_rounded,
+                  color: _showDelivered ? DriverTheme.success : DriverTheme.danger,
+                ),
                 const SizedBox(width: 10),
-                Text('طلبات لم توصل: ${_stats!['assigned']}', style: GoogleFonts.cairo(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                DriverUiKit.statTile(
+                  label: 'التاريخ',
+                  value: _date.split('-').reversed.take(2).join('/'),
+                  icon: Icons.calendar_today_rounded,
+                  color: DriverTheme.info,
+                ),
               ],
             ),
           ),
         ],
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         Expanded(
           child: _loading
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(width: 48, height: 48, child: CircularProgressIndicator(strokeWidth: 3, color: DriverTheme.primary)),
-                      const SizedBox(height: 20),
-                      Text('جاري التحميل...', style: DriverTheme.bodyMedium),
-                    ],
-                  ),
-                )
+              ? DriverUiKit.skeletonList(count: 5)
               : _orders.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.history_rounded, size: 64, color: DriverTheme.primary.withValues(alpha: 0.4)),
-                          const SizedBox(height: 16),
-                          Text(_showDelivered ? 'لا توجد طلبات موصّلة' : 'لا توجد طلبات مرتجعة', style: DriverTheme.titleMedium),
-                        ],
-                      ),
+                  ? DriverUiKit.emptyState(
+                      icon: Icons.history_rounded,
+                      title: _showDelivered ? 'لا توجد طلبات موصّلة' : 'لا توجد طلبات مرتجعة',
+                      subtitle: 'جرّب تاريخاً آخر',
+                      accent: DriverTheme.info,
                     )
                   : RefreshIndicator(
                       onRefresh: _load,
                       color: DriverTheme.primary,
                       child: ListView.builder(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                         itemCount: _orders.length,
                         itemBuilder: (_, i) {
                           final o = _orders[i] as Map<String, dynamic>;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: DriverTheme.outline.withValues(alpha: 0.5)),
-                              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
-                            ),
+                          final accent = _showDelivered ? DriverTheme.success : DriverTheme.danger;
+                          return DriverUiKit.listCard(
+                            accent: accent,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text('#${o['ShipmentNumber']}', style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: DriverTheme.primary, fontSize: 16)),
+                                    Expanded(
+                                      child: Text('#${o['ShipmentNumber']}', style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: DriverTheme.primary, fontSize: 16)),
+                                    ),
                                     if (_showDelivered)
                                       Text(formatIQD(o['TotalIQD'] ?? o['totaliqd']), style: GoogleFonts.cairo(fontWeight: FontWeight.w700, color: DriverTheme.success)),
                                   ],
                                 ),
                                 const SizedBox(height: 8),
-                                Text(o['CustomerName'] ?? '—', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w600)),
-                                if (o['Address'] != null)
-                                  Text(
-                                    (o['Address'] as String).length > 80 ? '${(o['Address'] as String).substring(0, 80)}...' : (o['Address'] ?? '—'),
-                                    style: GoogleFonts.cairo(fontSize: 13, color: DriverTheme.onSurfaceVariant),
-                                  ),
-                                if (o['RegionName'] != null)
-                                  Text(o['RegionName'] ?? '', style: GoogleFonts.cairo(fontSize: 12, color: DriverTheme.onSurfaceVariant)),
-                                if (!_showDelivered && o['ReturnReason'] != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 8),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.error_outline_rounded, size: 16, color: DriverTheme.danger),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text('سبب الإرجاع: ${o['ReturnReason']}', style: GoogleFonts.cairo(fontSize: 13, color: DriverTheme.danger, fontWeight: FontWeight.w600)),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                Text(o['CustomerName'] ?? '—', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700)),
+                                if (o['Address'] != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text('${o['Address']}', style: GoogleFonts.cairo(fontSize: 12, color: DriverTheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                ],
+                                if (o['RegionName'] != null) ...[
+                                  const SizedBox(height: 6),
+                                  DriverUiKit.statusChip('${o['RegionName']}', DriverTheme.secondary),
+                                ],
+                                if (!_showDelivered && o['ReturnReason'] != null) ...[
+                                  const SizedBox(height: 10),
+                                  DriverUiKit.infoBanner(message: 'سبب الإرجاع: ${o['ReturnReason']}', color: DriverTheme.danger, icon: Icons.error_outline_rounded),
+                                ],
                                 const SizedBox(height: 8),
                                 Row(
                                   children: [

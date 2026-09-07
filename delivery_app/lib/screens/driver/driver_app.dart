@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../../services/driver_api.dart';
 import 'driver_login_screen.dart';
 import 'driver_main_screen.dart';
+import 'driver_theme.dart';
 
 class DriverApp extends StatefulWidget {
   const DriverApp({super.key});
@@ -36,8 +37,26 @@ class _DriverAppState extends State<DriverApp> {
   @override
   Widget build(BuildContext context) {
     if (!_checked) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        backgroundColor: DriverTheme.surface,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  gradient: DriverTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Icon(Icons.local_shipping_rounded, color: Colors.white, size: 32),
+              ),
+              const SizedBox(height: 20),
+              const CircularProgressIndicator(color: DriverTheme.primary),
+            ],
+          ),
+        ),
       );
     }
     return _loggedIn

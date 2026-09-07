@@ -165,6 +165,10 @@ window.api = {
         delete: (id) => apiDelete('/api/regions/' + id)
     },
 
+    customers: {
+        lookupByPhone: (phone) => apiGet('/api/customers/lookup?phone=' + encodeURIComponent(phone || ''))
+    },
+
     users: {
         getAll: () => apiGet('/api/users'),
         create: (username, password, displayName, role, secretCode) => apiPost('/api/users', { username, password, displayName, role, secretCode }),

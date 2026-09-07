@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../services/employee_api.dart';
 import 'employee_theme.dart';
+import 'employee_ui_kit.dart';
 
 class EmployeeLoginScreen extends StatelessWidget {
   final VoidCallback onLoggedIn;
@@ -13,79 +14,69 @@ class EmployeeLoginScreen extends StatelessWidget {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        extendBodyBehindAppBar: true,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          iconTheme: const IconThemeData(color: Color(0xFF312E81)),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            tooltip: 'رجوع',
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
-        ),
-        body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Color(0xFFEDE9FE),
-                Color(0xFFF8FAFC),
-              ],
-            ),
-          ),
+        body: EmployeeUiKit.pageBackground(
           child: SafeArea(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(22),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF9333EA)],
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_forward_rounded),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: EmployeeTheme.onSurface,
+                      ),
                     ),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0x338B5CF6),
-                        blurRadius: 26,
-                        offset: const Offset(0, 8),
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Container(
+                      width: 96,
+                      height: 96,
+                      decoration: BoxDecoration(
+                        gradient: EmployeeTheme.primaryGradient,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: EmployeeTheme.shadowFor(EmployeeTheme.primary),
+                        border: Border.all(color: Colors.white, width: 3),
+                      ),
+                      child: const Icon(Icons.badge_rounded, size: 48, color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'تطبيق الموظفين',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.cairo(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w800,
+                      color: EmployeeTheme.onSurface,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'نظام التوصيل — ديما الحياة',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.cairo(fontSize: 15, color: EmployeeTheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 36),
+                  _LoginForm(onLoggedIn: onLoggedIn),
+                  const SizedBox(height: 24),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.verified_user_outlined, size: 16, color: EmployeeTheme.onSurfaceVariant),
+                      const SizedBox(width: 6),
+                      Text(
+                        'اتصال آمن مع السيرفر',
+                        style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant),
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.description_rounded,
-                    size: 60,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'تطبيق الموظفين',
-                  style: GoogleFonts.cairo(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF312E81),
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'نظام التوصيل — ديما الحياة',
-                  style: GoogleFonts.cairo(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 56),
-                _LoginForm(onLoggedIn: onLoggedIn),
                 ],
               ),
             ),
@@ -110,6 +101,7 @@ class _LoginFormState extends State<_LoginForm> {
   final _password = TextEditingController();
   String? _error;
   bool _loading = false;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -140,8 +132,7 @@ class _LoginFormState extends State<_LoginForm> {
       }
     } catch (e) {
       final msg = e.toString().replaceFirst('Exception: ', '');
-      final friendly = (msg.contains('CERTIFICATE_VERIFY_FAILED') ||
-              msg.contains('Handshake error'))
+      final friendly = (msg.contains('CERTIFICATE_VERIFY_FAILED') || msg.contains('Handshake error'))
           ? 'شهادة أمان السيرفر منتهية أو غير صالحة. يجب تجديد HTTPS على السيرفر.'
           : msg;
       setState(() => _error = friendly);
@@ -153,86 +144,74 @@ class _LoginFormState extends State<_LoginForm> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0x14000000),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(EmployeeTheme.radiusXl),
+        border: Border.all(color: EmployeeTheme.outline),
+        boxShadow: EmployeeTheme.cardShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('تسجيل الدخول', style: EmployeeTheme.titleLarge.copyWith(color: EmployeeTheme.onSurface)),
-          const SizedBox(height: 28),
+          Text('تسجيل الدخول', style: EmployeeTheme.titleLarge.copyWith(fontSize: 20)),
+          const SizedBox(height: 6),
+          Text('أدخل بيانات حسابك للمتابعة', style: EmployeeTheme.bodyMedium),
+          const SizedBox(height: 24),
           TextField(
             controller: _username,
-            decoration: EmployeeTheme.inputDecoration(label: 'اسم المستخدم', hint: 'أدخل اسم المستخدم'),
+            decoration: EmployeeTheme.inputDecoration(
+              label: 'اسم المستخدم',
+              hint: 'username',
+              prefixIcon: const Icon(Icons.person_outline_rounded, size: 22),
+            ),
             textInputAction: TextInputAction.next,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           TextField(
             controller: _password,
-            obscureText: true,
-            decoration: EmployeeTheme.inputDecoration(label: 'كلمة المرور', hint: 'أدخل كلمة المرور'),
+            obscureText: _obscure,
+            decoration: EmployeeTheme.inputDecoration(
+              label: 'كلمة المرور',
+              hint: '••••••••',
+              prefixIcon: const Icon(Icons.lock_outline_rounded, size: 22),
+              suffixIcon: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined, size: 22),
+              ),
+            ),
             onSubmitted: (_) => _login(),
           ),
           if (_error != null) ...[
             const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: EmployeeTheme.danger.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: EmployeeTheme.danger.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error_outline, size: 20, color: EmployeeTheme.danger),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(_error!, style: TextStyle(color: EmployeeTheme.danger, fontWeight: FontWeight.w600))),
-                ],
-              ),
-            ),
+            EmployeeUiKit.infoBanner(message: _error!, color: EmployeeTheme.danger, icon: Icons.error_outline_rounded),
           ],
-          const SizedBox(height: 28),
-          Container(
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7C3AED), Color(0xFF9333EA)],
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 54,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: EmployeeTheme.primaryGradient,
+                borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
+                boxShadow: EmployeeTheme.shadowFor(EmployeeTheme.primary),
               ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _loading ? null : _login,
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  alignment: Alignment.center,
-                  child: _loading
-                      ? const SizedBox(
-                          height: 24,
-                          width: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _loading ? null : _login,
+                  borderRadius: BorderRadius.circular(EmployeeTheme.radiusMd),
+                  child: Center(
+                    child: _loading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : Text(
+                            'دخول',
+                            style: GoogleFonts.cairo(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.white),
                           ),
-                        )
-                      : Text(
-                          'دخول',
-                          style: GoogleFonts.cairo(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
+                  ),
                 ),
               ),
             ),

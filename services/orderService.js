@@ -570,6 +570,41 @@ function getCustomerPhoneStats(customerPhone) {
     };
 }
 
+/** آخر طلب لنفس الهاتف — لتعبئة العنوان والمنطقة تلقائياً */
+function getCustomerLookupByPhone(customerPhone) {
+    const database = db.getDatabase();
+    const digits = String(customerPhone || '').replace(/\D/g, '');
+    if (!digits || digits.length < 10) return { found: false };
+    const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
+
+    const row = database.prepare(`
+        SELECT o.CustomerName, o.Address, o.RegionID, o.CustomerLocationLink,
+               r.RegionName, r.RegionArea, r.DeliveryFeeIQD
+        FROM Orders o
+        LEFT JOIN Regions r ON o.RegionID = r.RegionID
+        WHERE o.CustomerPhone IS NOT NULL AND TRIM(o.CustomerPhone) != ''
+          AND (
+            REPLACE(REPLACE(REPLACE(o.CustomerPhone, ' ', ''), '-', ''), '+', '') LIKE ?
+            OR REPLACE(REPLACE(REPLACE(o.CustomerPhone, ' ', ''), '-', ''), '+', '') LIKE ?
+          )
+        ORDER BY o.OrderID DESC
+        LIMIT 1
+    `).get(`%${last10}`, `%${digits}`);
+
+    if (!row) return { found: false };
+
+    return {
+        found: true,
+        customerName: row.CustomerName || '',
+        address: row.Address || '',
+        regionId: row.RegionID || null,
+        regionName: row.RegionName || '',
+        regionArea: row.RegionArea || '',
+        deliveryFeeIQD: row.DeliveryFeeIQD || 0,
+        customerLocationLink: row.CustomerLocationLink || ''
+    };
+}
+
 let dashboardStatsCache = { key: '', data: null, ts: 0 };
 const DASHBOARD_STATS_CACHE_MS = 30000;
 
@@ -644,6 +679,7 @@ module.exports = {
     getDriverReturnedOrders,
     markReturnedOrderReceived,
     getCustomerPhoneStats,
+    getCustomerLookupByPhone,
     getDashboardStats,
     invalidateDashboardStatsCache,
     getPendingOrdersByArea,

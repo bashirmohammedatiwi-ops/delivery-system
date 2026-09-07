@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'dart:typed_data';
 import '../../../services/employee_api.dart';
 import '../employee_theme.dart';
+import '../employee_ui_kit.dart';
 import '../../../utils/open_pdf_bytes/open_pdf_bytes.dart';
 import '../../../utils/order_label_printed.dart';
 import '../widgets/order_form_ui.dart';
@@ -26,6 +27,7 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
   List<Map<String, dynamic>> _allOrders = [];
   final _search = TextEditingController();
   String _searchQuery = '';
+  String? _statusFilter;
   Timer? _searchDebounce;
   bool _loading = true;
   bool _refreshing = false;
@@ -125,7 +127,17 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
     }).toList();
   }
 
-  List<Map<String, dynamic>> get _visibleOrders => _applyFilter(_searchQuery, _allOrders);
+  List<Map<String, dynamic>> get _visibleOrders {
+    var list = _applyFilter(_searchQuery, _allOrders);
+    if (_statusFilter != null && _statusFilter!.isNotEmpty) {
+      list = list.where((m) => m['Status']?.toString() == _statusFilter).toList();
+    }
+    return list;
+  }
+
+  int get _printedCount => _visibleOrders.where((o) => isOrderLabelPrinted(o)).length;
+
+  int get _unprintedCount => _visibleOrders.length - _printedCount;
 
   bool get _isSearching => _searchQuery.trim().isNotEmpty;
 
@@ -231,25 +243,83 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: TextField(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: Row(
+            children: [
+              EmployeeUiKit.statTile(
+                label: 'المعروض',
+                value: '${visible.length}',
+                icon: Icons.receipt_long_rounded,
+                color: EmployeeTheme.primary,
+              ),
+              const SizedBox(width: 10),
+              EmployeeUiKit.statTile(
+                label: 'مطبوع',
+                value: '$_printedCount',
+                icon: Icons.print_rounded,
+                color: EmployeeTheme.success,
+              ),
+              const SizedBox(width: 10),
+              EmployeeUiKit.statTile(
+                label: 'غير مطبوع',
+                value: '$_unprintedCount',
+                icon: Icons.print_disabled_rounded,
+                color: EmployeeTheme.warning,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              EmployeeUiKit.filterChip(
+                label: 'الكل',
+                selected: _statusFilter == null,
+                accent: EmployeeTheme.primary,
+                onTap: () => setState(() => _statusFilter = null),
+              ),
+              EmployeeUiKit.filterChip(
+                label: 'جديد',
+                selected: _statusFilter == 'New',
+                accent: EmployeeTheme.info,
+                onTap: () => setState(() => _statusFilter = 'New'),
+              ),
+              EmployeeUiKit.filterChip(
+                label: 'مع السائق',
+                selected: _statusFilter == 'AssignedToDriver',
+                accent: EmployeeTheme.primary,
+                onTap: () => setState(() => _statusFilter = 'AssignedToDriver'),
+              ),
+              EmployeeUiKit.filterChip(
+                label: 'تم التوصيل',
+                selected: _statusFilter == 'Delivered',
+                accent: EmployeeTheme.success,
+                onTap: () => setState(() => _statusFilter = 'Delivered'),
+              ),
+              EmployeeUiKit.filterChip(
+                label: 'راجع',
+                selected: _statusFilter == 'Returned',
+                accent: EmployeeTheme.warning,
+                onTap: () => setState(() => _statusFilter = 'Returned'),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          child: EmployeeUiKit.searchBar(
             controller: _search,
-            decoration: EmployeeTheme.inputDecoration(
-              label: 'بحث',
-              hint: 'رقم الشحنة، الاسم، الهاتف، العنوان...',
-              prefixIcon: const Icon(Icons.search_rounded),
-              suffixIcon: _search.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () {
-                        _search.clear();
-                        _searchQuery = '';
-                        setState(() {});
-                      },
-                    )
-                  : null,
-            ),
+            hint: 'رقم الشحنة، الاسم، الهاتف، العنوان...',
             onChanged: _onSearchChanged,
+            onClear: () {
+              _search.clear();
+              _searchQuery = '';
+              setState(() {});
+            },
           ),
         ),
         if (_refreshing)
@@ -263,66 +333,30 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
 
   Widget _buildBody(List<Map<String, dynamic>> visible) {
     if (_loading) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: CircularProgressIndicator(strokeWidth: 3, color: EmployeeTheme.primary),
-            ),
-            const SizedBox(height: 20),
-            Text('جاري التحميل...', style: EmployeeTheme.bodyMedium),
-          ],
-        ),
-      );
+      return EmployeeUiKit.skeletonList();
     }
 
     if (_loadError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.cloud_off_rounded, size: 48, color: EmployeeTheme.danger.withValues(alpha: 0.7)),
-              const SizedBox(height: 16),
-              Text('تعذّر تحميل الطلبات', style: EmployeeTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(_loadError!, style: EmployeeTheme.bodyMedium, textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: _load,
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('إعادة المحاولة'),
-                style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
-              ),
-            ],
-          ),
+      return EmployeeUiKit.emptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'تعذّر تحميل الطلبات',
+        subtitle: _loadError!,
+        accent: EmployeeTheme.danger,
+        action: FilledButton.icon(
+          onPressed: _load,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('إعادة المحاولة'),
+          style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
         ),
       );
     }
 
     if (visible.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.receipt_long_rounded, size: 64, color: EmployeeTheme.primary.withValues(alpha: 0.4)),
-              const SizedBox(height: 20),
-              Text('لا توجد طلبات', style: EmployeeTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text(
-                _isSearching ? 'جرّب كلمات بحث مختلفة' : 'ستظهر الطلبات هنا',
-                style: EmployeeTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
+      return EmployeeUiKit.emptyState(
+        icon: Icons.receipt_long_rounded,
+        title: 'لا توجد طلبات',
+        subtitle: _isSearching || _statusFilter != null ? 'جرّب تغيير البحث أو الفلتر' : 'ستظهر الطلبات هنا',
+        accent: EmployeeTheme.primary,
       );
     }
 
@@ -354,125 +388,138 @@ class _EmpOrdersTabState extends State<EmpOrdersTab> {
     final notesText = o['Notes']?.toString().trim() ?? '';
 
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(EmployeeTheme.radiusLg),
         border: Border.all(color: EmployeeTheme.outline),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4))],
+        boxShadow: EmployeeTheme.cardShadow,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(EmployeeTheme.radiusLg),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [EmployeeTheme.primary, EmployeeTheme.primaryDark]),
-                  borderRadius: BorderRadius.circular(9),
-                ),
-                child: Text(
-                  '#${o['ShipmentNumber'] ?? ''}',
-                  style: GoogleFonts.roboto(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 13),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(status, style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor)),
-              ),
-              const Spacer(),
-              Text(_formatIQD(total), style: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 15, color: EmployeeTheme.primary)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(name?.isNotEmpty == true ? name! : '—', style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700)),
-          if (phone.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(phone, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
-          ],
-          if (region.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(region, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
-          ],
-          if (address.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(address, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant), maxLines: 2, overflow: TextOverflow.ellipsis),
-          ],
-          if (notesText.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: EmployeeTheme.primary.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: EmployeeTheme.primary.withValues(alpha: 0.15)),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.notes_rounded, size: 16, color: EmployeeTheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      notesText,
-                      style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600, color: EmployeeTheme.onSurface),
-                    ),
+              Container(width: 5, color: statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            decoration: BoxDecoration(
+                              gradient: EmployeeTheme.primaryGradient,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '#${o['ShipmentNumber'] ?? ''}',
+                              style: GoogleFonts.roboto(fontWeight: FontWeight.w800, color: Colors.white, fontSize: 13),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          EmployeeUiKit.statusChip(status, statusColor),
+                          const Spacer(),
+                          Text(
+                            _formatIQD(total),
+                            style: GoogleFonts.cairo(fontWeight: FontWeight.w800, fontSize: 15, color: EmployeeTheme.primary),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(name?.isNotEmpty == true ? name! : '—', style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800)),
+                      if (phone.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.phone_outlined, size: 14, color: EmployeeTheme.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Text(phone, style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      ],
+                      if (region.isNotEmpty || address.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 14, color: EmployeeTheme.secondary),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                [if (region.isNotEmpty) region, if (address.isNotEmpty) address].join(' · '),
+                                style: GoogleFonts.cairo(fontSize: 12, color: EmployeeTheme.onSurfaceVariant),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (notesText.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        EmployeeUiKit.infoBanner(
+                          message: notesText,
+                          color: EmployeeTheme.primary,
+                          icon: Icons.notes_rounded,
+                        ),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          EmployeeUiKit.statusChip(
+                            free ? 'توصيل مجاني' : _formatIQD(deliveryFee),
+                            free ? EmployeeTheme.success : EmployeeTheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          EmployeeUiKit.statusChip(
+                            labelPrinted ? 'مطبوع' : 'لم يُطبع',
+                            labelPrinted ? EmployeeTheme.success : EmployeeTheme.warning,
+                          ),
+                        ],
+                      ),
+                      if (o['CreatedDate'] != null) ...[
+                        const SizedBox(height: 8),
+                        Text('${o['CreatedDate']}', style: GoogleFonts.cairo(fontSize: 11, color: EmployeeTheme.onSurfaceVariant)),
+                      ],
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showEditModal(o),
+                              icon: const Icon(Icons.edit_rounded, size: 18),
+                              label: const Text('تعديل'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: EmployeeTheme.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () => _printOrder(o),
+                              icon: const Icon(Icons.print_rounded, size: 18),
+                              label: const Text('طباعة'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: EmployeeTheme.primary,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          Text(
-            free ? 'توصيل مجاني' : 'أجرة التوصيل: ${_formatIQD(deliveryFee)}',
-            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w600, color: free ? EmployeeTheme.success : EmployeeTheme.onSurfaceVariant),
-          ),
-          if (o['CreatedDate'] != null) ...[
-            const SizedBox(height: 4),
-            Text('${o['CreatedDate']}', style: GoogleFonts.cairo(fontSize: 11, color: EmployeeTheme.onSurfaceVariant)),
-          ],
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: labelPrinted ? EmployeeTheme.success.withValues(alpha: 0.1) : EmployeeTheme.warning.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              labelPrinted ? '✓ تم الطباعة' : 'لم يُطبع',
-              style: GoogleFonts.cairo(fontSize: 11, fontWeight: FontWeight.w700, color: labelPrinted ? EmployeeTheme.success : EmployeeTheme.warning),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showEditModal(o),
-                  icon: const Icon(Icons.edit_rounded, size: 18),
-                  label: const Text('تعديل'),
-                  style: OutlinedButton.styleFrom(foregroundColor: EmployeeTheme.primary),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _printOrder(o),
-                  icon: const Icon(Icons.print_rounded, size: 18),
-                  label: const Text('طباعة'),
-                  style: FilledButton.styleFrom(backgroundColor: EmployeeTheme.primary),
                 ),
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

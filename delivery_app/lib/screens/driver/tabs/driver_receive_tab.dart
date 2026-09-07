@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../services/driver_api.dart';
 import '../../../widgets/barcode_scanner_view.dart';
 import '../driver_theme.dart';
+import '../driver_ui_kit.dart';
 
 class DriverReceiveTab extends StatefulWidget {
   final VoidCallback? onReceived;
@@ -19,6 +21,7 @@ class _DriverReceiveTabState extends State<DriverReceiveTab> {
   String? _message;
   bool _isSuccess = false;
   bool _scanning = false;
+  bool _submitting = false;
 
   @override
   void dispose() {
@@ -35,42 +38,86 @@ class _DriverReceiveTabState extends State<DriverReceiveTab> {
       });
       return;
     }
-    setState(() => _message = null);
+    setState(() {
+      _message = null;
+      _submitting = true;
+    });
     try {
+      HapticFeedback.mediumImpact();
       final result = await DriverApi.receiveOrder(n);
       setState(() {
         _message = 'تم استلام الطلب #$n بنجاح';
         _isSuccess = true;
         _controller.clear();
+        _submitting = false;
       });
       widget.onReceived?.call();
       final order = result['order'];
-      if (order != null && order is Map<String, dynamic> && mounted) {
-        Future.delayed(const Duration(milliseconds: 800), () {
-          if (mounted) widget.onShowOrderDetail?.call(order as Map<String, dynamic>);
+      if (order is Map<String, dynamic> && mounted) {
+        Future.delayed(const Duration(milliseconds: 600), () {
+          if (mounted) widget.onShowOrderDetail?.call(order);
         });
       }
     } catch (e) {
       setState(() {
         _message = e.toString().replaceFirst('Exception: ', '');
         _isSuccess = false;
+        _submitting = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [DriverTheme.secondary.withValues(alpha: 0.14), DriverTheme.primary.withValues(alpha: 0.06)],
+              ),
+              borderRadius: BorderRadius.circular(DriverTheme.radiusLg),
+              border: Border.all(color: DriverTheme.secondary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: DriverTheme.secondary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.qr_code_scanner_rounded, color: DriverTheme.secondary, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('استلام شحنة', style: DriverTheme.titleSmall),
+                      Text('امسح الباركود أو أدخل الرقم يدوياً', style: DriverTheme.bodyMedium.copyWith(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
           if (_scanning) ...[
-            Expanded(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(DriverTheme.radiusMd),
               child: BarcodeScannerView(
+                height: 280,
                 primaryColor: DriverTheme.primary,
-                instructionText: 'وجّه الكاميرا نحو الباركود',
+                instructionText: 'وجّه الكاميرا نحو باركود الشحنة',
                 onDetect: (capture) {
-                  for (final b in capture.barcodes) {
+                  final codes = capture.barcodes;
+                  for (final b in codes) {
                     if (b.rawValue != null && b.rawValue!.isNotEmpty) {
                       setState(() => _scanning = false);
                       _receive(b.rawValue!);
@@ -81,118 +128,66 @@ class _DriverReceiveTabState extends State<DriverReceiveTab> {
                 onClose: () => setState(() => _scanning = false),
               ),
             ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => setState(() => _scanning = false),
-                icon: const Icon(Icons.stop_rounded),
-                label: const Text('إيقاف المسح'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: DriverTheme.danger,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => setState(() => _scanning = false),
+              icon: const Icon(Icons.stop_rounded),
+              label: const Text('إيقاف المسح'),
             ),
           ] else ...[
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    DriverTheme.primary.withValues(alpha: 0.1),
-                    DriverTheme.primary.withValues(alpha: 0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: DriverTheme.primary.withValues(alpha: 0.2)),
-              ),
-              child: Column(
-                children: [
-                  Icon(Icons.qr_code_scanner_rounded, size: 72, color: DriverTheme.primary.withValues(alpha: 0.8)),
-                  const SizedBox(height: 16),
-                  Text(
-                    'مسح الباركود',
-                    style: GoogleFonts.cairo(fontSize: 20, fontWeight: FontWeight.w800, color: DriverTheme.onSurface),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'اضغط لتفعيل الكاميرا ومسح رقم الشحنة',
-                    style: GoogleFonts.cairo(fontSize: 14, color: DriverTheme.onSurfaceVariant),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              onPressed: () => setState(() => _scanning = true),
-              icon: const Icon(Icons.qr_code_scanner_rounded, size: 26),
-              label: const Text('تفعيل مسح الباركود'),
-              style: FilledButton.styleFrom(
-                backgroundColor: DriverTheme.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 18),
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                elevation: 2,
-                shadowColor: DriverTheme.primary.withValues(alpha: 0.4),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: Divider(color: DriverTheme.outline, thickness: 1)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('أو أدخل يدوياً', style: GoogleFonts.cairo(fontSize: 14, color: DriverTheme.onSurfaceVariant)),
-                ),
-                Expanded(child: Divider(color: DriverTheme.outline, thickness: 1)),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: _controller,
-              decoration: DriverTheme.inputDecoration(label: 'رقم الشحنة', hint: 'أدخل رقم الشحنة'),
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.cairo(fontSize: 20, fontWeight: FontWeight.w700),
-              onSubmitted: _receive,
-            ),
-            const SizedBox(height: 20),
             SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: () => _receive(_controller.text),
+              height: 56,
+              child: FilledButton.icon(
+                onPressed: () => setState(() => _scanning = true),
+                icon: const Icon(Icons.qr_code_scanner_rounded, size: 26),
+                label: const Text('مسح الباركود بالكاميرا'),
                 style: FilledButton.styleFrom(
                   backgroundColor: DriverTheme.primary,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
                 ),
-                child: const Text('استلام الطلب'),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(child: Divider(color: DriverTheme.outline)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text('أو يدوياً', style: DriverTheme.bodyMedium.copyWith(fontSize: 12)),
+                ),
+                Expanded(child: Divider(color: DriverTheme.outline)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              decoration: DriverTheme.inputDecoration(
+                label: 'رقم الشحنة',
+                hint: '123456',
+                prefixIcon: const Icon(Icons.numbers_rounded, size: 22),
+              ),
+              keyboardType: TextInputType.number,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.roboto(fontSize: 22, fontWeight: FontWeight.w700, color: DriverTheme.primary),
+              onSubmitted: _receive,
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              height: 52,
+              child: FilledButton(
+                onPressed: _submitting ? null : () => _receive(_controller.text),
+                child: _submitting
+                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Text('استلام الطلب'),
               ),
             ),
           ],
           if (_message != null) ...[
-            const SizedBox(height: 24),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: _isSuccess ? DriverTheme.success.withValues(alpha: 0.12) : DriverTheme.danger.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _isSuccess ? DriverTheme.success.withValues(alpha: 0.3) : DriverTheme.danger.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(_isSuccess ? Icons.check_circle_rounded : Icons.error_outline_rounded, color: _isSuccess ? DriverTheme.success : DriverTheme.danger, size: 24),
-                  const SizedBox(width: 14),
-                  Expanded(child: Text(_message!, style: GoogleFonts.cairo(fontWeight: FontWeight.w600, color: _isSuccess ? DriverTheme.success : DriverTheme.danger))),
-                ],
-              ),
+            const SizedBox(height: 16),
+            DriverUiKit.infoBanner(
+              message: _message!,
+              color: _isSuccess ? DriverTheme.success : DriverTheme.danger,
+              icon: _isSuccess ? Icons.check_circle_rounded : Icons.error_outline_rounded,
             ),
           ],
         ],

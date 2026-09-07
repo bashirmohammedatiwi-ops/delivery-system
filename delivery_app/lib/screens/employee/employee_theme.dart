@@ -1,48 +1,106 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// تصميم مميز لتطبيق الموظفين - شركة ديما الحياة
+/// تصميم v2 — تطبيق الموظفين · ديما الحياة
 class EmployeeTheme {
   EmployeeTheme._();
 
-  static const Color primary = Color(0xFF7C3AED);
-  static const Color primaryDark = Color(0xFF6D28D9);
-  static const Color primaryLight = Color(0xFFA78BFA);
+  static const Color primary = Color(0xFF6366F1);
+  static const Color primaryDark = Color(0xFF4F46E5);
+  static const Color primaryLight = Color(0xFFA5B4FC);
+  static const Color secondary = Color(0xFF0D9488);
+  static const Color secondaryLight = Color(0xFF5EEAD4);
   static const Color success = Color(0xFF059669);
   static const Color danger = Color(0xFFE11D48);
   static const Color warning = Color(0xFFD97706);
+  static const Color info = Color(0xFF0284C7);
 
-  static Color get surface => const Color(0xFFF8FAFC);
-  static Color get surfaceVariant => Colors.white;
-  static Color get onSurface => const Color(0xFF334155);
-  static Color get onSurfaceVariant => const Color(0xFF64748B);
-  static Color get outline => const Color(0xFFE2E8F0);
+  static const Color surface = Color(0xFFF1F5F9);
+  static const Color surfaceVariant = Colors.white;
+  static const Color onSurface = Color(0xFF0F172A);
+  static const Color onSurfaceVariant = Color(0xFF64748B);
+  static const Color outline = Color(0xFFE2E8F0);
+  static const Color outlineStrong = Color(0xFFCBD5E1);
 
-  static TextStyle get titleLarge => GoogleFonts.cairo(
-        fontSize: 20,
-        fontWeight: FontWeight.w800,
-        color: onSurface,
+  static const double radiusSm = 12;
+  static const double radiusMd = 16;
+  static const double radiusLg = 22;
+  static const double radiusXl = 28;
+
+  static LinearGradient get primaryGradient => const LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [primary, primaryDark, Color(0xFF4338CA)],
       );
-  static TextStyle get titleMedium => GoogleFonts.cairo(
-        fontSize: 16,
-        fontWeight: FontWeight.w700,
-        color: onSurface,
+
+  static LinearGradient gradientFor(Color accent) => LinearGradient(
+        begin: Alignment.topRight,
+        end: Alignment.bottomLeft,
+        colors: [accent.withValues(alpha: 0.85), accent, accent.withValues(alpha: 0.92)],
       );
-  static TextStyle get bodyLarge => GoogleFonts.cairo(
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
-        color: onSurface,
-      );
-  static TextStyle get bodyMedium => GoogleFonts.cairo(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        color: onSurfaceVariant,
-      );
-  static TextStyle get labelSmall => GoogleFonts.cairo(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: onSurfaceVariant,
-      );
+
+  static List<BoxShadow> get cardShadow => [
+        BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 18, offset: const Offset(0, 6)),
+        BoxShadow(color: primary.withValues(alpha: 0.04), blurRadius: 24, offset: const Offset(0, 10)),
+      ];
+
+  static List<BoxShadow> shadowFor(Color accent) => [
+        BoxShadow(color: accent.withValues(alpha: 0.22), blurRadius: 20, offset: const Offset(0, 8)),
+        BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+      ];
+
+  static TextStyle get titleLarge => GoogleFonts.cairo(fontSize: 22, fontWeight: FontWeight.w800, color: onSurface, height: 1.2);
+  static TextStyle get titleMedium => GoogleFonts.cairo(fontSize: 17, fontWeight: FontWeight.w800, color: onSurface);
+  static TextStyle get titleSmall => GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700, color: onSurface);
+  static TextStyle get bodyLarge => GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w500, color: onSurface);
+  static TextStyle get bodyMedium => GoogleFonts.cairo(fontSize: 14, fontWeight: FontWeight.w500, color: onSurfaceVariant);
+  static TextStyle get labelSmall => GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w700, color: onSurfaceVariant);
+
+  static ThemeData materialTheme() {
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: primary,
+        primary: primary,
+        secondary: secondary,
+        surface: surface,
+        error: danger,
+      ),
+      scaffoldBackgroundColor: surface,
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: false,
+        titleTextStyle: titleMedium,
+        iconTheme: const IconThemeData(color: onSurface),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusMd)),
+          textStyle: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.w800),
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: surfaceVariant,
+        labelStyle: labelSmall,
+        hintStyle: bodyMedium.copyWith(color: onSurfaceVariant.withValues(alpha: 0.55)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(radiusMd), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: const BorderSide(color: outline, width: 1),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: const BorderSide(color: primary, width: 2),
+        ),
+      ),
+    );
+  }
 
   static InputDecoration inputDecoration({
     required String label,
@@ -56,19 +114,18 @@ class EmployeeTheme {
         prefixIcon: prefixIcon,
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
+        fillColor: surfaceVariant,
+        labelStyle: labelSmall,
+        hintStyle: bodyMedium.copyWith(color: onSurfaceVariant.withValues(alpha: 0.55)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(radiusMd), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: outline, width: 1),
+          borderRadius: BorderRadius.circular(radiusMd),
+          borderSide: const BorderSide(color: outline),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(radiusMd),
           borderSide: const BorderSide(color: primary, width: 2),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       );
 }

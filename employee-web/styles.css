@@ -285,6 +285,17 @@ body {
 .region-search-item:hover,
 .region-search-item.focused { background: var(--primary); color: #fff; }
 .region-search-empty { color: var(--text-muted); cursor: default; }
+
+.phone-lookup-hint {
+    margin-top: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #0f766e;
+    background: #ecfdf5;
+    border: 1px solid #99f6e4;
+    border-radius: 8px;
+}
 .region-search-empty:hover { background: #fff; color: var(--text-muted); }
 
 .form-group input[type="checkbox"] {
