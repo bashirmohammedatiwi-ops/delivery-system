@@ -56,4 +56,17 @@ fi
 
 echo ""
 git log -1 --oneline
-curl -sf http://127.0.0.1:3000/health && echo "" || echo "تحذير: التطبيق لم يرد على :3000"
+
+echo "==> انتظار جاهزية التطبيق..."
+for i in $(seq 1 30); do
+  if curl -sf http://127.0.0.1:3000/health >/dev/null 2>&1; then
+    curl -s http://127.0.0.1:3000/health
+    echo ""
+    exit 0
+  fi
+  sleep 3
+done
+
+echo "تحذير: التطبيق لم يرد على :3000"
+echo "==> آخر سجلات delivery-system:"
+docker logs delivery-system --tail 50 2>&1 || true

@@ -1,5 +1,5 @@
 #!/bin/bash
-# نقل البيانات من SQLite إلى PostgreSQL بدون فقدان
+# نقل البيانات من SQLite (Docker volume) إلى PostgreSQL
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,18 +13,32 @@ if [ -f .env ]; then
 fi
 
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-delivery_secret_change_me}"
-export DATABASE_URL="${DATABASE_URL:-postgres://delivery:${POSTGRES_PASSWORD}@127.0.0.1:5432/delivery}"
+POSTGRES_USER="${POSTGRES_USER:-delivery}"
+POSTGRES_DB="${POSTGRES_DB:-delivery}"
 
-echo "==> Starting PostgreSQL (if using Docker)..."
+# رفض كلمة المرور النموذجية العربية
+if [[ "$POSTGRES_PASSWORD" == *"ضع_"* ]]; then
+  echo "ERROR: غيّر POSTGRES_PASSWORD في .env — لا تستخدم النص النموذجي العربي"
+  echo "شغّل بدلاً من ذلك: bash scripts/server-postgres-setup.sh"
+  exit 1
+fi
+
+export DATABASE_URL="${DATABASE_URL:-postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}}"
+
+echo "==> استخراج SQLite من Docker (إن لزم)..."
+bash "$ROOT/scripts/extract-sqlite-from-docker.sh"
+
+echo "==> Starting PostgreSQL..."
 docker compose -f docker-compose.yml up -d postgres 2>/dev/null || true
-sleep 3
+sleep 5
 
 echo "==> Installing dependencies..."
-npm install --omit=dev pg deasync 2>/dev/null || npm install pg deasync
+npm install --omit=dev 2>/dev/null || npm install
 
-echo "==> Running migration..."
+export SQLITE_PATH="$ROOT/data/delivery.db"
+echo "==> Running migration from $SQLITE_PATH ..."
 node scripts/migrate-sqlite-to-postgres.js
 
 echo ""
-echo "==> To activate PostgreSQL, ensure DATABASE_URL is set for the app service and run:"
-echo "    docker compose up -d --build app employee-web driver-web"
+echo "==> Migration done. Restart app:"
+echo "    bash scripts/deploy-update.sh"

@@ -55,16 +55,24 @@ async function loadSqlite() {
 }
 
 function sqliteRows(db, table) {
-    const stmt = db.prepare(`SELECT * FROM ${table}`);
-    const rows = [];
-    while (stmt.step()) rows.push(stmt.getAsObject());
-    stmt.free();
-    return rows;
+    try {
+        const stmt = db.prepare(`SELECT * FROM ${table}`);
+        const rows = [];
+        while (stmt.step()) rows.push(stmt.getAsObject());
+        stmt.free();
+        return rows;
+    } catch (_) {
+        return [];
+    }
 }
 
 function sqliteCount(db, table) {
-    const r = db.exec(`SELECT COUNT(*) AS c FROM ${table}`);
-    return r[0]?.values[0][0] || 0;
+    try {
+        const r = db.exec(`SELECT COUNT(*) AS c FROM ${table}`);
+        return r[0]?.values[0][0] || 0;
+    } catch (_) {
+        return 0;
+    }
 }
 
 function quoteIdent(name) {
