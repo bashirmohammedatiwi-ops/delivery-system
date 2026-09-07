@@ -11,7 +11,7 @@ function recordCollection(driverId, orderDate, collectedByUserID) {
         ).run(d, dateStr, collectedByUserID || null);
         return { success: true };
     } catch (err) {
-        if (err.message && err.message.includes('UNIQUE')) {
+        if (err.message && (err.message.includes('UNIQUE') || err.message.includes('duplicate key'))) {
             return { success: true, alreadyRecorded: true };
         }
         throw err;

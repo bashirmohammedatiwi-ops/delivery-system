@@ -17,15 +17,45 @@ function runAsync(promise) {
     return result;
 }
 
+/** PG lowercases unquoted aliases — map back to keys the app expects */
+const ALIAS_KEY_FIX = {
+    totalorders: 'totalOrders',
+    newcount: 'newCount',
+    assignedcount: 'assignedCount',
+    deliveredcount: 'deliveredCount',
+    todaycount: 'todayCount',
+    todaykarkh: 'todayKarkh',
+    todayrusafa: 'todayRusafa',
+    countkarkh: 'countKarkh',
+    countrusafa: 'countRusafa',
+    returnedcount: 'returnedCount',
+    orderdate: 'orderDate',
+    createdbyname: 'CreatedByName'
+};
+
+function normalizeRow(row) {
+    if (!row || typeof row !== 'object') return row;
+    const out = { ...row };
+    for (const [k, v] of Object.entries(row)) {
+        const fix = ALIAS_KEY_FIX[k.toLowerCase()];
+        if (fix && out[fix] === undefined) out[fix] = v;
+    }
+    return out;
+}
+
+function normalizeRows(rows) {
+    return (rows || []).map(normalizeRow);
+}
+
 function createStatement(sql) {
     return {
         get: (...params) => {
             const { pgSql, params: p } = toPgParams(sql, params);
-            return runAsync(pool.query(pgSql, p).then(r => r.rows[0]));
+            return runAsync(pool.query(pgSql, p).then(r => normalizeRow(r.rows[0])));
         },
         all: (...params) => {
             const { pgSql, params: p } = toPgParams(sql, params);
-            return runAsync(pool.query(pgSql, p).then(r => r.rows));
+            return runAsync(pool.query(pgSql, p).then(r => normalizeRows(r.rows)));
         },
         run: (...params) => {
             const { pgSql, params: p } = toPgParams(sql, params);

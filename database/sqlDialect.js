@@ -12,10 +12,14 @@ const PG_COLUMNS = [
     'DeliveredDate', 'ReturnedDate', 'ReturnReason', 'CollectionID', 'NotificationID',
     'TrackingID', 'SettingKey', 'SettingValue', 'RegionName', 'RegionArea', 'DriverName',
     'OrderDate', 'ScanTime', 'OrderNotes', 'ReviewedAt', 'CreatedAt', 'ExpiresAt',
-    'DriverID', 'RegionID', 'Username', 'UserID', 'OrderID', 'TotalIQD', 'AmountIQD',
-    'FreeDelivery', 'LabelPrinted', 'Active', 'Phone', 'Address', 'Pieces', 'Notes',
-    'Status', 'Token', 'Role', 'Reviewed'
+    'CollectedAt', 'CreatedByName', 'DriverID', 'RegionID', 'Username', 'UserID',
+    'OrderID', 'TotalIQD', 'AmountIQD', 'FreeDelivery', 'LabelPrinted', 'Active',
+    'Phone', 'Address', 'Pieces', 'Notes', 'Status', 'Token', 'Role', 'Reviewed'
 ].sort((a, b) => b.length - a.length);
+
+function quoteAsAliases(sql) {
+    return sql.replace(/\bas\s+([A-Za-z_][A-Za-z0-9_]*)\b/gi, (_match, alias) => `AS "${alias}"`);
+}
 
 function translateSqlForPostgres(sql) {
     let s = String(sql);
@@ -26,9 +30,18 @@ function translateSqlForPostgres(sql) {
         'INSERT INTO "AppSettings" ("SettingKey", "SettingValue") VALUES ($1, $2) ON CONFLICT ("SettingKey") DO UPDATE SET "SettingValue" = EXCLUDED."SettingValue"'
     );
 
+    // Session cleanup — TEXT ExpiresAt compared as timestamp
+    s = s.replace(
+        /ExpiresAt\s*<\s*datetime\s*\(\s*'now'\s*\)/gi,
+        '"ExpiresAt"::timestamp < NOW()'
+    );
+
     // datetime('now') and datetime('now', 'localtime')
     s = s.replace(/datetime\s*\(\s*'now'\s*,\s*'localtime'\s*\)/gi, "(NOW() AT TIME ZONE 'Asia/Baghdad')::TEXT");
-    s = s.replace(/datetime\s*\(\s*'now'\s*\)/gi, 'NOW()::TEXT');
+    s = s.replace(/datetime\s*\(\s*'now'\s*\)/gi, "(NOW() AT TIME ZONE 'UTC')::TEXT");
+
+    // date(?) parameter — must run before date(column)
+    s = s.replace(/date\s*\(\s*\?\s*\)/gi, 'SUBSTRING(?::text, 1, 10)');
 
     // date(column) comparisons — works on YYYY-MM-DD HH:MM:SS text
     s = s.replace(/date\s*\(\s*([a-zA-Z0-9_."]+)\s*\)/gi, '(SUBSTRING($1, 1, 10))');
@@ -49,6 +62,9 @@ function translateSqlForPostgres(sql) {
         const re = new RegExp(`(?<!")\\b${col}\\b(?!")`, 'g');
         s = s.replace(re, `"${col}"`);
     }
+
+    // Quote SELECT aliases so camelCase keys survive (totalOrders, CreatedByName, …)
+    s = quoteAsAliases(s);
 
     return s;
 }
