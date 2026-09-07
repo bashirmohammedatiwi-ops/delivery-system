@@ -1236,7 +1236,7 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
         sql += ` AND o.DriverID IN (${driverIds.map(() => '?').join(',')})`;
         params.push(...driverIds.map(id => parseInt(id)));
     }
-    sql += ' ORDER BY d.DriverName, OrderDate';
+    sql += ' ORDER BY d."DriverName", date(o."CreatedDate")';
     const orders = db_.prepare(sql).all(...params);
     const byKey = {};
     for (const o of orders) {

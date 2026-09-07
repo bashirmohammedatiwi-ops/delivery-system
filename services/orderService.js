@@ -547,7 +547,7 @@ function getPendingOrdersByArea(dateFrom, dateTo) {
         LEFT JOIN Regions r ON o.RegionID = r.RegionID
         WHERE o.Status = 'New' AND date(o.CreatedDate) >= date(?) AND date(o.CreatedDate) <= date(?)
         GROUP BY date(o.CreatedDate)
-        ORDER BY orderDate DESC
+        ORDER BY date(o.CreatedDate) DESC
     `).all(dateFrom, dTo);
     return rows;
 }
