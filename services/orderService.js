@@ -634,27 +634,52 @@ function getDashboardStats(today) {
             SUM(CASE WHEN o.Status = 'New' THEN 1 ELSE 0 END) AS newCount,
             SUM(CASE WHEN o.Status = 'AssignedToDriver' THEN 1 ELSE 0 END) AS assignedCount,
             SUM(CASE WHEN o.Status = 'Delivered' THEN 1 ELSE 0 END) AS deliveredCount,
+            SUM(CASE WHEN o.Status = 'Returned' THEN 1 ELSE 0 END) AS returnedCount,
             SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ? THEN 1 ELSE 0 END) AS todayCount,
             SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ?
                 AND TRIM(COALESCE(r.RegionArea, '')) = 'الكرخ' THEN 1 ELSE 0 END) AS todayKarkh,
             SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ?
-                AND TRIM(COALESCE(r.RegionArea, 'الرصافة')) = 'الرصافة' THEN 1 ELSE 0 END) AS todayRusafa
+                AND TRIM(COALESCE(r.RegionArea, 'الرصافة')) = 'الرصافة' THEN 1 ELSE 0 END) AS todayRusafa,
+            SUM(CASE WHEN o.CreatedDate >= ? AND o.CreatedDate < ?
+                AND COALESCE(o.LabelPrinted, 0) = 0 THEN 1 ELSE 0 END) AS todayUnprinted
         FROM Orders o
         LEFT JOIN Regions r ON o.RegionID = r.RegionID
-    `).get(dayStart, dayEnd, dayStart, dayEnd, dayStart, dayEnd);
+    `).get(dayStart, dayEnd, dayStart, dayEnd, dayStart, dayEnd, dayStart, dayEnd);
 
     const result = {
         totalOrders: Number(row?.totalOrders || 0),
         newCount: Number(row?.newCount || 0),
         assignedCount: Number(row?.assignedCount || 0),
         deliveredCount: Number(row?.deliveredCount || 0),
+        returnedCount: Number(row?.returnedCount || 0),
         todayCount: Number(row?.todayCount || 0),
         todayKarkh: Number(row?.todayKarkh || 0),
         todayRusafa: Number(row?.todayRusafa || 0),
+        todayUnprinted: Number(row?.todayUnprinted || 0),
         today: cacheKey
     };
     dashboardStatsCache = { key: cacheKey, data: result, ts: now };
     return result;
+}
+
+function getDashboardRecentOrders(today, limit = 6) {
+    const cacheKey = String(today || '');
+    const dayStart = `${cacheKey} 00:00:00`;
+    const dayEnd = `${nextDayIso(cacheKey)} 00:00:00`;
+    const lim = Math.min(Math.max(parseInt(limit, 10) || 6, 1), 12);
+    const database = db.getDatabase();
+    return database.prepare(`
+        SELECT o.OrderID, o.ShipmentNumber, o.AdminOrderNo, o.CustomerName, o.CustomerPhone,
+               o.Status, o.TotalIQD, o.AmountIQD, o.LabelPrinted, o.CreatedDate,
+               r.RegionName, r.RegionArea,
+               COALESCE(d.DriverName, '') AS DriverName
+        FROM Orders o
+        LEFT JOIN Regions r ON o.RegionID = r.RegionID
+        LEFT JOIN Drivers d ON o.DriverID = d.DriverID
+        WHERE o.CreatedDate >= ? AND o.CreatedDate < ?
+        ORDER BY o.OrderID DESC
+        LIMIT ?
+    `).all(dayStart, dayEnd, lim);
 }
 
 module.exports = {
@@ -681,6 +706,7 @@ module.exports = {
     getCustomerPhoneStats,
     getCustomerLookupByPhone,
     getDashboardStats,
+    getDashboardRecentOrders,
     invalidateDashboardStatsCache,
     getPendingOrdersByArea,
     getPendingOrdersList

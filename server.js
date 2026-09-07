@@ -737,11 +737,15 @@ app.get('/api/dashboard/home', requireAppAuth, requireAdmin, (req, res) => {
     try {
         const today = getTodayFromSettings();
         const stats = orderService.getDashboardStats(today);
+        const recentOrders = orderService.getDashboardRecentOrders(today, 6);
+        const activeDrivers = driverService.getAllDrivers(true).length;
         const list = notificationService.getUnreviewedNotifications();
         res.set('Cache-Control', 'private, max-age=15');
         res.json({
             today,
             stats,
+            recentOrders,
+            activeDrivers,
             notifications: { list, count: list.length }
         });
     } catch (err) {

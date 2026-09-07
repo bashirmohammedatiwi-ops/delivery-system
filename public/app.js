@@ -761,7 +761,13 @@ async function showEditOrderModal(container, order, onSuccess) {
 
 async function renderOrdersScreen(container, opts = {}) {
     const title = opts.title || 'الطلبات';
-    let filters = { search: '', driverId: '', status: opts.initialFilters?.status || '', dateFrom: opts.initialFilters?.dateFrom || '', dateTo: opts.initialFilters?.dateTo || '' };
+    let filters = {
+        search: opts.initialFilters?.search || '',
+        driverId: '',
+        status: opts.initialFilters?.status || '',
+        dateFrom: opts.initialFilters?.dateFrom || '',
+        dateTo: opts.initialFilters?.dateTo || ''
+    };
     let statusClickAttached = false;
 
     const renderOrders = async () => {
@@ -1278,6 +1284,7 @@ function showScreen(screenId, subTab, options = {}) {
 
     if (options.force) mount.dataset.forceRefresh = '1';
     if (options.ordersStatus) mount.dataset.ordersInitialStatus = options.ordersStatus;
+    if (options.ordersSearch) mount.dataset.ordersInitialSearch = options.ordersSearch;
 
     const screen = screens[screenId];
     if (screen) {
@@ -1307,9 +1314,22 @@ function bindDashboardQuickNav(container) {
             e.preventDefault();
             const screen = btn.dataset.screen;
             const status = btn.dataset.status || '';
+            const search = btn.dataset.search || '';
             invalidateScreenCache('orders');
             setNavActive(screen);
-            showScreen(screen, undefined, { force: true, ordersStatus: status });
+            showScreen(screen, undefined, {
+                force: true,
+                ordersStatus: status,
+                ordersSearch: search || undefined
+            });
+        });
+    });
+    container.querySelectorAll('.dash-v6-alert--scroll[data-scroll]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sel = btn.dataset.scroll;
+            const el = sel ? container.querySelector(sel) : null;
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
         });
     });
     container.querySelectorAll('.dash-fab[data-screen]').forEach(btn => {
@@ -1345,7 +1365,96 @@ function bindOverrideNotifications(container) {
     });
 }
 
-function renderDashboardMarkup(userName, today, stats, notifList) {
+function formatTimeShort(datetime) {
+    if (!datetime) return '—';
+    const m = String(datetime).trim().match(/(\d{2}):(\d{2})/);
+    return m ? `${m[1]}:${m[2]}` : '—';
+}
+
+function renderDashboardAlerts(stats, notifCount) {
+    const items = [];
+    if (stats.newCount > 0) {
+        items.push({
+            mod: 'dash-v6-alert--pink',
+            icon: 'bi-inbox',
+            text: `${stats.newCount} طلب جديد بانتظار التعيين`,
+            screen: 'orders',
+            status: 'New'
+        });
+    }
+    if (stats.todayUnprinted > 0) {
+        items.push({
+            mod: 'dash-v6-alert--amber',
+            icon: 'bi-printer',
+            text: `${stats.todayUnprinted} ملصق لم يُطبع اليوم`,
+            screen: 'orders',
+            status: ''
+        });
+    }
+    if (stats.returnedCount > 0) {
+        items.push({
+            mod: 'dash-v6-alert--danger',
+            icon: 'bi-arrow-return-left',
+            text: `${stats.returnedCount} طلب راجع في النظام`,
+            screen: 'orders',
+            status: 'Returned'
+        });
+    }
+    if (notifCount > 0) {
+        items.push({
+            mod: 'dash-v6-alert--purple',
+            icon: 'bi-bell-fill',
+            text: `${notifCount} إشعار توصيل مجاني`,
+            scroll: '#overrideNotifList'
+        });
+    }
+    if (!items.length) return '';
+    return `
+        <div class="dash-v6-alerts" role="region" aria-label="تنبيهات تشغيلية">
+            ${items.map(item => `
+                <button type="button"
+                    class="dash-v6-alert ${item.mod}${item.screen ? ' dash-stat-link' : ''}${item.scroll ? ' dash-v6-alert--scroll' : ''}"
+                    ${item.screen ? `data-screen="${item.screen}" data-status="${item.status || ''}"` : ''}
+                    ${item.scroll ? `data-scroll="${item.scroll}"` : ''}>
+                    <i class="bi ${item.icon}" aria-hidden="true"></i>
+                    <span>${escapeHtml(item.text)}</span>
+                    <i class="bi bi-chevron-left dash-v6-alert__chev" aria-hidden="true"></i>
+                </button>
+            `).join('')}
+        </div>`;
+}
+
+function renderDashboardRecentOrders(orders) {
+    if (!orders || !orders.length) {
+        return `
+            <div class="dash-v6-empty">
+                <div class="dash-v6-empty__icon" aria-hidden="true"><i class="bi bi-inbox"></i></div>
+                <p class="dash-v6-empty__title">لا توجد طلبات اليوم بعد</p>
+                <p class="dash-v6-empty__text">ابدأ بإنشاء أول طلب لليوم</p>
+                <button type="button" class="btn btn-primary dash-quick-btn" data-screen="new-order">
+                    <i class="bi bi-plus-circle" aria-hidden="true"></i> إنشاء طلب جديد
+                </button>
+            </div>`;
+    }
+    return `
+        <div class="dash-v6-recent">
+            ${orders.map(o => `
+                <button type="button" class="dash-v6-recent__row dash-stat-link" data-screen="orders" data-status="" data-search="${escapeHtml(o.ShipmentNumber || '')}">
+                    <div class="dash-v6-recent__main">
+                        <strong>${escapeHtml(o.ShipmentNumber || '—')}</strong>
+                        <span>${escapeHtml(o.CustomerName || '—')} · ${escapeHtml(o.RegionName || o.RegionArea || '—')}</span>
+                    </div>
+                    <div class="dash-v6-recent__meta">
+                        <span class="badge ${orderStatusBadgeClass(o.Status)}">${STATUS_MAP[o.Status] || escapeHtml(o.Status || '') || '—'}</span>
+                        <span class="dash-v6-recent__time"><i class="bi bi-clock" aria-hidden="true"></i> ${formatTimeShort(o.CreatedDate)}</span>
+                        <span class="dash-v6-recent__amount iqd">${formatIQD(o.TotalIQD)}</span>
+                    </div>
+                </button>
+            `).join('')}
+        </div>`;
+}
+
+function renderDashboardMarkup(userName, today, stats, notifList, recentOrders, activeDrivers) {
     const todayOrdersCount = stats.todayCount;
     const totalOrdersCount = stats.totalOrders;
     const newCount = stats.newCount;
@@ -1353,6 +1462,9 @@ function renderDashboardMarkup(userName, today, stats, notifList) {
     const todayKarkh = stats.todayKarkh;
     const todayRusafa = stats.todayRusafa;
     const deliveredCount = stats.deliveredCount;
+    const returnedCount = stats.returnedCount || 0;
+    const todayUnprinted = stats.todayUnprinted || 0;
+    const activeCount = newCount + assignedCount;
     const notifCount = notifList.length;
     const notifHtml = notifList.length > 0
         ? notifList.map(renderOverrideNotification).join('')
@@ -1360,66 +1472,84 @@ function renderDashboardMarkup(userName, today, stats, notifList) {
     const areaTotal = Math.max(todayKarkh + todayRusafa, 1);
     const karkhPct = Math.round((todayKarkh / areaTotal) * 100);
     const rusafaPct = 100 - karkhPct;
-    const completionPct = todayOrdersCount > 0 ? Math.round((deliveredCount / todayOrdersCount) * 100) : 0;
     const pipelineHtml = renderUxPipeline([
         { count: newCount, label: 'جديد', status: 'New', mod: 'ux-pipeline__step--new' },
         { count: assignedCount, label: 'مع السائق', status: 'AssignedToDriver', mod: 'ux-pipeline__step--driver' },
-        { count: deliveredCount, label: 'تم التوصيل', status: 'Delivered', mod: 'ux-pipeline__step--done' }
+        { count: deliveredCount, label: 'تم التوصيل', status: 'Delivered', mod: 'ux-pipeline__step--done' },
+        { count: returnedCount, label: 'راجع', status: 'Returned', mod: 'ux-pipeline__step--return' }
     ]);
+    const alertsHtml = renderDashboardAlerts(stats, notifCount);
+    const recentHtml = renderDashboardRecentOrders(recentOrders);
 
     return `
-        <div class="screen active dashboard-screen dash-v3 dash-v4">
-            <header class="dash-v3-hero dash-v4-hero">
+        <div class="screen active dashboard-screen dash-v3 dash-v4 dash-v5 dash-v6">
+            <header class="dash-v3-hero dash-v4-hero dash-v5-hero dash-v6-hero">
                 <div class="dash-v3-hero__content">
                     <span class="dash-v3-hero__chip"><i class="bi bi-stars" aria-hidden="true"></i> لوحة التحكم</span>
                     <h1 class="dash-v3-hero__title">مرحباً، ${userName}</h1>
-                    <p class="dash-v3-hero__meta"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
+                    <p class="dash-v3-hero__meta">
+                        <i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}
+                        <span class="dash-v6-hero__sep">·</span>
+                        <i class="bi bi-truck" aria-hidden="true"></i> ${activeDrivers} سائق نشط
+                    </p>
+                    <div class="dash-v5-hero__actions">
+                        <button type="button" class="dash-v5-hero__btn dash-v5-hero__btn--primary dash-quick-btn" data-screen="new-order">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i><span>طلب جديد</span>
+                        </button>
+                        <button type="button" class="dash-v5-hero__btn dash-quick-btn" data-screen="orders">
+                            <i class="bi bi-box-seam" aria-hidden="true"></i><span>الطلبات</span>
+                        </button>
+                        <button type="button" class="dash-v5-hero__btn dash-quick-btn" data-screen="driver-receive">
+                            <i class="bi bi-box-arrow-in-down" aria-hidden="true"></i><span>استلام</span>
+                        </button>
+                    </div>
                 </div>
-                <div class="dash-v3-hero__cards">
+                <div class="dash-v3-hero__cards dash-v5-hero__cards">
                     <div class="dash-v3-metric dash-v3-metric--primary">
                         <span class="dash-v3-metric__value">${todayOrdersCount}</span>
                         <span class="dash-v3-metric__label">طلبات اليوم</span>
                     </div>
-                    <div class="dash-v3-metric">
-                        <span class="dash-v3-metric__value">${completionPct}<small>%</small></span>
-                        <span class="dash-v3-metric__label">نسبة الإنجاز</span>
+                    <div class="dash-v3-metric dash-v3-metric--accent">
+                        <span class="dash-v3-metric__value">${activeCount}</span>
+                        <span class="dash-v3-metric__label">قيد التنفيذ</span>
                     </div>
                     <div class="dash-v3-metric dash-v3-metric--ghost">
                         <span class="dash-v3-metric__value">${todayKarkh}<span class="dash-v3-metric__sep">/</span>${todayRusafa}</span>
                         <span class="dash-v3-metric__label">كرخ / رصافة</span>
                     </div>
+                    ${todayUnprinted > 0 ? `
+                    <div class="dash-v3-metric dash-v3-metric--warn">
+                        <span class="dash-v3-metric__value">${todayUnprinted}</span>
+                        <span class="dash-v3-metric__label">لم يُطبع</span>
+                    </div>` : ''}
                 </div>
             </header>
 
-            ${pipelineHtml}
+            ${alertsHtml}
 
-            <div class="dash-v4-insights">
-                <div class="dash-v4-insight dash-v4-insight--pink">
-                    <i class="bi bi-inbox" aria-hidden="true"></i>
-                    <div><strong>${newCount}</strong><span>بانتظار التعيين</span></div>
+            <section class="dash-v5-pipeline dash-v6-pipeline" aria-label="مسار الطلبات">
+                <div class="dash-v5-section-head">
+                    <h2><i class="bi bi-diagram-3" aria-hidden="true"></i> مسار الطلبات</h2>
+                    <span>اضغط على أي مرحلة للفلترة</span>
                 </div>
-                <div class="dash-v4-insight dash-v4-insight--blue">
-                    <i class="bi bi-truck" aria-hidden="true"></i>
-                    <div><strong>${assignedCount}</strong><span>قيد التوصيل</span></div>
-                </div>
-                <div class="dash-v4-insight dash-v4-insight--green">
-                    <i class="bi bi-check2-all" aria-hidden="true"></i>
-                    <div><strong>${deliveredCount}</strong><span>مكتمل اليوم</span></div>
-                </div>
-                ${currentUser?.Role === 'admin' && notifCount > 0 ? `
-                <div class="dash-v4-insight dash-v4-insight--amber">
-                    <i class="bi bi-bell-fill" aria-hidden="true"></i>
-                    <div><strong>${notifCount}</strong><span>إشعار توصيل مجاني</span></div>
-                </div>` : ''}
-            </div>
+                ${pipelineHtml}
+            </section>
 
-            <div class="dash-v3-bento dash-v4-bento">
+            <div class="dash-v3-bento dash-v4-bento dash-v5-bento dash-v6-bento">
+                <section class="dash-v3-tile dash-v3-tile--recent" aria-label="آخر طلبات اليوم">
+                    <div class="dash-v3-tile__head">
+                        <h2><i class="bi bi-clock-history" aria-hidden="true"></i> آخر طلبات اليوم</h2>
+                        <button type="button" class="dash-v6-link dash-quick-btn" data-screen="orders">عرض الكل</button>
+                    </div>
+                    ${recentHtml}
+                </section>
+
                 <section class="dash-v3-tile dash-v3-tile--stats" aria-label="حالة الطلبات">
                     <div class="dash-v3-tile__head">
-                        <h2><i class="bi bi-bar-chart-steps" aria-hidden="true"></i> حالة الطلبات</h2>
+                        <h2><i class="bi bi-bar-chart-steps" aria-hidden="true"></i> ملخص الحالات</h2>
                         <span>اضغط للفلترة</span>
                     </div>
-                    <div class="dash-v3-statgrid">
+                    <div class="dash-v3-statgrid dash-v5-statgrid dash-v6-statgrid">
                         <button type="button" class="dash-v3-stat dash-v3-stat--new dash-stat-link" data-screen="orders" data-status="New">
                             <i class="bi bi-plus-lg" aria-hidden="true"></i>
                             <strong>${newCount}</strong>
@@ -1435,6 +1565,11 @@ function renderDashboardMarkup(userName, today, stats, notifList) {
                             <strong>${deliveredCount}</strong>
                             <span>تم التوصيل</span>
                         </button>
+                        <button type="button" class="dash-v3-stat dash-v3-stat--return dash-stat-link" data-screen="orders" data-status="Returned">
+                            <i class="bi bi-arrow-return-left" aria-hidden="true"></i>
+                            <strong>${returnedCount}</strong>
+                            <span>راجع</span>
+                        </button>
                         <button type="button" class="dash-v3-stat dash-v3-stat--all dash-stat-link" data-screen="orders" data-status="">
                             <i class="bi bi-layers" aria-hidden="true"></i>
                             <strong>${totalOrdersCount}</strong>
@@ -1446,18 +1581,22 @@ function renderDashboardMarkup(userName, today, stats, notifList) {
                 <section class="dash-v3-tile dash-v3-tile--areas">
                     <div class="dash-v3-tile__head">
                         <h2><i class="bi bi-geo-alt" aria-hidden="true"></i> توزيع المناطق</h2>
-                        <span class="dash-v3-pill">${todayOrdersCount} طلب</span>
+                        <span class="dash-v3-pill">${todayOrdersCount} طلب اليوم</span>
                     </div>
-                    <div class="dash-v3-area">
-                        <div class="dash-v3-area__row">
-                            <div class="dash-v3-area__info"><span>الكرخ</span><strong>${todayKarkh}</strong></div>
+                    <div class="dash-v3-area dash-v5-area">
+                        <div class="dash-v5-area__card dash-v5-area__card--karkh">
+                            <div class="dash-v5-area__top">
+                                <span class="dash-v5-area__name"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> الكرخ</span>
+                                <strong>${todayKarkh}</strong>
+                            </div>
                             <div class="dash-v3-area__track"><div class="dash-v3-area__fill dash-v3-area__fill--karkh" style="width:${karkhPct}%"></div></div>
-                            <em>${karkhPct}%</em>
                         </div>
-                        <div class="dash-v3-area__row">
-                            <div class="dash-v3-area__info"><span>الرصافة</span><strong>${todayRusafa}</strong></div>
+                        <div class="dash-v5-area__card dash-v5-area__card--rusafa">
+                            <div class="dash-v5-area__top">
+                                <span class="dash-v5-area__name"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i> الرصافة</span>
+                                <strong>${todayRusafa}</strong>
+                            </div>
                             <div class="dash-v3-area__track"><div class="dash-v3-area__fill dash-v3-area__fill--rusafa" style="width:${rusafaPct}%"></div></div>
-                            <em>${rusafaPct}%</em>
                         </div>
                     </div>
                 </section>
@@ -1466,7 +1605,7 @@ function renderDashboardMarkup(userName, today, stats, notifList) {
                     <div class="dash-v3-tile__head">
                         <h2><i class="bi bi-lightning-charge-fill" aria-hidden="true"></i> اختصارات</h2>
                     </div>
-                    <nav class="dash-v3-actions" aria-label="اختصارات سريعة">
+                    <nav class="dash-v3-actions dash-v5-actions" aria-label="اختصارات سريعة">
                         <button type="button" class="dash-v3-action dash-v3-action--pink dash-quick-btn" data-screen="new-order">
                             <i class="bi bi-plus-circle" aria-hidden="true"></i><span>طلب جديد</span>
                         </button>
@@ -1514,20 +1653,26 @@ function renderDashboardMarkup(userName, today, stats, notifList) {
 
 function renderDashboardSkeleton(userName) {
     return `
-        <div class="screen active dashboard-screen dash-v3 dashboard-screen--loading">
-            <header class="dash-v3-hero dash-v3-hero--loading">
+        <div class="screen active dashboard-screen dash-v3 dash-v5 dash-v6 dashboard-screen--loading">
+            <header class="dash-v3-hero dash-v5-hero dash-v6-hero dash-v3-hero--loading">
                 <div class="dash-v3-hero__content">
                     <div class="dash-skeleton dash-skeleton--badge"></div>
                     <div class="dash-skeleton dash-skeleton--title"></div>
                     <div class="dash-skeleton dash-skeleton--text"></div>
+                    <div class="dash-skeleton dash-skeleton--actions"></div>
                 </div>
-                <div class="dash-v3-hero__cards">
+                <div class="dash-v3-hero__cards dash-v5-hero__cards">
+                    <div class="dash-skeleton dash-skeleton--block"></div>
                     <div class="dash-skeleton dash-skeleton--block"></div>
                     <div class="dash-skeleton dash-skeleton--block"></div>
                 </div>
             </header>
-            <div class="dash-v3-bento dash-v3-bento--loading">
-                ${[1, 2, 3].map(() => '<div class="dash-v3-tile dash-v3-tile--skeleton"><div class="dash-skeleton dash-skeleton--block"></div></div>').join('')}
+            <div class="dash-skeleton dash-skeleton--alerts"></div>
+            <div class="dash-v5-pipeline dash-v5-pipeline--loading">
+                <div class="dash-skeleton dash-skeleton--pipeline"></div>
+            </div>
+            <div class="dash-v3-bento dash-v5-bento dash-v6-bento dash-v3-bento--loading">
+                ${[1, 2, 3, 4].map(() => '<div class="dash-v3-tile dash-v3-tile--skeleton"><div class="dash-skeleton dash-skeleton--block"></div></div>').join('')}
             </div>
             <p class="dash-loading-hint"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> جاري تحميل لوحة التحكم…</p>
         </div>
@@ -1545,22 +1690,27 @@ const screens = {
             let today = new Date().toISOString().split('T')[0];
             let stats = {
                 totalOrders: 0, newCount: 0, assignedCount: 0, deliveredCount: 0,
-                todayCount: 0, todayKarkh: 0, todayRusafa: 0, today
+                returnedCount: 0, todayCount: 0, todayKarkh: 0, todayRusafa: 0,
+                todayUnprinted: 0, today
             };
             let notifList = [];
+            let recentOrders = [];
+            let activeDrivers = 0;
 
             try {
                 const home = await getDashboardHomeCached(forceRefresh);
                 today = home?.today || today;
                 stats = home?.stats || stats;
                 notifList = home?.notifications?.list || [];
+                recentOrders = home?.recentOrders || [];
+                activeDrivers = home?.activeDrivers || 0;
             } catch (_) {
                 try {
                     stats = await window.api.dashboard.stats(today);
                 } catch (e2) { /* keep defaults */ }
             }
 
-            container.innerHTML = renderDashboardMarkup(userName, today, stats, notifList);
+            container.innerHTML = renderDashboardMarkup(userName, today, stats, notifList, recentOrders, activeDrivers);
             bindDashboardQuickNav(container);
             bindOverrideNotifications(container);
             const mount = container.closest('.screen-mount');
@@ -2038,10 +2188,12 @@ const screens = {
         async render(container) {
             const mount = container.closest('.screen-mount');
             const initialStatus = mount?.dataset?.ordersInitialStatus || '';
+            const initialSearch = mount?.dataset?.ordersInitialSearch || '';
             if (mount && initialStatus) delete mount.dataset.ordersInitialStatus;
+            if (mount && initialSearch) delete mount.dataset.ordersInitialSearch;
             await renderOrdersScreen(container, {
                 title: 'الطلبات',
-                initialFilters: { status: initialStatus }
+                initialFilters: { status: initialStatus, search: initialSearch }
             });
         }
     },
