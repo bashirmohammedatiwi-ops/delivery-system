@@ -88,6 +88,12 @@ window.api = {
         setToken: (token) => { if (token) localStorage.setItem('appToken', token); else localStorage.removeItem('appToken'); }
     },
 
+    dashboard: {
+        stats: (today) => {
+            const q = today ? `?today=${encodeURIComponent(today)}` : '';
+            return apiGet('/api/dashboard/stats' + q);
+        }
+    },
     orders: {
         create: (data) => apiPost('/api/orders', data),
         getAll: (filters = {}) => {

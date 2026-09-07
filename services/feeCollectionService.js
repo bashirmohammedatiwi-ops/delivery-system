@@ -1,4 +1,4 @@
-const db = require('../database/init');
+const db = require('../database/index');
 
 function recordCollection(driverId, orderDate, collectedByUserID) {
     const database = db.getDatabase();

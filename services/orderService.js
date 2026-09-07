@@ -1,4 +1,4 @@
-const db = require('../database/init');
+const db = require('../database/index');
 
 /** تاريخ ووقت محلي لضمان تطابق مع توقيت السائق (بدلاً من UTC) */
 function getLocalDateTimeStr() {
@@ -170,7 +170,10 @@ function getOrders(filters = {}) {
     }
 
     sql += ` ORDER BY o.OrderID DESC`;
-    if (filters.limit) sql += ` LIMIT ${Math.min(parseInt(filters.limit) || 1000, 5000)}`;
+    const limitVal = filters.limit != null && filters.limit !== ''
+        ? Math.min(parseInt(filters.limit, 10) || 1000, 5000)
+        : 1000;
+    sql += ` LIMIT ${limitVal}`;
 
     const stmt = database.prepare(sql);
     return stmt.all(...params);
@@ -508,29 +511,54 @@ function getCustomerPhoneStats(customerPhone) {
     const digits = String(customerPhone || '').replace(/\D/g, '');
     if (!digits) return { deliveredCount: 0, returnedCount: 0 };
     const last10 = digits.length >= 10 ? digits.slice(-10) : digits;
-    const last11 = digits.length >= 11 ? digits.slice(-11) : digits;
 
-    const rows = database.prepare(
-        `SELECT CustomerPhone, Status FROM Orders WHERE CustomerPhone IS NOT NULL AND TRIM(CustomerPhone) != ''`
-    ).all();
+    const row = database.prepare(`
+        SELECT
+            SUM(CASE WHEN o.Status = 'Delivered' THEN 1 ELSE 0 END) AS deliveredCount,
+            SUM(CASE WHEN o.Status = 'Returned' OR o.Status IN ('Canceled','ملغي','RejectedByCustomer')
+                OR LOWER(TRIM(o.Status)) IN ('canceled','returned') THEN 1 ELSE 0 END) AS returnedCount
+        FROM Orders o
+        WHERE o.CustomerPhone IS NOT NULL AND TRIM(o.CustomerPhone) != ''
+          AND (
+            REPLACE(REPLACE(REPLACE(o.CustomerPhone, ' ', ''), '-', ''), '+', '') LIKE ?
+            OR REPLACE(REPLACE(REPLACE(o.CustomerPhone, ' ', ''), '-', ''), '+', '') LIKE ?
+          )
+    `).get(`%${last10}`, `%${digits}`);
 
-    let deliveredCount = 0;
-    let returnedCount = 0;
-    for (const r of rows) {
-        const rowDigits = String(r.CustomerPhone || '').replace(/\D/g, '');
-        if (!rowDigits) continue;
-        const rowLast10 = rowDigits.length >= 10 ? rowDigits.slice(-10) : rowDigits;
-        const rowLast11 = rowDigits.length >= 11 ? rowDigits.slice(-11) : rowDigits;
-        const samePhone =
-            rowDigits === digits ||
-            rowLast11 === last11 ||
-            rowLast10 === last10;
-        if (!samePhone) continue;
-        const s = String(r.Status || '').trim();
-        if (s === 'Delivered') deliveredCount++;
-        else if (s === 'Returned' || /راجع|returned|canceled|ملغي/i.test(s)) returnedCount++;
-    }
-    return { deliveredCount, returnedCount };
+    return {
+        deliveredCount: Number(row?.deliveredCount || 0),
+        returnedCount: Number(row?.returnedCount || 0)
+    };
+}
+
+function getDashboardStats(today) {
+    const database = db.getDatabase();
+    const prefix = `${today}%`;
+    const row = database.prepare(`
+        SELECT
+            (SELECT COUNT(*) FROM Orders) AS totalOrders,
+            (SELECT COUNT(*) FROM Orders WHERE Status = 'New') AS newCount,
+            (SELECT COUNT(*) FROM Orders WHERE Status = 'AssignedToDriver') AS assignedCount,
+            (SELECT COUNT(*) FROM Orders WHERE Status = 'Delivered') AS deliveredCount,
+            (SELECT COUNT(*) FROM Orders WHERE CreatedDate LIKE ?) AS todayCount,
+            (SELECT COUNT(*) FROM Orders o
+             LEFT JOIN Regions r ON o.RegionID = r.RegionID
+             WHERE o.CreatedDate LIKE ? AND TRIM(COALESCE(r.RegionArea, '')) = 'الكرخ') AS todayKarkh,
+            (SELECT COUNT(*) FROM Orders o
+             LEFT JOIN Regions r ON o.RegionID = r.RegionID
+             WHERE o.CreatedDate LIKE ? AND TRIM(COALESCE(r.RegionArea, 'الرصافة')) = 'الرصافة') AS todayRusafa
+    `).get(prefix, prefix, prefix);
+
+    return {
+        totalOrders: Number(row?.totalOrders || 0),
+        newCount: Number(row?.newCount || 0),
+        assignedCount: Number(row?.assignedCount || 0),
+        deliveredCount: Number(row?.deliveredCount || 0),
+        todayCount: Number(row?.todayCount || 0),
+        todayKarkh: Number(row?.todayKarkh || 0),
+        todayRusafa: Number(row?.todayRusafa || 0),
+        today
+    };
 }
 
 module.exports = {
@@ -552,6 +580,7 @@ module.exports = {
     getDriverReturnedOrders,
     markReturnedOrderReceived,
     getCustomerPhoneStats,
+    getDashboardStats,
     getPendingOrdersByArea,
     getPendingOrdersList
 };

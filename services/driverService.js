@@ -1,4 +1,4 @@
-const db = require('../database/init');
+const db = require('../database/index');
 
 function getAllDrivers(activeOnly = true, includePasswords = false) {
     const database = db.getDatabase();

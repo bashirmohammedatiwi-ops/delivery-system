@@ -4,6 +4,8 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev || npm install --omit=dev
 
@@ -26,6 +28,7 @@ COPY public ./public
 COPY driver-web ./driver-web
 COPY employee-web ./employee-web
 COPY services ./services
+COPY scripts ./scripts
 COPY fonts ./fonts
 
 RUN mkdir -p data && chown -R nodejs:nodejs /app

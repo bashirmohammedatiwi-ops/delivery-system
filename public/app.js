@@ -1114,14 +1114,24 @@ function showScreen(screenId, subTab) {
 const screens = {
     dashboard: {
         async render(container) {
-            const orders = await window.api.orders.getAll({ limit: 5000 });
             let today = new Date().toISOString().split('T')[0];
             try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
-            const todayOrders = orders.filter(o => (o.CreatedDate || '').startsWith(today));
-            const newCount = orders.filter(o => o.Status === 'New').length;
-            const assignedCount = orders.filter(o => o.Status === 'AssignedToDriver').length;
-            const todayKarkh = todayOrders.filter(o => (o.RegionArea || '').trim() === 'الكرخ').length;
-            const todayRusafa = todayOrders.filter(o => (o.RegionArea || 'الرصافة').trim() === 'الرصافة').length;
+
+            let stats = {
+                totalOrders: 0, newCount: 0, assignedCount: 0, deliveredCount: 0,
+                todayCount: 0, todayKarkh: 0, todayRusafa: 0, today
+            };
+            try {
+                stats = await window.api.dashboard.stats(today);
+            } catch (_) {}
+
+            const todayOrdersCount = stats.todayCount;
+            const totalOrdersCount = stats.totalOrders;
+            const newCount = stats.newCount;
+            const assignedCount = stats.assignedCount;
+            const todayKarkh = stats.todayKarkh;
+            const todayRusafa = stats.todayRusafa;
+            const deliveredCount = stats.deliveredCount;
 
             let overrideNotifications = { list: [], count: 0 };
             if (currentUser?.Role === 'admin') {
@@ -1137,7 +1147,6 @@ const screens = {
                 : '<p class="ovn-empty">لا توجد إشعارات جديدة</p>';
 
             const userName = (currentUser?.DisplayName || currentUser?.Username || 'مدير').replace(/</g, '&lt;');
-            const deliveredCount = orders.filter(o => o.Status === 'Delivered').length;
             const areaTotal = Math.max(todayKarkh + todayRusafa, 1);
             const karkhPct = Math.round((todayKarkh / areaTotal) * 100);
             const rusafaPct = 100 - karkhPct;
@@ -1152,7 +1161,7 @@ const screens = {
                         <p class="dash-hero__welcome">مرحباً، ${userName}</p>
                         <p class="dash-hero__date"><i class="bi bi-calendar3" aria-hidden="true"></i> ${formatDateAr(today)}</p>
                         <div class="dash-hero__mega">
-                            <div class="dash-hero__mega-value">${todayOrders.length}</div>
+                            <div class="dash-hero__mega-value">${todayOrdersCount}</div>
                             <div class="dash-hero__mega-label">طلبات اليوم</div>
                         </div>
                     </header>
@@ -1171,7 +1180,7 @@ const screens = {
                             <span class="dash-status-pill__label">تم التوصيل</span>
                         </div>
                         <div class="dash-status-pill dash-status-pill--all">
-                            <span class="dash-status-pill__value">${orders.length}</span>
+                            <span class="dash-status-pill__value">${totalOrdersCount}</span>
                             <span class="dash-status-pill__label">الكل</span>
                         </div>
                     </div>
@@ -1179,7 +1188,7 @@ const screens = {
                     <section class="dash-areas-card">
                         <div class="dash-areas-card__head">
                             <h2 class="dash-areas-card__title">توزيع اليوم</h2>
-                            <span class="dash-areas-card__total">${todayOrders.length} طلب</span>
+                            <span class="dash-areas-card__total">${todayOrdersCount} طلب</span>
                         </div>
                         <div class="dash-area-bar">
                             <div class="dash-area-bar__label"><span>الكرخ</span><strong>${todayKarkh}</strong></div>
@@ -1218,7 +1227,7 @@ const screens = {
                         <div class="stat-card stat-card--icon stat-card--compact">
                             <div class="stat-card__icon stat-card__icon--teal"><i class="bi bi-calendar-check" aria-hidden="true"></i></div>
                             <div class="stat-card__body">
-                                <div class="value">${todayOrders.length}</div>
+                                <div class="value">${stats.todayCount}</div>
                                 <div class="label">طلبات اليوم</div>
                             </div>
                         </div>
@@ -1239,7 +1248,7 @@ const screens = {
                         <div class="stat-card stat-card--icon stat-card--compact">
                             <div class="stat-card__icon stat-card__icon--purple"><i class="bi bi-stack" aria-hidden="true"></i></div>
                             <div class="stat-card__body">
-                                <div class="value">${orders.length}</div>
+                                <div class="value">${stats.totalOrders}</div>
                                 <div class="label">إجمالي الطلبات</div>
                             </div>
                         </div>

@@ -1,4 +1,4 @@
-const db = require('../database/init');
+const db = require('../database/index');
 
 function getAllRegions() {
     const database = db.getDatabase();

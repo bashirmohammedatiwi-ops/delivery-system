@@ -2,7 +2,7 @@
  * إشعارات التوصيل المجاني اليدوي
  * عندما يضع موظف توصيل مجاني على طلب أقل من 50000
  */
-const db = require('../database/init');
+const db = require('../database/index');
 
 const FREE_DELIVERY_THRESHOLD = 50000;
 

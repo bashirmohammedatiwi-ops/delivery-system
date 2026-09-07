@@ -1,4 +1,4 @@
-const db = require('../database/init');
+const db = require('../database/index');
 const feeCollectionService = require('./feeCollectionService');
 const PDFDocument = require('pdfkit');
 const path = require('path');

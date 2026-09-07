@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const db = require('../database/init');
+const db = require('../database/index');
 
 const TOKEN_EXPIRY_DAYS = 7;
 const ROLES = { admin: 'admin', employee: 'employee' };

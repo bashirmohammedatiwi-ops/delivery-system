@@ -4,7 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const db = require('./database/init');
+const db = require('./database/index');
 
 /** تاريخ اليوم بتوقيت العراق حسب وقت بداية اليوم (من الإعدادات) */
 function getTodayInIraq(dayStartHour = 0) {
@@ -40,7 +40,11 @@ app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '10mb' }));
 
 // نقطة فحص الصحة لـ Docker (قبل أي مسار آخر)
-app.get('/health', (_req, res) => res.status(200).json({ ok: true, version: APP_UI_VERSION }));
+app.get('/health', (_req, res) => res.status(200).json({
+    ok: true,
+    version: APP_UI_VERSION,
+    db: db.isPostgres() ? 'postgres' : 'sqlite'
+}));
 
 // سياسة الخصوصية — قبل static حتى لا يُعاد index.html
 app.get('/privacy', (req, res) => {
@@ -639,6 +643,16 @@ app.post('/api/orders', requireAppAuth, async (req, res) => {
         const isEmployee = empUser && empUser.Role === 'employee';
         notificationService.maybeCreateNotification(order, emp.UserID, empUser?.DisplayName || empUser?.Username, isEmployee);
         res.json(order);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/dashboard/stats', requireAppAuth, requireAdmin, (req, res) => {
+    try {
+        const today = req.query.today || getTodayFromSettings();
+        const stats = orderService.getDashboardStats(today);
+        res.json(stats);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
