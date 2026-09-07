@@ -3,6 +3,20 @@
  * (converted to $1, $2, ... in pg adapter).
  */
 
+const PG_COLUMNS = [
+    'ReturnedOrderReceivedAt', 'ReturnedByDriverID', 'CustomerLocationLink',
+    'WaivedDeliveryIQD', 'PerformedByUserID', 'PerformedByName', 'CollectedByUserID',
+    'ReturnedOrderReceived', 'AdminOrderNo', 'ShipmentNumber', 'DeliveryFeeIQD',
+    'CreatedByUserID', 'StoredPassword', 'PasswordHash', 'DisplayName', 'SecretCode',
+    'StorePhone', 'StoreName', 'CustomerPhone', 'CustomerName', 'CreatedDate',
+    'DeliveredDate', 'ReturnedDate', 'ReturnReason', 'CollectionID', 'NotificationID',
+    'TrackingID', 'SettingKey', 'SettingValue', 'RegionName', 'RegionArea', 'DriverName',
+    'OrderDate', 'ScanTime', 'OrderNotes', 'ReviewedAt', 'CreatedAt', 'ExpiresAt',
+    'DriverID', 'RegionID', 'Username', 'UserID', 'OrderID', 'TotalIQD', 'AmountIQD',
+    'FreeDelivery', 'LabelPrinted', 'Active', 'Phone', 'Address', 'Pieces', 'Notes',
+    'Status', 'Token', 'Role', 'Reviewed'
+].sort((a, b) => b.length - a.length);
+
 function translateSqlForPostgres(sql) {
     let s = String(sql);
 
@@ -28,6 +42,12 @@ function translateSqlForPostgres(sql) {
     for (const t of tables) {
         const re = new RegExp(`(?<!")\\b${t}\\b(?!")`, 'g');
         s = s.replace(re, `"${t}"`);
+    }
+
+    // Quote PascalCase column names (PG folds unquoted identifiers to lowercase)
+    for (const col of PG_COLUMNS) {
+        const re = new RegExp(`(?<!")\\b${col}\\b(?!")`, 'g');
+        s = s.replace(re, `"${col}"`);
     }
 
     return s;
