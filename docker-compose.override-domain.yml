@@ -1,10 +1,10 @@
 # تشغيل على الدومين مع Let's Encrypt (https://demaalhayaadelivery.online)
 #
-# ⚠️ سيرفر فيه دومينات أخرى؟ أضف override-multisite.yml (انظر FIX-MULTI-DOMAIN.md):
-#   docker compose -f docker-compose.yml -f docker-compose.override-domain.yml \
-#     -f docker-compose.override-multisite.yml --profile https up -d --build
+# ⚠️ سيرفر فيه دومينات أخرى (nginx على Ubuntu)؟ استخدم override-multisite.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.override-multisite.yml up -d --build
+#   أو: bash scripts/deploy-update.sh
 #
-# سيرفر مخصص لدومين التوصيل فقط:
+# سيرفر مخصص لدومين التوصيل فقط (Docker nginx على 80/443):
 #   docker compose -f docker-compose.yml -f docker-compose.override-domain.yml --profile https up -d
 
 services:
