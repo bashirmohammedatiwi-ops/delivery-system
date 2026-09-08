@@ -55,18 +55,66 @@ function getScreenInitialTab(defaultTab) {
     return document.getElementById('screen-container')?.dataset.initialTab || defaultTab;
 }
 
+function pickRowField(row, ...keys) {
+    if (!row || typeof row !== 'object') return '';
+    for (const k of keys) {
+        if (row[k] != null && row[k] !== '') return row[k];
+    }
+    for (const k of keys) {
+        const lk = String(k).toLowerCase();
+        for (const [kk, vv] of Object.entries(row)) {
+            if (kk.toLowerCase() === lk && vv != null && vv !== '') return vv;
+        }
+    }
+    return '';
+}
+
+function syncDatePickersIn(scope) {
+    (scope || document).querySelectorAll('.date-range-picker').forEach(root => {
+        if (root.dataset.initialized !== '1') initDateRangePicker(root);
+        const fromTriple = root.querySelector('.date-triple[data-side="from"]');
+        const toTriple = root.querySelector('.date-triple[data-side="to"]');
+        const fromHidden = root.querySelector('.date-hidden-from');
+        const toHidden = root.querySelector('.date-hidden-to');
+        if (fromTriple && fromHidden) {
+            const fromIso = readDateTriple(fromTriple);
+            if (fromIso) fromHidden.value = fromIso;
+        }
+        if (toTriple && toHidden) {
+            const toIso = readDateTriple(toTriple);
+            if (toIso) toHidden.value = toIso;
+        }
+    });
+}
+
+function dedupeScreenMounts(screenId, keepKey) {
+    screenMounts.forEach((entry, key) => {
+        if (!key.startsWith(`${screenId}:`) || key === keepKey) return;
+        entry.mount.remove();
+        screenMounts.delete(key);
+    });
+}
+
 function applyScreenSubTab(mount, screenId, subTab) {
     const cfg = SCREENS_WITH_SUBTABS[screenId];
     if (!cfg) return;
     const tab = subTab || cfg.defaultTab;
     mount.dataset.initialTab = tab;
     const screenContainer = document.getElementById('screen-container');
-    if (screenContainer) screenContainer.dataset.initialTab = tab;
+    if (screenContainer) {
+        screenContainer.dataset.initialTab = tab;
+        screenContainer.dataset.currentScreen = screenId;
+    }
     mount.querySelectorAll('.ux-subnav__item').forEach(btn => {
         btn.classList.toggle('is-active', btn.dataset.tab === tab);
     });
     mount.querySelectorAll(cfg.paneSelector).forEach(p => p.classList.remove('active'));
     mount.querySelector(`${cfg.panePrefix}${tab}`)?.classList.add('active');
+    const activeNav = mount.querySelector(`.ux-subnav__item[data-tab="${tab}"]`);
+    activeNav?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    setNavActive(screenId, tab);
+    updateDesktopChrome(screenId, tab);
+    updateMobileChrome(screenId, tab);
 }
 
 function screenNeedsLiveRefresh(screenId) {
@@ -148,6 +196,7 @@ function showApp() {
         const btnAdmin = document.getElementById('btnAdminLogin');
         if (btnAdmin) btnAdmin.style.display = currentUser.Role === 'admin' ? 'none' : '';
         initSidebarNav();
+        invalidateScreenCache();
         const defaultScreen = currentUser.Role === 'admin' ? 'dashboard' : 'new-order';
         setNavActive(defaultScreen);
         showScreen(defaultScreen);
@@ -501,17 +550,21 @@ function bindUxSubnav(container, opts) {
     container.querySelectorAll('.ux-subnav__item').forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.dataset.tab;
-            container.querySelectorAll('.ux-subnav__item').forEach(b => b.classList.toggle('is-active', b.dataset.tab === tab));
-            container.querySelectorAll(paneSelector).forEach(p => p.classList.remove('active'));
-            container.querySelector(`${panePrefix}${tab}`)?.classList.add('active');
-            container.dataset.initialTab = tab;
-            const screenContainer = document.getElementById('screen-container');
-            const screenId = screenContainer?.dataset.currentScreen;
-            if (screenContainer) screenContainer.dataset.initialTab = tab;
-            if (screenId) {
-                setNavActive(screenId, tab);
-                updateDesktopChrome(screenId, tab);
-                updateMobileChrome(screenId, tab);
+            const screenId = document.getElementById('screen-container')?.dataset.currentScreen;
+            if (screenId && SCREENS_WITH_SUBTABS[screenId]) {
+                applyScreenSubTab(container, screenId, tab);
+            } else {
+                container.querySelectorAll('.ux-subnav__item').forEach(b => b.classList.toggle('is-active', b.dataset.tab === tab));
+                container.querySelectorAll(paneSelector).forEach(p => p.classList.remove('active'));
+                container.querySelector(`${panePrefix}${tab}`)?.classList.add('active');
+                container.dataset.initialTab = tab;
+                const screenContainer = document.getElementById('screen-container');
+                if (screenContainer) screenContainer.dataset.initialTab = tab;
+                if (screenId) {
+                    setNavActive(screenId, tab);
+                    updateDesktopChrome(screenId, tab);
+                    updateMobileChrome(screenId, tab);
+                }
             }
             if (onChange) onChange(tab);
         });
@@ -1277,6 +1330,7 @@ function initSidebarNav() {
             setNavActive(screen, tab);
             showScreen(screen, tab || undefined);
         } else {
+            item.closest('.nav-group')?.classList.add('expanded');
             setNavActive(screen, item.dataset.tab);
             showScreen(screen, item.dataset.tab);
         }
@@ -1290,6 +1344,7 @@ function showScreen(screenId, subTab, options = {}) {
     const cfg = SCREENS_WITH_SUBTABS[screenId];
     const resolvedSubTab = subTab || (cfg ? cfg.defaultTab : '');
     const key = screenCacheKey(screenId, resolvedSubTab);
+    dedupeScreenMounts(screenId, key);
     setNavActive(screenId, resolvedSubTab || subTab);
     updateMobileChrome(screenId, resolvedSubTab || subTab);
     updateDesktopChrome(screenId, resolvedSubTab || subTab);
@@ -1312,7 +1367,7 @@ function showScreen(screenId, subTab, options = {}) {
     if (cached && !cached.stale && !force) {
         cached.mount.hidden = false;
         cached.mount.classList.add('active');
-        if (cfg && (resolvedSubTab || subTab)) {
+        if (cfg) {
             applyScreenSubTab(cached.mount, screenId, resolvedSubTab || subTab);
         }
         return;
@@ -2756,7 +2811,7 @@ const screens = {
             let employees = [];
             try {
                 const users = await window.api.users.getAll();
-                employees = (users || []).filter(u => u.Role === 'employee' && u.Active !== 0);
+                employees = (users || []).filter(u => String(u.Role || '').toLowerCase() === 'employee' && u.Active !== 0 && u.Active !== false);
             } catch (_) {}
             let today = new Date().toISOString().split('T')[0];
             try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
@@ -2839,7 +2894,7 @@ const screens = {
                                     <div class="report-field report-field--full">
                                         ${dateRangePickerHtml('report', today)}
                                     </div>
-                                    <button class="btn btn-primary" id="btnDriverReport">عرض التقرير</button>
+                                    <button type="button" class="btn btn-primary" id="btnDriverReport">عرض التقرير</button>
                                 </div>
                                 <div id="driverReportContent"></div>
                                 <div id="driverReportActions" class="report-actions" style="display:none"><button class="btn btn-primary" id="btnPrintDriverReport">طباعة</button><button class="btn btn-secondary" id="btnExportDriverPDF">تصدير PDF</button></div>
@@ -2859,7 +2914,7 @@ const screens = {
                                     <div class="report-field report-field--full">
                                         ${dateRangePickerHtml('employee', today)}
                                     </div>
-                                    <button class="btn btn-primary" id="btnEmployeeReport" ${employees.length ? '' : 'disabled'}>عرض التقرير</button>
+                                    <button type="button" class="btn btn-primary" id="btnEmployeeReport" ${employees.length ? '' : 'disabled'}>عرض التقرير</button>
                                 </div>
                                 <div id="employeeReportContent"></div>
                                 <div id="employeeReportActions" class="report-actions" style="display:none">
@@ -2874,7 +2929,7 @@ const screens = {
                                     <div class="report-field report-field--full">
                                         ${dateRangePickerHtml('company', today)}
                                     </div>
-                                    <button class="btn btn-primary" id="btnCompanyReport">عرض التقرير</button>
+                                    <button type="button" class="btn btn-primary" id="btnCompanyReport">عرض التقرير</button>
                         </div>
                         <div id="companyReportContent"></div>
                                 <div id="companyReportActions" class="report-actions" style="display:none"><button class="btn btn-secondary" id="btnExportCompanyPDF">تصدير PDF</button></div>
@@ -2892,29 +2947,48 @@ const screens = {
             });
             initAllDateRangePickers(container);
 
+            const $ = (id) => container.querySelector('#' + id);
+            const $$ = (sel) => container.querySelectorAll(sel);
+            const readMountDate = (id, fallback = today) => {
+                syncDatePickersIn(container);
+                return ($(id)?.value || fallback || '').trim();
+            };
+            const activateReportTab = (tab) => applyScreenSubTab(container, 'reports', tab);
+            const setReportLoading = (btn, loading) => {
+                if (!btn) return;
+                btn.disabled = loading;
+                if (loading) {
+                    btn.dataset.prevHtml = btn.innerHTML;
+                    btn.innerHTML = '<span class="btn-loading">جاري التحميل...</span>';
+                } else if (btn.dataset.prevHtml) {
+                    btn.innerHTML = btn.dataset.prevHtml;
+                    delete btn.dataset.prevHtml;
+                }
+            };
+
             let collectExpectedAmount = null;
             let collectAlreadyPaid = false;
             let collectBlockedUnreceived = false;
             const hideCollectAmount = () => {
-                document.getElementById('collectAmountBox').style.display = 'none';
-                document.getElementById('collectAlreadyPaidMsg').style.display = 'none';
-                document.getElementById('collectUnreceivedReturnedMsg').style.display = 'none';
-                document.getElementById('collectAmountInput').disabled = false;
-                document.getElementById('btnCollectFees').disabled = false;
+                $('collectAmountBox').style.display = 'none';
+                $('collectAlreadyPaidMsg').style.display = 'none';
+                $('collectUnreceivedReturnedMsg').style.display = 'none';
+                $('collectAmountInput').disabled = false;
+                $('btnCollectFees').disabled = false;
                 collectExpectedAmount = null;
                 collectAlreadyPaid = false;
                 collectBlockedUnreceived = false;
             };
-            document.getElementById('collectDriver').addEventListener('change', hideCollectAmount);
-            document.getElementById('collectOrderDate').addEventListener('change', hideCollectAmount);
+            $('collectDriver').addEventListener('change', hideCollectAmount);
+            $('collectOrderDate').addEventListener('change', hideCollectAmount);
 
-            document.getElementById('btnLoadCollectAmount').addEventListener('click', async () => {
-                const driverId = document.getElementById('collectDriver').value;
-                const orderDate = document.getElementById('collectOrderDate').value;
-                const feedback = document.getElementById('collectFeedback');
-                const amountBox = document.getElementById('collectAmountBox');
-                const totalEl = document.getElementById('collectTotalDue');
-                const countEl = document.getElementById('collectOrderCount');
+            $('btnLoadCollectAmount').addEventListener('click', async () => {
+                const driverId = $('collectDriver').value;
+                const orderDate = $('collectOrderDate').value;
+                const feedback = $('collectFeedback');
+                const amountBox = $('collectAmountBox');
+                const totalEl = $('collectTotalDue');
+                const countEl = $('collectOrderCount');
                 if (!orderDate) {
                     feedback.style.display = 'block';
                     feedback.className = 'scan-feedback error';
@@ -2929,10 +3003,10 @@ const screens = {
                     ]);
                     collectAlreadyPaid = status.collected || false;
                     collectBlockedUnreceived = !!(report && report.hasUnreceivedReturned);
-                    const alreadyPaidMsg = document.getElementById('collectAlreadyPaidMsg');
-                    const unreceivedMsg = document.getElementById('collectUnreceivedReturnedMsg');
-                    const amountInput = document.getElementById('collectAmountInput');
-                    const btnCollect = document.getElementById('btnCollectFees');
+                    const alreadyPaidMsg = $('collectAlreadyPaidMsg');
+                    const unreceivedMsg = $('collectUnreceivedReturnedMsg');
+                    const amountInput = $('collectAmountInput');
+                    const btnCollect = $('btnCollectFees');
                     if (collectAlreadyPaid) {
                         alreadyPaidMsg.style.display = 'block';
                         unreceivedMsg.style.display = 'none';
@@ -2961,7 +3035,7 @@ const screens = {
                         amountBox.style.display = 'block';
                         totalEl.textContent = formatIQD(collectExpectedAmount) + ' د.ع';
                         countEl.textContent = 'عدد الطلبات: ' + report.count + (report.countReturned ? ' | مرتجعات: ' + report.countReturned : '');
-                        document.getElementById('collectAmountInput').value = '';
+                        $('collectAmountInput').value = '';
                     }
                 } catch (err) {
                     feedback.style.display = 'block';
@@ -2972,11 +3046,11 @@ const screens = {
                 }
             });
 
-            document.getElementById('btnCollectFees').addEventListener('click', async () => {
-                const driverId = document.getElementById('collectDriver').value;
-                const orderDate = document.getElementById('collectOrderDate').value;
-                const amountInput = document.getElementById('collectAmountInput').value.trim();
-                const feedback = document.getElementById('collectFeedback');
+            $('btnCollectFees').addEventListener('click', async () => {
+                const driverId = $('collectDriver').value;
+                const orderDate = $('collectOrderDate').value;
+                const amountInput = $('collectAmountInput').value.trim();
+                const feedback = $('collectFeedback');
                 if (!orderDate) {
                     feedback.style.display = 'block';
                     feedback.className = 'scan-feedback error';
@@ -3023,27 +3097,30 @@ const screens = {
                 }
             });
 
-            document.getElementById('dailySummaryAll')?.addEventListener('change', (e) => {
-                document.querySelectorAll('.dailySummaryDriver').forEach(cb => { cb.checked = e.target.checked; });
+            $('dailySummaryAll')?.addEventListener('change', (e) => {
+                $$('.dailySummaryDriver').forEach(cb => { cb.checked = e.target.checked; });
             });
-            document.querySelectorAll('.dailySummaryDriver').forEach(cb => {
+            $$('.dailySummaryDriver').forEach(cb => {
                 cb.addEventListener('change', () => {
-                    const anyUnchecked = [...document.querySelectorAll('.dailySummaryDriver')].some(c => !c.checked);
-                    document.getElementById('dailySummaryAll').checked = !anyUnchecked;
+                    const anyUnchecked = [...$$('.dailySummaryDriver')].some(c => !c.checked);
+                    $('dailySummaryAll').checked = !anyUnchecked;
                 });
             });
 
-            document.getElementById('btnDailySummary')?.addEventListener('click', async () => {
-                const dateFrom = document.getElementById('dailySummaryFrom').value;
-                let dateTo = document.getElementById('dailySummaryTo').value;
+            $('btnDailySummary')?.addEventListener('click', async () => {
+                const dateFrom = readMountDate('dailySummaryFrom');
+                let dateTo = readMountDate('dailySummaryTo');
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
-                const useAll = document.getElementById('dailySummaryAll')?.checked;
-                const driverIds = useAll ? [] : [...document.querySelectorAll('.dailySummaryDriver:checked')].map(c => c.value);
+                const useAll = $('dailySummaryAll')?.checked;
+                const driverIds = useAll ? [] : [...$$('.dailySummaryDriver:checked')].map(c => c.value);
+                const btn = $('btnDailySummary');
+                setReportLoading(btn, true);
                 try {
                     const report = await window.api.reports.dailySummary(dateFrom, dateTo, driverIds);
                     currentDailySummaryReport = report;
-                    const content = document.getElementById('dailySummaryContent');
-                    const actions = document.getElementById('dailySummaryActions');
+                    activateReportTab('daily');
+                    const content = $('dailySummaryContent');
+                    const actions = $('dailySummaryActions');
                     if (!report?.rows?.length) {
                         content.innerHTML = '<div class="report-empty">لا توجد بيانات في الفترة المحددة</div>';
                         actions.style.display = 'none';
@@ -3085,13 +3162,16 @@ const screens = {
                     </div>
                 `;
                 } catch (err) {
-                    document.getElementById('dailySummaryContent').innerHTML = `<div class="scan-feedback error">${err?.message || 'فشل تحميل التقرير'}</div>`;
-                    document.getElementById('dailySummaryActions').style.display = 'none';
+                    activateReportTab('daily');
+                    $('dailySummaryContent').innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                    $('dailySummaryActions').style.display = 'none';
+                } finally {
+                    setReportLoading(btn, false);
                 }
             });
 
             let currentDailySummaryReport = null;
-            document.getElementById('btnDailySummaryPDF')?.addEventListener('click', async () => {
+            $('btnDailySummaryPDF')?.addEventListener('click', async () => {
                 if (!currentDailySummaryReport) return;
                 try {
                     await window.api.reports.dailySummaryReportPDF(currentDailySummaryReport);
@@ -3102,15 +3182,27 @@ const screens = {
 
             let currentDriverReport = null;
 
-            document.getElementById('btnDriverReport').addEventListener('click', async () => {
-                const driverId = document.getElementById('reportDriver').value;
-                const dateFrom = document.getElementById('reportDateFrom').value;
-                let dateTo = document.getElementById('reportDateTo').value;
+            $('btnDriverReport').addEventListener('click', async () => {
+                const btn = $('btnDriverReport');
+                const driverId = parseInt($('reportDriver')?.value, 10);
+                const dateFrom = readMountDate('reportDateFrom');
+                let dateTo = readMountDate('reportDateTo');
+                if (!dateFrom) {
+                    await showMsg('اختر تاريخ البداية');
+                    return;
+                }
+                if (!driverId) {
+                    await showMsg('اختر سائقاً');
+                    return;
+                }
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
-                const content = document.getElementById('driverReportContent');
-                const actions = document.getElementById('driverReportActions');
+                activateReportTab('driver');
+                const content = $('driverReportContent');
+                const actions = $('driverReportActions');
+                setReportLoading(btn, true);
+                content.innerHTML = '<div class="report-empty">جاري تحميل التقرير...</div>';
                 try {
-                const report = await window.api.reports.driverByRange(parseInt(driverId), dateFrom, dateTo);
+                const report = await window.api.reports.driverByRange(driverId, dateFrom, dateTo);
                 currentDriverReport = report;
 
                 if (!report || !(report.orders || []).length) {
@@ -3119,10 +3211,12 @@ const screens = {
                     return;
                 }
 
+                const driverName = pickRowField(report.driver, 'DriverName');
+                const driverPhone = pickRowField(report.driver, 'Phone');
                 const driverAmt = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
                 content.innerHTML = `
                     <div class="report-view">
-                        <div class="report-view-title">تقرير السائق - ${report.driver.DriverName}${report.driver.Phone ? ' | ' + report.driver.Phone : ''}</div>
+                        <div class="report-view-title">تقرير السائق - ${escapeHtml(driverName)}${driverPhone ? ' | ' + escapeHtml(driverPhone) : ''}</div>
                         <div class="report-summary-cards">
                             <div class="report-summary-card"><div class="label">التاريخ</div><div class="value">${report.date}</div></div>
                             <div class="report-summary-card"><div class="label">عدد الطلبات</div><div class="value">${report.count}</div></div>
@@ -3180,27 +3274,38 @@ const screens = {
                     </div>
                 `;
                 actions.style.display = 'flex';
+                content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } catch (err) {
                     currentDriverReport = null;
                     actions.style.display = 'none';
                     content.innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                } finally {
+                    setReportLoading(btn, false);
                 }
             });
 
             let currentEmployeeReport = null;
-            document.getElementById('btnEmployeeReport')?.addEventListener('click', async () => {
-                const employeeId = document.getElementById('reportEmployee').value;
-                const dateFrom = document.getElementById('employeeDateFrom').value;
-                let dateTo = document.getElementById('employeeDateTo').value;
+            $('btnEmployeeReport')?.addEventListener('click', async () => {
+                const btn = $('btnEmployeeReport');
+                const employeeId = parseInt($('reportEmployee')?.value, 10);
+                const dateFrom = readMountDate('employeeDateFrom');
+                let dateTo = readMountDate('employeeDateTo');
                 if (!employeeId) {
                     await showMsg('اختر موظفاً');
                     return;
                 }
+                if (!dateFrom) {
+                    await showMsg('اختر تاريخ البداية');
+                    return;
+                }
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
-                const content = document.getElementById('employeeReportContent');
-                const actions = document.getElementById('employeeReportActions');
+                activateReportTab('employee');
+                const content = $('employeeReportContent');
+                const actions = $('employeeReportActions');
+                setReportLoading(btn, true);
+                content.innerHTML = '<div class="report-empty">جاري تحميل التقرير...</div>';
                 try {
-                const report = await window.api.reports.employeeByRange(parseInt(employeeId, 10), dateFrom, dateTo);
+                const report = await window.api.reports.employeeByRange(employeeId, dateFrom, dateTo);
                 currentEmployeeReport = report;
 
                 const driverAmt = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
@@ -3211,9 +3316,10 @@ const screens = {
                     return;
                 }
 
+                const employeeName = escapeHtml(report.employeeName || pickRowField(report.employee, 'DisplayName', 'Username') || '');
                 content.innerHTML = `
                     <div class="report-view">
-                        <div class="report-view-title">تقرير الموظف - ${escapeHtml(report.employeeName || report.employee?.DisplayName || '')}</div>
+                        <div class="report-view-title">تقرير الموظف - ${employeeName}</div>
                         <div class="report-summary-cards">
                             <div class="report-summary-card"><div class="label">التاريخ</div><div class="value">${report.date}</div></div>
                             <div class="report-summary-card"><div class="label">عدد الطلبات</div><div class="value">${report.count}</div></div>
@@ -3267,14 +3373,17 @@ const screens = {
                     </div>
                 `;
                 actions.style.display = 'flex';
+                content.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } catch (err) {
                     currentEmployeeReport = null;
                     actions.style.display = 'none';
                     content.innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                } finally {
+                    setReportLoading(btn, false);
                 }
             });
 
-            document.getElementById('btnPrintEmployeeReport')?.addEventListener('click', () => {
+            $('btnPrintEmployeeReport')?.addEventListener('click', () => {
                 if (!currentEmployeeReport) return;
                 const w = window.open('', 'printEmployeeReport', 'width=800,height=700,scrollbars=yes,resizable=yes');
                 if (!w) return;
@@ -3296,7 +3405,7 @@ const screens = {
                 w.print();
             });
 
-            document.getElementById('btnExportEmployeePDF')?.addEventListener('click', async () => {
+            $('btnExportEmployeePDF')?.addEventListener('click', async () => {
                 if (!currentEmployeeReport) return;
                 try {
                     await window.api.reports.employeeReportPDF(currentEmployeeReport);
@@ -3308,12 +3417,20 @@ const screens = {
 
             let currentCompanyReport = null;
             const driverAmt = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
-            document.getElementById('btnCompanyReport').addEventListener('click', async () => {
-                const dateFrom = document.getElementById('companyDateFrom').value;
-                let dateTo = document.getElementById('companyDateTo').value;
+            $('btnCompanyReport').addEventListener('click', async () => {
+                const btn = $('btnCompanyReport');
+                const dateFrom = readMountDate('companyDateFrom');
+                let dateTo = readMountDate('companyDateTo');
+                if (!dateFrom) {
+                    await showMsg('اختر تاريخ البداية');
+                    return;
+                }
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
-                const contentEl = document.getElementById('companyReportContent');
-                const actionsEl = document.getElementById('companyReportActions');
+                activateReportTab('company');
+                const contentEl = $('companyReportContent');
+                const actionsEl = $('companyReportActions');
+                setReportLoading(btn, true);
+                contentEl.innerHTML = '<div class="report-empty">جاري تحميل التقرير...</div>';
                 try {
                 const report = await window.api.reports.companyByRange(dateFrom, dateTo);
                 currentCompanyReport = report;
@@ -3322,7 +3439,7 @@ const screens = {
                 const grandTotal = summary.reduce((s, x) => s + (x.net || 0), 0);
                 const grandDue = summary.reduce((s, x) => s + (x.totalDue || 0), 0);
                 const allOrders = summary.flatMap(s => s.orders || []);
-                const hasAnyOrders = (report.totalOrders || 0) > 0 || (report.totalReturned || 0) > 0;
+                const hasAnyOrders = (report?.totalOrders || 0) > 0 || (report?.totalReturned || 0) > 0 || allOrders.length > 0;
 
                 contentEl.innerHTML = !hasAnyOrders
                     ? '<div class="report-empty">لا توجد طلبات في الفترة المحددة</div>'
@@ -3407,21 +3524,25 @@ const screens = {
                     </div>
                 `;
                 actionsEl.style.display = hasAnyOrders ? 'flex' : 'none';
+                if (hasAnyOrders) contentEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                 } catch (err) {
                     currentCompanyReport = null;
                     actionsEl.style.display = 'none';
                     contentEl.innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                } finally {
+                    setReportLoading(btn, false);
                 }
             });
 
-            document.getElementById('btnPrintDriverReport').addEventListener('click', () => {
+            $('btnPrintDriverReport').addEventListener('click', () => {
                 if (currentDriverReport) {
                     const da = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
                     const w = window.open('', '_blank');
+                    const driverName = pickRowField(currentDriverReport.driver, 'DriverName');
                     w.document.write(`
                         <html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير السائق</title></head>
                         <body style="font-family:Tajawal,sans-serif;padding:20px">
-                        <h2>تقرير السائق اليومي - ${currentDriverReport.driver.DriverName}</h2>
+                        <h2>تقرير السائق اليومي - ${driverName}</h2>
                         <p>التاريخ: ${currentDriverReport.date} | عدد الطلبات: ${currentDriverReport.count}</p>
                         <p>المبلغ النهائي: ${formatIQD(currentDriverReport.net)} د.ع | المبلغ المستحق: ${formatIQD(currentDriverReport.totalDue)} د.ع</p>
                         <table border="1" style="width:100%;border-collapse:collapse;margin-top:16px">
@@ -3439,17 +3560,17 @@ const screens = {
                 }
             });
 
-            document.getElementById('btnExportDriverPDF').addEventListener('click', async () => {
+            $('btnExportDriverPDF').addEventListener('click', async () => {
                 if (!currentDriverReport) return;
                 const pdf = await window.api.reports.driverReportPDF(currentDriverReport);
-                const name = `تقرير-سائق-${currentDriverReport.driver.DriverName}-${currentDriverReport.date}.pdf`;
+                const name = `تقرير-سائق-${pickRowField(currentDriverReport.driver, 'DriverName')}-${currentDriverReport.date}.pdf`;
                 const res = await window.api.reports.savePDF({ base64: pdf, defaultName: name });
                 if (res.saved) await showMsg('تم حفظ الملف: ' + res.path);
             });
 
-            document.getElementById('btnExportCompanyPDF').addEventListener('click', async () => {
+            $('btnExportCompanyPDF').addEventListener('click', async () => {
                 if (!currentCompanyReport) return;
-                const btn = document.getElementById('btnExportCompanyPDF');
+                const btn = $('btnExportCompanyPDF');
                 const origText = btn.innerHTML;
                 btn.disabled = true;
                 btn.innerHTML = '<span class="btn-loading">جاري التصدير...</span>';

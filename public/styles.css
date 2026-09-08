@@ -4055,6 +4055,17 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     flex: 1;
     min-height: 0;
 }
+
+#pane-driver.active #driverReportContent,
+#pane-employee.active #employeeReportContent,
+#pane-company.active #companyReportContent {
+    min-height: 48px;
+}
+
+#pane-driver.active,
+#pane-employee.active {
+    display: block !important;
+}
 #pane-company.active #companyReportActions {
     flex-shrink: 0;
     margin-top: auto;
@@ -7255,4 +7266,34 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     }
 
     .content-topbar__crumb { display: none; }
+}
+
+/* إخفاء الشريط الجانبي على سطح المكتب — أولوية عالية */
+@media (min-width: 901px) {
+    #app-main .app-body.sidebar-collapsed .sidebar {
+        width: 0 !important;
+        min-width: 0 !important;
+        max-width: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        opacity: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+        overflow: hidden !important;
+        transform: translateX(100%) !important;
+    }
+
+    #app-main .app-body:not(.sidebar-collapsed) .sidebar {
+        transform: translateX(0) !important;
+    }
+
+    #app-main .app-body.sidebar-collapsed .content,
+    #app-main .app-body.sidebar-collapsed .content::before {
+        margin-right: 0 !important;
+    }
+
+    #app-main .app-body.sidebar-collapsed .sidebar-toggle {
+        right: 0 !important;
+    }
 }
