@@ -16,8 +16,15 @@ function getAuthHeaders(extra = {}) {
 
 async function apiGet(url) {
     const res = await fetch(API_BASE + url, { headers: getAuthHeaders() });
-    if (!res.ok) throw new Error(await res.text().catch(() => res.statusText));
-    const text = await res.text();
+    const text = await res.text().catch(() => res.statusText || '');
+    if (!res.ok) {
+        let msg = text || res.statusText;
+        try {
+            const j = JSON.parse(text);
+            msg = j.error || j.message || msg;
+        } catch (_) {}
+        throw new Error(msg);
+    }
     if (!text) return null;
     try { return JSON.parse(text); } catch { return text; }
 }

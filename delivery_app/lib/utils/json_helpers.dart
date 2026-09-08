@@ -31,6 +31,18 @@ String pickField(Map<dynamic, dynamic> map, List<String> keys, [String fallback 
   return fallback;
 }
 
+/// Like pickField but returns value even when empty (key exists).
+String pickFieldRaw(Map<dynamic, dynamic> map, List<String> keys, [String fallback = '']) {
+  for (final key in keys) {
+    for (final entry in map.entries) {
+      if ('${entry.key}'.toLowerCase() == key.toLowerCase()) {
+        return pickStr(entry.value, fallback);
+      }
+    }
+  }
+  return fallback;
+}
+
 int pickFieldInt(Map<dynamic, dynamic> map, List<String> keys, [int fallback = 0]) {
   for (final key in keys) {
     for (final entry in map.entries) {

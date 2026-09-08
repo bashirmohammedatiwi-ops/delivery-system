@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../utils/driver_order_utils.dart';
+import '../../../utils/json_helpers.dart';
 import '../../../services/driver_api.dart';
 import '../driver_app.dart';
 import '../driver_theme.dart';
@@ -276,25 +277,55 @@ class _OrderCard extends StatelessWidget {
   }
 }
 
-void showDriverOrderDetail(BuildContext context, Map<String, dynamic> order, {VoidCallback? onAction}) {
+void showDriverOrderDetail(
+  BuildContext context,
+  Map<String, dynamic> order, {
+  VoidCallback? onAction,
+  bool readOnly = false,
+}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _OrderDetailSheet(order: order, onAction: onAction ?? () => Navigator.pop(ctx)),
+    builder: (ctx) => _OrderDetailSheet(
+      order: order,
+      onAction: onAction ?? () => Navigator.pop(ctx),
+      readOnly: readOnly,
+    ),
   );
 }
 
 class _OrderDetailSheet extends StatelessWidget {
   final Map<String, dynamic> order;
   final VoidCallback onAction;
+  final bool readOnly;
 
-  const _OrderDetailSheet({required this.order, required this.onAction});
+  const _OrderDetailSheet({
+    required this.order,
+    required this.onAction,
+    this.readOnly = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final deferred = isDeferredOrder(order);
-    final reason = order['DeferredReason']?.toString() ?? order['deferredreason']?.toString() ?? '';
+    final reason = pickField(order, ['DeferredReason', 'deferredreason']);
+    final shipment = pickField(order, ['ShipmentNumber', 'shipmentnumber']);
+    final storeName = pickField(order, ['StoreName', 'storename']);
+    final storePhone = pickField(order, ['StorePhone', 'storephone']);
+    final customerName = pickField(order, ['CustomerName', 'customername']);
+    final customerPhone = pickField(order, ['CustomerPhone', 'customerphone']);
+    final address = pickField(order, ['Address', 'address']);
+    final locationLink = pickField(order, ['CustomerLocationLink', 'customerlocationlink']);
+    final regionName = pickField(order, ['RegionName', 'regionname']);
+    final adminOrderNo = pickField(order, ['AdminOrderNo', 'adminorderno']);
+    final notes = pickFieldRaw(order, ['Notes', 'notes']);
+    final pieces = pickFieldInt(order, ['Pieces', 'pieces'], 1);
+    final amountIqd = pickFieldInt(order, ['AmountIQD', 'amountiqd']);
+    final deliveryFee = pickFieldInt(order, ['DeliveryFeeIQD', 'deliveryfeeiqd']);
+    final waivedFee = pickFieldInt(order, ['WaivedDeliveryIQD', 'waiveddeliveryiqd']);
+    final displayDeliveryFee = waivedFee > 0 ? waivedFee : deliveryFee;
+    final totalIqd = pickFieldInt(order, ['TotalIQD', 'totaliqd']);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -314,6 +345,14 @@ class _OrderDetailSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
             children: [
               DriverUiKit.bottomSheetHeader(title: 'تفاصيل الشحنة', onClose: () => Navigator.pop(context)),
+              if (readOnly) ...[
+                const SizedBox(height: 8),
+                DriverUiKit.infoBanner(
+                  message: 'طلب منتظر للاستلام — للعرض فقط',
+                  color: DriverTheme.secondary,
+                  icon: Icons.info_outline_rounded,
+                ),
+              ],
               if (deferred) ...[
                 const SizedBox(height: 8),
                 Container(
@@ -343,145 +382,181 @@ class _OrderDetailSheet extends StatelessWidget {
                   border: deferred ? Border.all(color: DriverTheme.warning.withValues(alpha: 0.35)) : null,
                 ),
                 child: Text(
-                  '#${order['ShipmentNumber']}',
+                  '#$shipment',
                   style: GoogleFonts.cairo(fontSize: 22, fontWeight: FontWeight.w800, color: deferred ? DriverTheme.warning : Colors.white),
                   textAlign: TextAlign.center,
                 ),
               ),
               const SizedBox(height: 20),
-              DriverUiKit.detailRow(icon: Icons.store_rounded, label: 'المحل', value: order['StoreName']?.toString()),
-              DriverUiKit.detailRow(icon: Icons.person_rounded, label: 'العميل', value: order['CustomerName']?.toString()),
+              DriverUiKit.detailRow(icon: Icons.store_rounded, label: 'المحل', value: storeName.isEmpty ? '—' : storeName),
+              if (storePhone.isNotEmpty)
+                DriverUiKit.detailRow(
+                  icon: Icons.phone_in_talk_rounded,
+                  label: 'هاتف المتجر',
+                  value: storePhone,
+                  valueColor: DriverTheme.primary,
+                  onTap: () {
+                    final phone = storePhone.replaceAll(RegExp(r'\D'), '');
+                    if (phone.isNotEmpty) launchUrl(Uri.parse('tel:$phone'));
+                  },
+                ),
+              DriverUiKit.detailRow(icon: Icons.person_rounded, label: 'العميل', value: customerName.isEmpty ? '—' : customerName),
               DriverUiKit.detailRow(
                 icon: Icons.phone_rounded,
                 label: 'هاتف العميل',
-                value: order['CustomerPhone']?.toString(),
+                value: customerPhone.isEmpty ? '—' : customerPhone,
                 valueColor: DriverTheme.primary,
-                onTap: () {
-                  final phone = order['CustomerPhone']?.toString().replaceAll(RegExp(r'\D'), '') ?? '';
-                  if (phone.isNotEmpty) launchUrl(Uri.parse('tel:$phone'));
-                },
+                onTap: customerPhone.isEmpty
+                    ? null
+                    : () {
+                        final phone = customerPhone.replaceAll(RegExp(r'\D'), '');
+                        if (phone.isNotEmpty) launchUrl(Uri.parse('tel:$phone'));
+                      },
               ),
-              DriverUiKit.detailRow(icon: Icons.location_on_rounded, label: 'العنوان', value: order['Address']?.toString()),
-              if (order['CustomerLocationLink'] != null && (order['CustomerLocationLink'] as String).isNotEmpty)
+              DriverUiKit.detailRow(icon: Icons.location_on_rounded, label: 'العنوان', value: address.isEmpty ? '—' : address),
+              if (locationLink.isNotEmpty)
                 DriverUiKit.detailRow(
                   icon: Icons.map_rounded,
                   label: 'الموقع',
                   value: 'فتح على الخريطة',
                   valueColor: DriverTheme.secondary,
-                  onTap: () => launchUrl(Uri.parse(order['CustomerLocationLink'])),
+                  onTap: () => launchUrl(Uri.parse(locationLink)),
                 ),
+              if (regionName.isNotEmpty)
+                DriverUiKit.detailRow(icon: Icons.place_rounded, label: 'المنطقة', value: regionName),
+              if (adminOrderNo.isNotEmpty)
+                DriverUiKit.detailRow(icon: Icons.tag_rounded, label: 'رقم الأدمن', value: adminOrderNo),
+              DriverUiKit.detailRow(icon: Icons.inventory_2_outlined, label: 'عدد القطع', value: '$pieces'),
+              DriverUiKit.detailRow(icon: Icons.receipt_long_rounded, label: 'مبلغ الفاتورة', value: formatIQD(amountIqd)),
+              DriverUiKit.detailRow(icon: Icons.local_shipping_outlined, label: 'أجرة التوصيل', value: formatIQD(displayDeliveryFee)),
               DriverUiKit.detailRow(
                 icon: Icons.payments_rounded,
-                label: 'المبلغ',
-                value: formatIQD(order['TotalIQD'] ?? order['totaliqd']),
+                label: 'المبلغ الإجمالي',
+                value: formatIQD(totalIqd),
                 valueColor: DriverTheme.success,
               ),
-              if (order['Notes'] != null && (order['Notes'] as String).isNotEmpty)
-                DriverUiKit.detailRow(icon: Icons.note_rounded, label: 'ملاحظات', value: order['Notes']?.toString()),
-              const SizedBox(height: 12),
-              if (deferred)
-                FilledButton.icon(
-                  onPressed: () async {
-                    if (!context.mounted) return;
-                    if (!await _confirm(context, 'هل تريد إعادة الطلب للتوصيل الآن؟')) return;
-                    try {
-                      await DriverApi.resumeDeferredOrder(orderIdOf(order));
-                      onAction();
-                    } catch (e) {
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                    }
-                  },
-                  icon: const Icon(Icons.play_circle_rounded, size: 22),
-                  label: const Text('إلغاء التأجيل — متابعة التوصيل'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: DriverTheme.warning,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
-                  ),
-                )
-              else
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final reason = await _askDeferReason(context);
-                    if (reason == null || reason.trim().isEmpty) return;
-                    try {
-                      await DriverApi.deferOrder(orderIdOf(order), reason.trim());
-                      onAction();
-                    } catch (e) {
-                      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                    }
-                  },
-                  icon: const Icon(Icons.pause_circle_rounded, size: 22),
-                  label: const Text('تأجيل الطلب'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: DriverTheme.warning,
-                    side: BorderSide(color: DriverTheme.warning.withValues(alpha: 0.6)),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
-                  ),
-                ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: deferred
-                          ? null
-                          : () async {
-                              if (!context.mounted) return;
-                              if (!await _confirm(context, 'هل تم توصيل الطلب؟')) return;
-                              try {
-                                await DriverApi.deliverOrder(orderIdOf(order));
-                                onAction();
-                              } catch (e) {
-                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                              }
-                            },
-                      icon: const Icon(Icons.check_circle_rounded, size: 22),
-                      label: const Text('تم التوصيل'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: DriverTheme.success,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: deferred
-                          ? null
-                          : () async {
-                              final reason = await showDialog<String>(
-                                context: context,
-                                builder: (ctx) => SimpleDialog(
-                                  title: Text('سبب الإرجاع', style: DriverTheme.titleMedium),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusLg)),
-                                  children: ['غير متوفر', 'رفض الاستلام', 'عنوان خاطئ', 'المحل مغلق', 'أخرى']
-                                      .map((r) => ListTile(title: Text(r), onTap: () => Navigator.pop(ctx, r)))
-                                      .toList(),
-                                ),
-                              );
-                              if (reason == null) return;
-                              try {
-                                await DriverApi.returnOrder(orderIdOf(order), reason);
-                                onAction();
-                              } catch (e) {
-                                if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
-                              }
-                            },
-                      icon: const Icon(Icons.undo_rounded, size: 22),
-                      label: const Text('إرجاع'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: DriverTheme.danger,
-                        side: const BorderSide(color: DriverTheme.danger),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
-                      ),
-                    ),
-                  ),
-                ],
+              DriverUiKit.detailRow(
+                icon: Icons.note_rounded,
+                label: 'ملاحظات',
+                value: notes.isEmpty ? '—' : notes,
+                multiline: true,
               ),
+              const SizedBox(height: 12),
+              if (readOnly)
+                FilledButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: DriverTheme.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
+                  ),
+                  child: Text('إغلاق', style: GoogleFonts.cairo(fontWeight: FontWeight.w800)),
+                )
+              else ...[
+                if (deferred)
+                  FilledButton.icon(
+                    onPressed: () async {
+                      if (!context.mounted) return;
+                      if (!await _confirm(context, 'هل تريد إعادة الطلب للتوصيل الآن؟')) return;
+                      try {
+                        await DriverApi.resumeDeferredOrder(orderIdOf(order));
+                        onAction();
+                      } catch (e) {
+                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                      }
+                    },
+                    icon: const Icon(Icons.play_circle_rounded, size: 22),
+                    label: const Text('إلغاء التأجيل — متابعة التوصيل'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: DriverTheme.warning,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
+                    ),
+                  )
+                else
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final reason = await _askDeferReason(context);
+                      if (reason == null || reason.trim().isEmpty) return;
+                      try {
+                        await DriverApi.deferOrder(orderIdOf(order), reason.trim());
+                        onAction();
+                      } catch (e) {
+                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                      }
+                    },
+                    icon: const Icon(Icons.pause_circle_rounded, size: 22),
+                    label: const Text('تأجيل الطلب'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: DriverTheme.warning,
+                      side: BorderSide(color: DriverTheme.warning.withValues(alpha: 0.6)),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: deferred
+                            ? null
+                            : () async {
+                                if (!context.mounted) return;
+                                if (!await _confirm(context, 'هل تم توصيل الطلب؟')) return;
+                                try {
+                                  await DriverApi.deliverOrder(orderIdOf(order));
+                                  onAction();
+                                } catch (e) {
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                }
+                              },
+                        icon: const Icon(Icons.check_circle_rounded, size: 22),
+                        label: const Text('تم التوصيل'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: DriverTheme.success,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: deferred
+                            ? null
+                            : () async {
+                                final reason = await showDialog<String>(
+                                  context: context,
+                                  builder: (ctx) => SimpleDialog(
+                                    title: Text('سبب الإرجاع', style: DriverTheme.titleMedium),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusLg)),
+                                    children: ['غير متوفر', 'رفض الاستلام', 'عنوان خاطئ', 'المحل مغلق', 'أخرى']
+                                        .map((r) => ListTile(title: Text(r), onTap: () => Navigator.pop(ctx, r)))
+                                        .toList(),
+                                  ),
+                                );
+                                if (reason == null) return;
+                                try {
+                                  await DriverApi.returnOrder(orderIdOf(order), reason);
+                                  onAction();
+                                } catch (e) {
+                                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+                                }
+                              },
+                        icon: const Icon(Icons.undo_rounded, size: 22),
+                        label: const Text('إرجاع'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: DriverTheme.danger,
+                          side: const BorderSide(color: DriverTheme.danger),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(DriverTheme.radiusMd)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),

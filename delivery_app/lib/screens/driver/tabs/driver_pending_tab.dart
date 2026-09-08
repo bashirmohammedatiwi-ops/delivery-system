@@ -7,6 +7,7 @@ import '../driver_app.dart';
 import '../driver_theme.dart';
 import '../../../widgets/app_layout.dart';
 import '../driver_ui_kit.dart';
+import 'driver_orders_tab.dart' show showDriverOrderDetail;
 
 class DriverPendingTab extends StatefulWidget {
   const DriverPendingTab({super.key});
@@ -277,36 +278,57 @@ class _PendingOrdersListSheetState extends State<_PendingOrdersListSheet> {
                             itemBuilder: (_, i) {
                               final o = _orders[i];
                               final store = pickField(o, ['StoreName', 'storename']);
-                              return DriverUiKit.listCard(
-                                accent: widget.area == 'الكرخ' ? DriverTheme.karkh : DriverTheme.rusafa,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '#${pickField(o, ['ShipmentNumber', 'shipmentnumber'])}',
-                                            style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: DriverTheme.primary, fontSize: 16, height: 1.3),
+                              final region = pickField(o, ['RegionName', 'regionname']);
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () => showDriverOrderDetail(context, o, readOnly: true),
+                                    borderRadius: BorderRadius.circular(DriverTheme.radiusLg),
+                                    child: DriverUiKit.listCard(
+                                      accent: widget.area == 'الكرخ' ? DriverTheme.karkh : DriverTheme.rusafa,
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  '#${pickField(o, ['ShipmentNumber', 'shipmentnumber'])}',
+                                                  style: GoogleFonts.cairo(fontWeight: FontWeight.w800, color: DriverTheme.primary, fontSize: 16, height: 1.3),
+                                                ),
+                                              ),
+                                              Text(
+                                                formatIQD(pickFieldInt(o, ['TotalIQD', 'totaliqd'])),
+                                                style: GoogleFonts.cairo(fontWeight: FontWeight.w700, color: DriverTheme.success, height: 1.3),
+                                              ),
+                                            ],
                                           ),
-                                        ),
-                                        Text(
-                                          formatIQD(pickFieldInt(o, ['TotalIQD', 'totaliqd'])),
-                                          style: GoogleFonts.cairo(fontWeight: FontWeight.w700, color: DriverTheme.success, height: 1.3),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 8),
+                                          Text(pickField(o, ['CustomerName', 'customername'], '—'), style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
+                                          if (pickField(o, ['Address', 'address']).isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text(pickField(o, ['Address', 'address']), style: GoogleFonts.cairo(fontSize: 12, color: DriverTheme.onSurfaceVariant, height: 1.35), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                          ],
+                                          if (region.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            DriverUiKit.statusChip(region, DriverTheme.secondary),
+                                          ],
+                                          if (store.isNotEmpty) ...[
+                                            const SizedBox(height: 6),
+                                            DriverUiKit.statusChip(store, DriverTheme.primary),
+                                          ],
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'اضغط لعرض التفاصيل الكاملة',
+                                            style: GoogleFonts.cairo(fontSize: 12, fontWeight: FontWeight.w700, color: DriverTheme.primary),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Text(pickField(o, ['CustomerName', 'customername'], '—'), style: GoogleFonts.cairo(fontSize: 15, fontWeight: FontWeight.w700, height: 1.3)),
-                                    if (pickField(o, ['Address', 'address']).isNotEmpty) ...[
-                                      const SizedBox(height: 4),
-                                      Text(pickField(o, ['Address', 'address']), style: GoogleFonts.cairo(fontSize: 12, color: DriverTheme.onSurfaceVariant, height: 1.35), maxLines: 2, overflow: TextOverflow.ellipsis),
-                                    ],
-                                    if (store.isNotEmpty) ...[
-                                      const SizedBox(height: 6),
-                                      DriverUiKit.statusChip(store, DriverTheme.secondary),
-                                    ],
-                                  ],
+                                  ),
                                 ),
                               );
                             },

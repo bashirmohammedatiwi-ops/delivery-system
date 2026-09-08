@@ -122,7 +122,7 @@ body {
 }
 
 .app-body.sidebar-collapsed .sidebar-toggle-icon {
-    transform: rotate(0deg);
+    transform: rotate(180deg);
 }
 
 /* ─── القائمة الجانبية ─── */
@@ -4295,6 +4295,33 @@ tbody tr:hover { background: var(--primary-soft) !important; }
         margin-top: 2px;
     }
 
+    .mobile-topbar__inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .mobile-topbar__refresh {
+        flex-shrink: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: linear-gradient(135deg, #fff, #F8FAFC);
+        color: var(--primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    }
+
+    .mobile-topbar__refresh:active {
+        transform: scale(0.96);
+    }
+
     .mobile-bottom-nav {
         display: flex;
         position: fixed;
@@ -5107,6 +5134,16 @@ tbody tr:hover { background: var(--primary-soft) !important; }
     background: linear-gradient(180deg, #0B1220 0%, #111827 45%, #0F172A 100%);
     border-left-color: rgba(255, 255, 255, 0.06);
     box-shadow: -16px 0 48px rgba(0, 0, 0, 0.22);
+}
+
+#app-main .app-body.sidebar-collapsed .sidebar {
+    width: 0;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#app-main .app-body.sidebar-collapsed .content {
+    margin-right: 0;
 }
 
 #app-main .sidebar::before {

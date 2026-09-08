@@ -1236,13 +1236,13 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
         sql += ` AND o.DriverID IN (${driverIds.map(() => '?').join(',')})`;
         params.push(...driverIds.map(id => parseInt(id)));
     }
-    sql += ' ORDER BY d."DriverName", date(o."CreatedDate")';
+    sql += ' ORDER BY d.DriverName, date(o.CreatedDate)';
     const orders = db_.prepare(sql).all(...params);
     const byKey = {};
     for (const o of orders) {
-        const dateStr = (o.OrderDate || '').toString().slice(0, 10);
+        const dateStr = (o.OrderDate || o.orderDate || '').toString().slice(0, 10);
         const driverId = o.DriverID || 0;
-        const driverName = o.DriverName || 'غير معين';
+        const driverName = o.DriverName || o.driverName || 'غير معين';
         const key = `${driverId}:${dateStr}`;
         if (!byKey[key]) {
             byKey[key] = {
@@ -1268,9 +1268,9 @@ function getDailySummaryReport(driverIds, dateFrom, dateTo) {
             rec.countReturned++;
         } else {
             rec.count++;
-            rec.totalAmount += o.AmountIQD || 0;
+            rec.totalAmount += Number(o.AmountIQD || 0);
             rec.totalDelivery += getDriverDeliveryAmount(o);
-            rec.net += o.TotalIQD || 0;
+            rec.net += Number(o.TotalIQD || 0);
             rec.totalDue += getAmountDue(o);
             if (o.FreeDelivery) {
                 rec.countFreeDelivery++;

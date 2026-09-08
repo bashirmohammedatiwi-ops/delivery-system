@@ -40,8 +40,41 @@ function invalidateDashboardCache() {
 
 const screenMounts = new Map();
 
+const SCREENS_WITH_SUBTABS = {
+    reports: { paneSelector: '.report-pane', panePrefix: '#pane-', defaultTab: 'collect' },
+    settings: { paneSelector: '.settings-pane', panePrefix: '#settings-pane-', defaultTab: 'regions' },
+    'support-sections': { paneSelector: '.support-section-pane', panePrefix: '#support-pane-', defaultTab: 'driver-return' }
+};
+
 function screenCacheKey(screenId, subTab) {
+    if (SCREENS_WITH_SUBTABS[screenId]) return `${screenId}:`;
     return `${screenId}:${subTab || ''}`;
+}
+
+function getScreenInitialTab(defaultTab) {
+    return document.getElementById('screen-container')?.dataset.initialTab || defaultTab;
+}
+
+function applyScreenSubTab(mount, screenId, subTab) {
+    const cfg = SCREENS_WITH_SUBTABS[screenId];
+    if (!cfg) return;
+    const tab = subTab || cfg.defaultTab;
+    mount.dataset.initialTab = tab;
+    const screenContainer = document.getElementById('screen-container');
+    if (screenContainer) screenContainer.dataset.initialTab = tab;
+    mount.querySelectorAll('.ux-subnav__item').forEach(btn => {
+        btn.classList.toggle('is-active', btn.dataset.tab === tab);
+    });
+    mount.querySelectorAll(cfg.paneSelector).forEach(p => p.classList.remove('active'));
+    mount.querySelector(`${cfg.panePrefix}${tab}`)?.classList.add('active');
+}
+
+function screenNeedsLiveRefresh(screenId) {
+    if (screenId === 'dashboard') {
+        return !dashboardHomeCache.data || Date.now() - dashboardHomeCache.ts >= DASHBOARD_CACHE_MS;
+    }
+    if (screenId === 'drivers') return true;
+    return false;
 }
 
 function invalidateScreenCache(screenId) {
@@ -472,8 +505,14 @@ function bindUxSubnav(container, opts) {
             container.querySelectorAll(paneSelector).forEach(p => p.classList.remove('active'));
             container.querySelector(`${panePrefix}${tab}`)?.classList.add('active');
             container.dataset.initialTab = tab;
-            const screenId = document.getElementById('screen-container')?.dataset.currentScreen;
-            if (screenId) updateDesktopChrome(screenId, tab);
+            const screenContainer = document.getElementById('screen-container');
+            const screenId = screenContainer?.dataset.currentScreen;
+            if (screenContainer) screenContainer.dataset.initialTab = tab;
+            if (screenId) {
+                setNavActive(screenId, tab);
+                updateDesktopChrome(screenId, tab);
+                updateMobileChrome(screenId, tab);
+            }
             if (onChange) onChange(tab);
         });
     });
@@ -1230,15 +1269,13 @@ function initSidebarNav() {
 
         if (item.classList.contains('nav-parent')) {
             const group = item.closest('.nav-group');
-            const wasExpanded = group?.classList.contains('expanded');
-            group?.classList.toggle('expanded');
-            /* عند التوسيع أو عند الضغط على قسم موسّع: عرض الفرعي الأول */
-            if (group?.classList.contains('expanded')) {
-                const firstChild = group.querySelector('.nav-child');
-                const tab = firstChild?.dataset.tab;
-                setNavActive(screen, tab);
-                showScreen(screen, tab || undefined);
+            if (!group?.classList.contains('expanded')) {
+                group?.classList.add('expanded');
             }
+            const firstChild = group.querySelector('.nav-child');
+            const tab = firstChild?.dataset.tab;
+            setNavActive(screen, tab);
+            showScreen(screen, tab || undefined);
         } else {
             setNavActive(screen, item.dataset.tab);
             showScreen(screen, item.dataset.tab);
@@ -1250,24 +1287,34 @@ function initSidebarNav() {
 }
 
 function showScreen(screenId, subTab, options = {}) {
-    const key = screenCacheKey(screenId, subTab);
-    setNavActive(screenId, subTab);
-    updateMobileChrome(screenId, subTab);
-    updateDesktopChrome(screenId, subTab);
+    const cfg = SCREENS_WITH_SUBTABS[screenId];
+    const resolvedSubTab = subTab || (cfg ? cfg.defaultTab : '');
+    const key = screenCacheKey(screenId, resolvedSubTab);
+    setNavActive(screenId, resolvedSubTab || subTab);
+    updateMobileChrome(screenId, resolvedSubTab || subTab);
+    updateDesktopChrome(screenId, resolvedSubTab || subTab);
     const container = document.getElementById('screen-container');
     if (!container) return;
     container.dataset.currentScreen = screenId || '';
-    container.dataset.initialTab = subTab || '';
+    container.dataset.initialTab = resolvedSubTab || subTab || '';
 
     container.querySelectorAll('.screen-mount').forEach(m => {
         m.classList.remove('active');
         m.hidden = true;
     });
 
+    let force = options.force;
     const cached = screenMounts.get(key);
-    if (cached && !cached.stale && !options.force) {
+    if (cached && !cached.stale && !force) {
+        if (screenNeedsLiveRefresh(screenId)) force = true;
+    }
+
+    if (cached && !cached.stale && !force) {
         cached.mount.hidden = false;
         cached.mount.classList.add('active');
+        if (cfg && (resolvedSubTab || subTab)) {
+            applyScreenSubTab(cached.mount, screenId, resolvedSubTab || subTab);
+        }
         return;
     }
 
@@ -1279,10 +1326,11 @@ function showScreen(screenId, subTab, options = {}) {
     const mount = document.createElement('div');
     mount.className = 'screen-mount active';
     mount.dataset.screenKey = key;
+    mount.dataset.initialTab = resolvedSubTab || subTab || '';
     container.appendChild(mount);
     screenMounts.set(key, { mount, stale: false });
 
-    if (options.force) mount.dataset.forceRefresh = '1';
+    if (force) mount.dataset.forceRefresh = '1';
     if (options.ordersStatus) mount.dataset.ordersInitialStatus = options.ordersStatus;
     if (options.ordersSearch) mount.dataset.ordersInitialSearch = options.ordersSearch;
 
@@ -2489,7 +2537,7 @@ const screens = {
 
     'support-sections': {
         async render(container) {
-            const initialTab = container.dataset.initialTab || 'driver-return';
+            const initialTab = getScreenInitialTab('driver-return');
             container.innerHTML = `
                 <div class="screen active support-sections-screen support-sections-screen--v4">
                     ${renderUxHero({
@@ -2713,7 +2761,7 @@ const screens = {
             let today = new Date().toISOString().split('T')[0];
             try { const t = await window.api.settings.getToday(); today = t.today || today; } catch (_) {}
 
-            const initialTab = container.dataset.initialTab || 'collect';
+            const initialTab = getScreenInitialTab('collect');
             container.innerHTML = `
                 <div class="screen active reports-screen reports-screen--v4">
                     ${renderUxHero({
@@ -2903,7 +2951,7 @@ const screens = {
                         amountInput.disabled = false;
                         btnCollect.disabled = false;
                     }
-                    if (!report || report.orders.length === 0) {
+                    if (!report || !(report.orders || []).length) {
                         amountBox.style.display = 'block';
                         totalEl.textContent = '0 د.ع';
                         countEl.textContent = 'لا توجد طلبات لهذا اليوم';
@@ -2996,7 +3044,7 @@ const screens = {
                     currentDailySummaryReport = report;
                     const content = document.getElementById('dailySummaryContent');
                     const actions = document.getElementById('dailySummaryActions');
-                    if (!report.rows.length) {
+                    if (!report?.rows?.length) {
                         content.innerHTML = '<div class="report-empty">لا توجد بيانات في الفترة المحددة</div>';
                         actions.style.display = 'none';
                         return;
@@ -3059,13 +3107,13 @@ const screens = {
                 const dateFrom = document.getElementById('reportDateFrom').value;
                 let dateTo = document.getElementById('reportDateTo').value;
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
+                const content = document.getElementById('driverReportContent');
+                const actions = document.getElementById('driverReportActions');
+                try {
                 const report = await window.api.reports.driverByRange(parseInt(driverId), dateFrom, dateTo);
                 currentDriverReport = report;
 
-                const content = document.getElementById('driverReportContent');
-                const actions = document.getElementById('driverReportActions');
-
-                if (!report || report.orders.length === 0) {
+                if (!report || !(report.orders || []).length) {
                     content.innerHTML = '<div class="report-empty">لا توجد طلبات لهذا السائق في الفترة المحددة</div>';
                     actions.style.display = 'none';
                     return;
@@ -3132,6 +3180,11 @@ const screens = {
                     </div>
                 `;
                 actions.style.display = 'flex';
+                } catch (err) {
+                    currentDriverReport = null;
+                    actions.style.display = 'none';
+                    content.innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                }
             });
 
             let currentEmployeeReport = null;
@@ -3144,14 +3197,15 @@ const screens = {
                     return;
                 }
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
+                const content = document.getElementById('employeeReportContent');
+                const actions = document.getElementById('employeeReportActions');
+                try {
                 const report = await window.api.reports.employeeByRange(parseInt(employeeId, 10), dateFrom, dateTo);
                 currentEmployeeReport = report;
 
-                const content = document.getElementById('employeeReportContent');
-                const actions = document.getElementById('employeeReportActions');
                 const driverAmt = o => o.FreeDelivery ? (o.WaivedDeliveryIQD || 0) : (o.DeliveryFeeIQD || 0);
 
-                if (!report || report.orders.length === 0) {
+                if (!report || !(report.orders || []).length) {
                     content.innerHTML = '<div class="report-empty">لا توجد طلبات لهذا الموظف في الفترة المحددة</div>';
                     actions.style.display = 'none';
                     return;
@@ -3213,6 +3267,11 @@ const screens = {
                     </div>
                 `;
                 actions.style.display = 'flex';
+                } catch (err) {
+                    currentEmployeeReport = null;
+                    actions.style.display = 'none';
+                    content.innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                }
             });
 
             document.getElementById('btnPrintEmployeeReport')?.addEventListener('click', () => {
@@ -3253,15 +3312,19 @@ const screens = {
                 const dateFrom = document.getElementById('companyDateFrom').value;
                 let dateTo = document.getElementById('companyDateTo').value;
                 if (!dateTo || dateTo < dateFrom) dateTo = dateFrom;
+                const contentEl = document.getElementById('companyReportContent');
+                const actionsEl = document.getElementById('companyReportActions');
+                try {
                 const report = await window.api.reports.companyByRange(dateFrom, dateTo);
                 currentCompanyReport = report;
 
-                const grandTotal = report.summary.reduce((s, x) => s + x.net, 0);
-                const grandDue = report.summary.reduce((s, x) => s + (x.totalDue || 0), 0);
-                const allOrders = report.summary.flatMap(s => s.orders);
+                const summary = report?.summary || [];
+                const grandTotal = summary.reduce((s, x) => s + (x.net || 0), 0);
+                const grandDue = summary.reduce((s, x) => s + (x.totalDue || 0), 0);
+                const allOrders = summary.flatMap(s => s.orders || []);
                 const hasAnyOrders = (report.totalOrders || 0) > 0 || (report.totalReturned || 0) > 0;
 
-                document.getElementById('companyReportContent').innerHTML = !hasAnyOrders
+                contentEl.innerHTML = !hasAnyOrders
                     ? '<div class="report-empty">لا توجد طلبات في الفترة المحددة</div>'
                     : `
                     <div class="report-view">
@@ -3269,9 +3332,9 @@ const screens = {
                         <div class="report-summary-cards">
                             <div class="report-summary-card"><div class="label">إجمالي الطلبات</div><div class="value">${report.totalOrders}</div></div>
                             <div class="report-summary-card"><div class="label">عدد المرتجعات</div><div class="value">${report.totalReturned || 0}</div></div>
-                            <div class="report-summary-card"><div class="label">عدد السائقين</div><div class="value">${report.summary.length}</div></div>
-                            <div class="report-summary-card"><div class="label">إجمالي الفواتير</div><div class="value">${formatIQD(report.summary.reduce((a,x)=>a+x.totalAmount,0))} د.ع</div></div>
-                            <div class="report-summary-card"><div class="label">أجور التوصيل</div><div class="value">${formatIQD(report.summary.reduce((a,x)=>a+x.totalDelivery,0))} د.ع</div></div>
+                            <div class="report-summary-card"><div class="label">عدد السائقين</div><div class="value">${summary.length}</div></div>
+                            <div class="report-summary-card"><div class="label">إجمالي الفواتير</div><div class="value">${formatIQD(summary.reduce((a,x)=>a+(x.totalAmount||0),0))} د.ع</div></div>
+                            <div class="report-summary-card"><div class="label">أجور التوصيل</div><div class="value">${formatIQD(summary.reduce((a,x)=>a+(x.totalDelivery||0),0))} د.ع</div></div>
                             <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ النهائي</div><div class="value">${formatIQD(grandTotal)} د.ع</div></div>
                             <div class="report-summary-card report-summary-card--primary"><div class="label">المبلغ المستحق</div><div class="value">${formatIQD(grandDue)} د.ع</div></div>
                         </div>
@@ -3287,7 +3350,7 @@ const screens = {
                             <table class="report-table report-table--compact">
                                 <thead><tr><th>اسم السائق</th><th>عدد الطلبات</th><th>عدد المرتجعات</th><th>إجمالي الفواتير</th><th>أجور التوصيل</th><th>المبلغ النهائي</th><th>المبلغ المستحق</th></tr></thead>
                                 <tbody>
-                                    ${report.summary.map(s => `
+                                    ${summary.map(s => `
                                         <tr>
                                             <td>${s.driverName}</td>
                                             <td>${s.count}</td>
@@ -3343,7 +3406,12 @@ const screens = {
                         </div>
                     </div>
                 `;
-                document.getElementById('companyReportActions').style.display = hasAnyOrders ? 'flex' : 'none';
+                actionsEl.style.display = hasAnyOrders ? 'flex' : 'none';
+                } catch (err) {
+                    currentCompanyReport = null;
+                    actionsEl.style.display = 'none';
+                    contentEl.innerHTML = `<div class="scan-feedback error">${escapeHtml(err?.message || 'فشل تحميل التقرير')}</div>`;
+                }
             });
 
             document.getElementById('btnPrintDriverReport').addEventListener('click', () => {
@@ -3413,7 +3481,7 @@ const screens = {
                 regions = await window.api.regions.getAll();
             } catch (_) {}
             const esc = (s) => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const initialTab = container.dataset.initialTab || 'regions';
+            const initialTab = getScreenInitialTab('regions');
             container.innerHTML = `
                 <div class="screen active settings-screen settings-screen--v4">
                     ${renderUxHero({
@@ -3828,12 +3896,15 @@ MOBILE_NAV_MQ.addEventListener('change', () => {
     applySidebarForViewport();
     const container = document.getElementById('screen-container');
     if (container?.dataset.currentScreen) {
-        updateDesktopChrome(container.dataset.currentScreen, container.dataset.initialTab || '');
+        const screenId = container.dataset.currentScreen;
+        const subTab = container.dataset.initialTab || '';
+        updateDesktopChrome(screenId, subTab);
+        updateMobileChrome(screenId, subTab);
     }
 });
 applySidebarForViewport();
 
-document.getElementById('btnRefreshScreen')?.addEventListener('click', () => {
+function refreshCurrentScreen() {
     const container = document.getElementById('screen-container');
     const screenId = container?.dataset.currentScreen;
     const subTab = container?.dataset.initialTab || '';
@@ -3842,7 +3913,10 @@ document.getElementById('btnRefreshScreen')?.addEventListener('click', () => {
     if (screenId === 'drivers') invalidateDriversCache();
     invalidateScreenCache(screenId);
     showScreen(screenId, subTab || undefined, { force: true });
-});
+}
+
+document.getElementById('btnRefreshScreen')?.addEventListener('click', refreshCurrentScreen);
+document.getElementById('btnRefreshMobile')?.addEventListener('click', refreshCurrentScreen);
 
 const MOBILE_SCREEN_TITLES = {
     dashboard: 'لوحة التحكم',
@@ -3899,9 +3973,17 @@ function updateDesktopChrome(screenId, subTab) {
     }
 }
 
-function updateMobileChrome(screenId) {
+function updateMobileChrome(screenId, subTab) {
+    const mainTitle = MOBILE_SCREEN_TITLES[screenId] || 'ديما الحياة';
+    const sub = subTab && DESKTOP_SCREEN_SUBTITLES[screenId]?.[subTab];
     const titleEl = document.getElementById('mobileTopbarTitle');
-    if (titleEl) titleEl.textContent = MOBILE_SCREEN_TITLES[screenId] || 'ديما الحياة';
+    const subtitleEl = document.getElementById('mobileTopbarSubtitle');
+    if (titleEl) titleEl.textContent = sub || mainTitle;
+    if (subtitleEl) {
+        subtitleEl.textContent = sub
+            ? `قسم ${mainTitle}`
+            : 'نظام التوصيل';
+    }
     document.querySelectorAll('.mobile-bottom-nav__item[data-screen]').forEach(el => {
         el.classList.toggle('active', el.dataset.screen === screenId);
     });

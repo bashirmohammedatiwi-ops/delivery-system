@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Pool } = require('pg');
-const { toPgParams, translateSqlForPostgres } = require('./sqlDialect');
+const { toPgParams, translateSqlForPostgres, PG_COLUMNS } = require('./sqlDialect');
 
 let pool = null;
 let db = null;
@@ -17,7 +17,7 @@ function runAsync(promise) {
     return result;
 }
 
-/** PG lowercases unquoted aliases — map back to keys the app expects */
+/** PG may return lowercase keys — map back to PascalCase / camelCase the app expects */
 const ALIAS_KEY_FIX = {
     totalorders: 'totalOrders',
     newcount: 'newCount',
@@ -26,18 +26,27 @@ const ALIAS_KEY_FIX = {
     todaycount: 'todayCount',
     todaykarkh: 'todayKarkh',
     todayrusafa: 'todayRusafa',
+    todayunprinted: 'todayUnprinted',
     countkarkh: 'countKarkh',
     countrusafa: 'countRusafa',
     returnedcount: 'returnedCount',
-    orderdate: 'orderDate',
-    createdbyname: 'CreatedByName'
+    orderdate: 'OrderDate',
+    createdbyname: 'CreatedByName',
+    labelprinted: 'LabelPrinted',
+    returnedorderreceived: 'ReturnedOrderReceived',
+    regionname: 'RegionName',
+    regionarea: 'RegionArea',
+    feescollected: 'FeesCollected'
 };
+
+const PG_COLUMN_KEY_FIX = Object.fromEntries(PG_COLUMNS.map((col) => [col.toLowerCase(), col]));
 
 function normalizeRow(row) {
     if (!row || typeof row !== 'object') return row;
     const out = { ...row };
     for (const [k, v] of Object.entries(row)) {
-        const fix = ALIAS_KEY_FIX[k.toLowerCase()];
+        const lower = k.toLowerCase();
+        const fix = ALIAS_KEY_FIX[lower] || PG_COLUMN_KEY_FIX[lower];
         if (fix && out[fix] === undefined) out[fix] = v;
     }
     return out;

@@ -644,6 +644,7 @@ class DriverUiKit {
     required String? value,
     Color? valueColor,
     VoidCallback? onTap,
+    bool multiline = false,
   }) {
     final content = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,7 +672,10 @@ class DriverUiKit {
                   fontWeight: FontWeight.w700,
                   color: valueColor ?? DriverTheme.onSurface,
                   decoration: onTap != null ? TextDecoration.underline : null,
+                  height: multiline ? 1.45 : null,
                 ),
+                maxLines: multiline ? null : 1,
+                overflow: multiline ? null : TextOverflow.ellipsis,
               ),
             ],
           ),

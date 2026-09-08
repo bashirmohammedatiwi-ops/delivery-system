@@ -77,5 +77,6 @@ function toPgParams(sql, params) {
 
 module.exports = {
     translateSqlForPostgres,
-    toPgParams
+    toPgParams,
+    PG_COLUMNS
 };
