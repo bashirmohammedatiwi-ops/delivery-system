@@ -16,10 +16,12 @@ function invalidateDriversCache() {
 
 function debounce(fn, ms) {
     let timer;
-    return (...args) => {
+    const wrapped = (...args) => {
         clearTimeout(timer);
         timer = setTimeout(() => fn(...args), ms);
     };
+    wrapped.cancel = () => clearTimeout(timer);
+    return wrapped;
 }
 
 let dashboardHomeCache = { data: null, ts: 0 };
@@ -861,16 +863,164 @@ async function renderOrdersScreen(container, opts = {}) {
         dateTo: opts.initialFilters?.dateTo || ''
     };
     let statusClickAttached = false;
+    let toolbarBound = false;
+    let fetchSeq = 0;
+    let composingSearch = false;
+    const $in = (sel) => container.querySelector(sel);
+
+    const readToolbar = () => {
+        const searchEl = $in('#search');
+        const driverEl = $in('#filterDriver');
+        const fromEl = $in('#dateFrom');
+        const toEl = $in('#dateTo');
+        if (searchEl) filters.search = searchEl.value;
+        if (driverEl) filters.driverId = driverEl.value;
+        if (fromEl) filters.dateFrom = fromEl.value;
+        if (toEl) filters.dateTo = toEl.value;
+    };
+
+    const listStats = (list) => ({
+        total: list.length,
+        New: list.filter(o => o.Status === 'New').length,
+        Assigned: list.filter(o => o.Status === 'AssignedToDriver').length,
+        Delivered: list.filter(o => o.Status === 'Delivered').length,
+        Returned: list.filter(o => isOrderReturned(o)).length
+    });
+
+    const buildOrdersTableRows = (list) => list.map(o => {
+        const notesRaw = (o.Notes || '').trim();
+        const notesTitle = notesRaw ? escapeHtml(notesRaw) : '';
+        const loc = (o.CustomerLocationLink || '').replace(/"/g, '&quot;');
+        return `
+                                        <tr data-order-id="${o.OrderID}" class="${isOrderReturned(o) ? 'order-returned' : ''}">
+                                            <td class="orders-cell-order">
+                                                <div class="orders-shipment-row">
+                                                    <span class="orders-shipment-num">${escapeHtml(o.ShipmentNumber)}</span>
+                                                    ${notesRaw ? `<span class="orders-note-dot" title="${notesTitle}" aria-label="توجد ملاحظات">📝</span>` : ''}
+                                                </div>
+                                                <div class="orders-order-meta">
+                                                    <span>#${o.OrderID}</span><span class="orders-meta-sep">·</span>
+                                                    <span>${escapeHtml(o.AdminOrderNo || '—')}</span><span class="orders-meta-sep">·</span>
+                                                    <span>${o.Pieces || 1} قطعة</span>
+                                                </div>
+                                                <span class="badge badge-${(o.Status || 'new').toLowerCase().replace('assignedtodriver','assigned').replace('delivered','delivered').replace('returned','returned')}">${STATUS_MAP[o.Status] || escapeHtml(o.Status || '') || '—'}</span>
+                                                ${isOrderReturned(o) && (o.ReturnReason || '').trim() ? `<div class="orders-return-reason" title="سبب الإرجاع (السائق)"><span class="orders-return-reason-label">سبب الرجوع:</span> ${escapeHtml((o.ReturnReason || '').trim())}</div>` : ''}
+                                            </td>
+                                            <td class="orders-cell-party">
+                                                <div class="orders-party-name">${escapeHtml(o.CustomerName || '—')}</div>
+                                                <div class="orders-party-phone">${escapeHtml(o.CustomerPhone || '—')}</div>
+                                                <div class="orders-party-store"><i class="bi bi-shop" aria-hidden="true"></i> ${escapeHtml(o.StoreName || '—')}</div>
+                                            </td>
+                                            <td class="col-address orders-cell-address" title="${escapeHtml(getFullAddress(o))}">
+                                                <span class="orders-address-text">${escapeHtml(getFullAddress(o))}</span>
+                                            </td>
+                                            <td class="orders-cell-link">
+                                                ${o.CustomerLocationLink ? `<a href="${loc}" target="_blank" rel="noopener noreferrer" class="orders-loc-pill" title="فتح رابط الموقع"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><span>فتح</span></a>` : '<span class="orders-loc-empty">—</span>'}
+                                            </td>
+                                            <td class="orders-cell-money">
+                                                <ul class="orders-money-list">
+                                                    <li><span>فاتورة</span><strong class="iqd">${formatIQD(o.AmountIQD)}</strong></li>
+                                                    <li><span>توصيل</span><strong class="iqd">${o.FreeDelivery ? 'مجاني' : formatIQD(o.DeliveryFeeIQD)}</strong></li>
+                                                    <li><span>نهائي</span><strong class="iqd iqd-total">${formatIQD(o.TotalIQD)}</strong></li>
+                                                    <li><span>مستحق</span><strong class="iqd">${formatIQD(getAmountDue(o))}</strong></li>
+                                                </ul>
+                                            </td>
+                                            <td class="orders-cell-ops">
+                                                <div class="orders-ops-line"><span class="orders-ops-k">سائق</span><span class="orders-ops-v">${escapeHtml(o.DriverName || '—')}</span></div>
+                                                <div class="orders-ops-line"><span class="orders-ops-k">أنشأه</span><span class="orders-ops-v">${escapeHtml((o.CreatedByName || '—').toString())}</span></div>
+                                                <div class="orders-ops-line"><span class="orders-ops-k">تاريخ</span><span class="orders-ops-v orders-ops-date">${escapeHtml((o.CreatedDate || '').slice(0, 16))}</span></div>
+                                                <div class="orders-ops-line"><span class="orders-ops-k">ملصق</span><span class="orders-ops-v"><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'} orders-badge-tiny">${o.LabelPrinted ? 'مطبوع' : 'لم يُطبع'}</span></span></div>
+                                            </td>
+                                            <td class="orders-cell-actions">
+                                                ${renderOrderActionsHtml(o)}
+                                            </td>
+                                        </tr>`;
+    }).join('');
+
+    const buildOrdersResultsInner = (list) => {
+        const hint = list.length >= ORDERS_LIST_LIMIT
+            ? `<p class="orders-limit-hint">يُعرض أحدث ${ORDERS_LIST_LIMIT} طلب — استخدم الفلاتر لتضييق النتائج</p>`
+            : '';
+        if (!list.length) {
+            return '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p class="orders-empty-title">لا توجد طلبات</p><p class="orders-empty-hint">جرّب تغيير البحث، التاريخ، أو حالة الطلب</p></div>';
+        }
+        const body = ORDERS_MOBILE_MQ.matches
+            ? `<div class="orders-mobile-list" id="ordersMobileList">${list.map(o => renderOrderCardHtml(o)).join('')}</div>`
+            : `<div class="orders-table-wrap">
+                            <table class="orders-table">
+                                <thead>
+                                    <tr>
+                                        <th class="orders-th-order">الطلب</th>
+                                        <th class="orders-th-party">المستلم والمتجر</th>
+                                        <th class="col-address orders-th-address">العنوان</th>
+                                        <th class="orders-th-link">موقع</th>
+                                        <th class="orders-th-money">المبالغ (د.ع)</th>
+                                        <th class="orders-th-ops">التشغيل</th>
+                                        <th class="orders-th-actions">إجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ordersTableBody">
+                                    ${buildOrdersTableRows(list)}
+                                </tbody>
+                            </table>
+                        </div>`;
+        return body + hint;
+    };
+
+    const paintOrdersMeta = (list) => {
+        const s = listStats(list);
+        const countEl = $in('#ordersCount');
+        if (countEl) countEl.textContent = `${s.total} طلب`;
+        const meta = $in('.orders-table-headbar-meta');
+        if (meta) meta.textContent = `${s.total} سجل`;
+        const exportBtn = $in('#btnExportOrdersPDF');
+        if (exportBtn) exportBtn.disabled = s.total === 0;
+        const pipeline = $in('#ordersPipelineHost');
+        if (pipeline) {
+            pipeline.innerHTML = renderUxPipeline([
+                { count: s.New, label: 'جديد', status: 'New', mod: 'ux-pipeline__step--new' },
+                { count: s.Assigned, label: 'مع السائق', status: 'AssignedToDriver', mod: 'ux-pipeline__step--driver' },
+                { count: s.Delivered, label: 'تم التوصيل', status: 'Delivered', mod: 'ux-pipeline__step--done' }
+            ]);
+        }
+        const stats = $in('#ordersStatsBar');
+        if (stats) {
+            stats.innerHTML = `
+                                <div class="orders-stat orders-stat--all"><span class="orders-stat-value">${s.total}</span><span class="orders-stat-label">في النتائج</span></div>
+                                <div class="orders-stat orders-stat--new"><span class="orders-stat-value">${s.New}</span><span class="orders-stat-label">جديد</span></div>
+                                <div class="orders-stat orders-stat--assigned"><span class="orders-stat-value">${s.Assigned}</span><span class="orders-stat-label">مع السائق</span></div>
+                                <div class="orders-stat orders-stat--done"><span class="orders-stat-value">${s.Delivered}</span><span class="orders-stat-label">تم التوصيل</span></div>
+                                <div class="orders-stat orders-stat--return"><span class="orders-stat-value">${s.Returned}</span><span class="orders-stat-label">راجع</span></div>`;
+        }
+        container.querySelectorAll('.orders-chip').forEach(chip => {
+            const on = (chip.dataset.status || '') === (filters.status || '');
+            chip.classList.toggle('active', on);
+            chip.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+    };
+
+    const paintOrdersResults = (list) => {
+        paintOrdersMeta(list);
+        const results = $in('#ordersResults');
+        if (results) results.innerHTML = buildOrdersResultsInner(list);
+    };
 
     const renderOrders = async () => {
+        const seq = ++fetchSeq;
         const [list, drivers] = await Promise.all([
             window.api.orders.getAll({ ...filters, limit: ORDERS_LIST_LIMIT }),
             getDriversCached()
         ]);
+        if (seq !== fetchSeq) return;
         const statNew = list.filter(o => o.Status === 'New').length;
         const statAssigned = list.filter(o => o.Status === 'AssignedToDriver').length;
         const statDelivered = list.filter(o => o.Status === 'Delivered').length;
         const statReturned = list.filter(o => isOrderReturned(o)).length;
+
+        if ($in('.orders-screen') && $in('#ordersResults')) {
+            paintOrdersResults(list);
+            return;
+        }
 
         container.innerHTML = `
             <div class="screen active orders-screen orders-screen--v4">
@@ -886,13 +1036,15 @@ async function renderOrdersScreen(container, opts = {}) {
                                 <p class="orders-subtitle">بحث، فلترة، وتعديل الطلبات — تصدير PDF للنتائج المعروضة</p>
                             </div>
                         </div>
+                        <div id="ordersPipelineHost">
                         ${renderUxPipeline([
                             { count: statNew, label: 'جديد', status: 'New', mod: 'ux-pipeline__step--new' },
                             { count: statAssigned, label: 'مع السائق', status: 'AssignedToDriver', mod: 'ux-pipeline__step--driver' },
                             { count: statDelivered, label: 'تم التوصيل', status: 'Delivered', mod: 'ux-pipeline__step--done' }
                         ])}
+                        </div>
                         <div class="orders-stats-scroll" role="status" aria-label="ملخص الحالات في النتائج">
-                            <div class="orders-stats-bar">
+                            <div class="orders-stats-bar" id="ordersStatsBar">
                                 <div class="orders-stat orders-stat--all"><span class="orders-stat-value">${list.length}</span><span class="orders-stat-label">في النتائج</span></div>
                                 <div class="orders-stat orders-stat--new"><span class="orders-stat-value">${statNew}</span><span class="orders-stat-label">جديد</span></div>
                                 <div class="orders-stat orders-stat--assigned"><span class="orders-stat-value">${statAssigned}</span><span class="orders-stat-label">مع السائق</span></div>
@@ -906,8 +1058,9 @@ async function renderOrdersScreen(container, opts = {}) {
                             <h2 class="orders-panel-heading" id="orders-search-heading"><i class="bi bi-search" aria-hidden="true"></i> بحث سريع</h2>
                             <div class="orders-search-wrap">
                                 <span class="orders-search-icon" aria-hidden="true"><i class="bi bi-search"></i></span>
-                                <input type="text" id="search" placeholder="رقم الطلب، رقم الشحنة، الهاتف، المتجر، المستلم…" class="orders-search-input" autocomplete="off" aria-label="بحث في الطلبات">
+                                <input type="search" id="search" placeholder="رقم الطلب، رقم الشحنة، الهاتف، المتجر، المستلم…" class="orders-search-input" autocomplete="off" spellcheck="false" inputmode="search" aria-label="بحث في الطلبات">
                             </div>
+                            <p class="orders-search-hint">اكتب رقم الفاتورة كاملاً — البحث يبدأ بعد التوقف عن الكتابة، أو اضغط Enter</p>
                         </section>
                         <section class="orders-panel orders-panel--filters" aria-label="فلترة الطلبات">
                             <div class="orders-toolbar-grid">
@@ -956,123 +1109,75 @@ async function renderOrdersScreen(container, opts = {}) {
                                 <span class="orders-table-headbar-meta">${list.length} سجل</span>
                             </div>
                         </div>
-                        ${list.length > 0 ? (ORDERS_MOBILE_MQ.matches
-                            ? `<div class="orders-mobile-list" id="ordersMobileList">${list.map(o => renderOrderCardHtml(o)).join('')}</div>`
-                            : `<div class="orders-table-wrap">
-                            <table class="orders-table">
-                                <thead>
-                                    <tr>
-                                        <th class="orders-th-order">الطلب</th>
-                                        <th class="orders-th-party">المستلم والمتجر</th>
-                                        <th class="col-address orders-th-address">العنوان</th>
-                                        <th class="orders-th-link">موقع</th>
-                                        <th class="orders-th-money">المبالغ (د.ع)</th>
-                                        <th class="orders-th-ops">التشغيل</th>
-                                        <th class="orders-th-actions">إجراءات</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ordersTableBody">
-                                    ${list.map(o => {
-                                        const notesRaw = (o.Notes || '').trim();
-                                        const notesTitle = notesRaw ? escapeHtml(notesRaw) : '';
-                                        const loc = (o.CustomerLocationLink || '').replace(/"/g, '&quot;');
-                                        return `
-                                        <tr data-order-id="${o.OrderID}" class="${isOrderReturned(o) ? 'order-returned' : ''}">
-                                            <td class="orders-cell-order">
-                                                <div class="orders-shipment-row">
-                                                    <span class="orders-shipment-num">${escapeHtml(o.ShipmentNumber)}</span>
-                                                    ${notesRaw ? `<span class="orders-note-dot" title="${notesTitle}" aria-label="توجد ملاحظات">📝</span>` : ''}
-                                                </div>
-                                                <div class="orders-order-meta">
-                                                    <span>#${o.OrderID}</span><span class="orders-meta-sep">·</span>
-                                                    <span>${escapeHtml(o.AdminOrderNo || '—')}</span><span class="orders-meta-sep">·</span>
-                                                    <span>${o.Pieces || 1} قطعة</span>
-                                                </div>
-                                                <span class="badge badge-${(o.Status || 'new').toLowerCase().replace('assignedtodriver','assigned').replace('delivered','delivered').replace('returned','returned')}">${STATUS_MAP[o.Status] || escapeHtml(o.Status || '') || '—'}</span>
-                                                ${isOrderReturned(o) && (o.ReturnReason || '').trim() ? `<div class="orders-return-reason" title="سبب الإرجاع (السائق)"><span class="orders-return-reason-label">سبب الرجوع:</span> ${escapeHtml((o.ReturnReason || '').trim())}</div>` : ''}
-                                            </td>
-                                            <td class="orders-cell-party">
-                                                <div class="orders-party-name">${escapeHtml(o.CustomerName || '—')}</div>
-                                                <div class="orders-party-phone">${escapeHtml(o.CustomerPhone || '—')}</div>
-                                                <div class="orders-party-store"><i class="bi bi-shop" aria-hidden="true"></i> ${escapeHtml(o.StoreName || '—')}</div>
-                                            </td>
-                                            <td class="col-address orders-cell-address" title="${escapeHtml(getFullAddress(o))}">
-                                                <span class="orders-address-text">${escapeHtml(getFullAddress(o))}</span>
-                                            </td>
-                                            <td class="orders-cell-link">
-                                                ${o.CustomerLocationLink ? `<a href="${loc}" target="_blank" rel="noopener noreferrer" class="orders-loc-pill" title="فتح رابط الموقع"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><span>فتح</span></a>` : '<span class="orders-loc-empty">—</span>'}
-                                            </td>
-                                            <td class="orders-cell-money">
-                                                <ul class="orders-money-list">
-                                                    <li><span>فاتورة</span><strong class="iqd">${formatIQD(o.AmountIQD)}</strong></li>
-                                                    <li><span>توصيل</span><strong class="iqd">${o.FreeDelivery ? 'مجاني' : formatIQD(o.DeliveryFeeIQD)}</strong></li>
-                                                    <li><span>نهائي</span><strong class="iqd iqd-total">${formatIQD(o.TotalIQD)}</strong></li>
-                                                    <li><span>مستحق</span><strong class="iqd">${formatIQD(getAmountDue(o))}</strong></li>
-                                                </ul>
-                                            </td>
-                                            <td class="orders-cell-ops">
-                                                <div class="orders-ops-line"><span class="orders-ops-k">سائق</span><span class="orders-ops-v">${escapeHtml(o.DriverName || '—')}</span></div>
-                                                <div class="orders-ops-line"><span class="orders-ops-k">أنشأه</span><span class="orders-ops-v">${escapeHtml((o.CreatedByName || '—').toString())}</span></div>
-                                                <div class="orders-ops-line"><span class="orders-ops-k">تاريخ</span><span class="orders-ops-v orders-ops-date">${escapeHtml((o.CreatedDate || '').slice(0, 16))}</span></div>
-                                                <div class="orders-ops-line"><span class="orders-ops-k">ملصق</span><span class="orders-ops-v"><span class="badge ${o.LabelPrinted ? 'badge-delivered' : 'badge-new'} orders-badge-tiny">${o.LabelPrinted ? 'مطبوع' : 'لم يُطبع'}</span></span></div>
-                                            </td>
-                                            <td class="orders-cell-actions">
-                                                ${renderOrderActionsHtml(o)}
-                                            </td>
-                                        </tr>`;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>`) : '<div class="orders-empty"><span class="orders-empty-icon">📋</span><p class="orders-empty-title">لا توجد طلبات</p><p class="orders-empty-hint">جرّب تغيير البحث، التاريخ، أو حالة الطلب</p></div>'}
-                        ${list.length >= ORDERS_LIST_LIMIT ? `<p class="orders-limit-hint">يُعرض أحدث ${ORDERS_LIST_LIMIT} طلب — استخدم الفلاتر لتضييق النتائج</p>` : ''}
+                        <div id="ordersResults">${buildOrdersResultsInner(list)}</div>
                     </div>
                 </div>
             </div>
         `;
 
-        document.getElementById('search').value = filters.search;
-        document.getElementById('filterDriver').value = filters.driverId;
-        document.getElementById('dateFrom').value = filters.dateFrom;
-        document.getElementById('dateTo').value = filters.dateTo;
+        const searchEl = $in('#search');
+        const driverEl = $in('#filterDriver');
+        const fromEl = $in('#dateFrom');
+        const toEl = $in('#dateTo');
+        if (searchEl && document.activeElement !== searchEl) searchEl.value = filters.search;
+        if (driverEl) driverEl.value = filters.driverId;
+        if (fromEl) fromEl.value = filters.dateFrom;
+        if (toEl) toEl.value = filters.dateTo;
 
-        container.querySelectorAll('.orders-chip').forEach(chip => {
-            chip.addEventListener('click', () => {
-                filters.status = chip.dataset.status || '';
-                renderOrders();
-            });
-        });
+        if (toolbarBound) return;
+        toolbarBound = true;
 
-        container.querySelectorAll('.ux-pipeline__step[data-status]').forEach(step => {
-            step.addEventListener('click', () => {
-                filters.status = step.dataset.status || '';
-                renderOrders();
-            });
-        });
-
-        const apply = () => {
-            filters.search = document.getElementById('search').value;
-            filters.driverId = document.getElementById('filterDriver').value;
-            filters.dateFrom = document.getElementById('dateFrom').value;
-            filters.dateTo = document.getElementById('dateTo').value;
+        const applyNow = () => {
+            readToolbar();
             renderOrders();
         };
+        const scheduleSearch = debounce(() => {
+            if (composingSearch) return;
+            applyNow();
+        }, 900);
 
-        document.getElementById('btnSearch').addEventListener('click', apply);
-        document.getElementById('search').addEventListener('keypress', e => { if (e.key === 'Enter') apply(); });
-        document.getElementById('search').addEventListener('input', debounce(apply, 350));
-        document.getElementById('btnClearFilters')?.addEventListener('click', () => {
+        searchEl?.addEventListener('compositionstart', () => { composingSearch = true; });
+        searchEl?.addEventListener('compositionend', () => {
+            composingSearch = false;
+            scheduleSearch();
+        });
+        searchEl?.addEventListener('input', () => {
+            if (composingSearch) return;
+            filters.search = searchEl.value;
+            scheduleSearch();
+        });
+        searchEl?.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter') return;
+            e.preventDefault();
+            scheduleSearch.cancel();
+            applyNow();
+        });
+        $in('#btnSearch')?.addEventListener('click', () => {
+            scheduleSearch.cancel();
+            applyNow();
+        });
+        $in('#filterDriver')?.addEventListener('change', applyNow);
+        $in('#dateFrom')?.addEventListener('change', applyNow);
+        $in('#dateTo')?.addEventListener('change', applyNow);
+        $in('#btnClearFilters')?.addEventListener('click', () => {
+            scheduleSearch.cancel();
             filters.search = '';
             filters.driverId = '';
             filters.status = '';
             filters.dateFrom = '';
             filters.dateTo = '';
+            if (searchEl) searchEl.value = '';
+            if (driverEl) driverEl.value = '';
+            if (fromEl) fromEl.value = '';
+            if (toEl) toEl.value = '';
             renderOrders();
         });
 
-        document.getElementById('btnExportOrdersPDF')?.addEventListener('click', async () => {
-            const btn = document.getElementById('btnExportOrdersPDF');
+        $in('#btnExportOrdersPDF')?.addEventListener('click', async () => {
+            const btn = $in('#btnExportOrdersPDF');
             if (!btn || btn.disabled) return;
-            const driverSelect = document.getElementById('filterDriver');
+            readToolbar();
+            const driverSelect = $in('#filterDriver');
             const driverName = driverSelect?.selectedOptions?.[0]?.textContent?.trim() || '';
             const exportFilters = {
                 search: filters.search,
@@ -1090,7 +1195,8 @@ async function renderOrdersScreen(container, opts = {}) {
             } catch (err) {
                 await showMsg('فشل التصدير: ' + (err?.message || err));
             } finally {
-                btn.disabled = list.length === 0;
+                const countText = $in('#ordersCount')?.textContent || '';
+                btn.disabled = countText.startsWith('0');
                 btn.innerHTML = prevHtml;
             }
         });
@@ -1098,67 +1204,92 @@ async function renderOrdersScreen(container, opts = {}) {
         if (!statusClickAttached) {
             statusClickAttached = true;
             container.addEventListener('click', async (e) => {
-                const btn = e.target.closest('.btn-status-sm');
-                if (!btn) return;
-                const id = parseInt(btn.dataset.orderId || btn.closest('[data-order-id]')?.dataset?.orderId, 10);
-                const status = (btn.dataset.status || '').trim();
-                if (!id || isNaN(id)) {
-                    await showMsg('خطأ: رقم الطلب غير صالح');
+                const chip = e.target.closest('.orders-chip');
+                if (chip && container.contains(chip)) {
+                    filters.status = chip.dataset.status || '';
+                    container.querySelectorAll('.orders-chip').forEach(c => {
+                        const on = (c.dataset.status || '') === (filters.status || '');
+                        c.classList.toggle('active', on);
+                        c.setAttribute('aria-selected', on ? 'true' : 'false');
+                    });
+                    await renderOrders();
                     return;
                 }
-                if (status === 'Returned' && !(await window.api.showConfirm('هل أنت متأكد من جعل هذا الطلب راجع؟'))) return;
-                try {
-                    await window.api.orders.updateStatus(id, status);
-                    invalidateDashboardCache();
-                    invalidateScreenCache('orders');
+                const step = e.target.closest('.ux-pipeline__step[data-status]');
+                if (step && container.contains(step)) {
+                    e.preventDefault();
+                    filters.status = step.dataset.status || '';
+                    container.querySelectorAll('.orders-chip').forEach(c => {
+                        const on = (c.dataset.status || '') === (filters.status || '');
+                        c.classList.toggle('active', on);
+                        c.setAttribute('aria-selected', on ? 'true' : 'false');
+                    });
                     await renderOrders();
-                } catch (err) {
-                    await showMsg('خطأ: ' + (err.message || String(err)));
+                    return;
+                }
+                const statusBtn = e.target.closest('.btn-status-sm');
+                if (statusBtn) {
+                    const id = parseInt(statusBtn.dataset.orderId || statusBtn.closest('[data-order-id]')?.dataset?.orderId, 10);
+                    const status = (statusBtn.dataset.status || '').trim();
+                    if (!id || isNaN(id)) {
+                        await showMsg('خطأ: رقم الطلب غير صالح');
+                        return;
+                    }
+                    if (status === 'Returned' && !(await window.api.showConfirm('هل أنت متأكد من جعل هذا الطلب راجع؟'))) return;
+                    try {
+                        await window.api.orders.updateStatus(id, status);
+                        invalidateDashboardCache();
+                        invalidateScreenCache('orders');
+                        await renderOrders();
+                    } catch (err) {
+                        await showMsg('خطأ: ' + (err.message || String(err)));
+                    }
+                    return;
+                }
+                const printBtn = e.target.closest('.btn-print-order');
+                if (printBtn) {
+                    const id = parseInt(printBtn.dataset.orderId, 10);
+                    try {
+                        const order = await window.api.orders.getById(id);
+                        if (!order) { await showMsg('الطلب غير موجود'); return; }
+                        const path = await window.api.orders.print(order);
+                        const w = window.open(path, 'printLabel', 'width=800,height=700,scrollbars=yes,resizable=yes');
+                        if (w) { w.onload = () => { try { w.focus(); w.print(); } catch (err) {} }; }
+                        await window.api.orders.markLabelPrinted(order.OrderID).catch(() => {});
+                        await renderOrders();
+                    } catch (err) {
+                        await showMsg('خطأ في الطباعة: ' + (err.message || err));
+                    }
+                    return;
+                }
+                const editBtn = e.target.closest('.btn-edit');
+                if (editBtn) {
+                    const id = parseInt(editBtn.dataset.orderId, 10);
+                    const order = await window.api.orders.getById(id);
+                    if (!order) { await showMsg('الطلب غير موجود'); return; }
+                    showEditOrderModal(container, order, renderOrders);
+                    return;
+                }
+                const deleteBtn = e.target.closest('.btn-delete');
+                if (deleteBtn) {
+                    if (!(await window.api.showConfirm('هل أنت متأكد من حذف هذا الطلب؟ لا يمكن التراجع عن الحذف.'))) return;
+                    const id = parseInt(deleteBtn.dataset.orderId, 10);
+                    const result = await window.api.orders.delete(id);
+                    if (result.success) {
+                        await renderOrders();
+                    } else {
+                        await showMsg(result.error || 'فشل الحذف');
+                    }
                 }
             });
         }
-
-        container.querySelectorAll('.btn-print-order').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = parseInt(btn.dataset.orderId);
-                try {
-                    const order = await window.api.orders.getById(id);
-                    if (!order) { await showMsg('الطلب غير موجود'); return; }
-                    const path = await window.api.orders.print(order);
-                    const w = window.open(path, 'printLabel', 'width=800,height=700,scrollbars=yes,resizable=yes');
-                    if (w) { w.onload = () => { try { w.focus(); w.print(); } catch (e) {} }; }
-                    await window.api.orders.markLabelPrinted(order.OrderID).catch(() => {});
-                    await renderOrders();
-                } catch (err) {
-                    await showMsg('خطأ في الطباعة: ' + (err.message || err));
-                }
-            });
-        });
-
-        container.querySelectorAll('.btn-edit').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = parseInt(btn.dataset.orderId);
-                const order = await window.api.orders.getById(id);
-                if (!order) { await showMsg('الطلب غير موجود'); return; }
-                showEditOrderModal(container, order, renderOrders);
-            });
-        });
-
-        container.querySelectorAll('.btn-delete').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                if (!(await window.api.showConfirm('هل أنت متأكد من حذف هذا الطلب؟ لا يمكن التراجع عن الحذف.'))) return;
-                const id = parseInt(btn.dataset.orderId);
-                const result = await window.api.orders.delete(id);
-                if (result.success) {
-                    await renderOrders();
-                } else {
-                    await showMsg(result.error || 'فشل الحذف');
-                }
-            });
-        });
     };
 
     await renderOrders();
+    ORDERS_MOBILE_MQ.addEventListener('change', () => {
+        if (!container.isConnected || !$in('#ordersResults')) return;
+        renderOrders();
+    });
 }
 
 // ─── نوافذة إنشاء حساب أو تغيير كلمة السر (بدون توليد تلقائي) ───

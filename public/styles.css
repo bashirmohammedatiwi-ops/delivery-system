@@ -1302,6 +1302,14 @@ body {
     box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.14);
 }
 
+.orders-search-hint {
+    margin: 8px 2px 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
 .orders-btn-apply {
     font-weight: 700;
     padding: 11px 20px;
